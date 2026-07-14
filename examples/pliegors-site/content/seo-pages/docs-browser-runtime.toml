@@ -1,0 +1,5 @@
+key = "docs-browser-runtime"
+title = { en = "PliegoRS Browser Runtime | Rust WASM, GSAP, Lenis and WebGL", es = "Runtime de navegador PliegoRS | Rust WASM, GSAP, Lenis y WebGL" }
+description = { en = "Resume Rust/WASM behavior and use GSAP, Lenis, Three.js, or WebGL through lazy, policy-aware lifecycle adapters.", es = "Reanuda comportamiento Rust/WASM y usa GSAP, Lenis, Three.js o WebGL mediante adapters lazy y conscientes de policy." }
+image = "/media/pliegors/fold-hero.webp"
+imageAlt = { en = "The PliegoRS execution fold representing browser lifecycle boundaries", es = "El pliegue de ejecución de PliegoRS que representa límites del lifecycle en navegador" }

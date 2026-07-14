@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PliegoRS · M4 — full stack: log → fold → view</title>
+<!-- wasm-opt off: the downloaded optimizer trips Windows AppControl on this
+     machine; size discipline returns in CI (docs/00 §5). -->
+<link data-trunk rel="rust" data-wasm-opt="0" />
+<style>
+  :root {
+    --bg: #12140f; --panel: #1b1e17; --ink: #e8ead9; --muted: #8a8f7c;
+    --accent: #7fd68a; --line: #2c3026; --danger: #d67f7f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+    display: grid; place-items: start center; min-height: 100vh; padding: 3rem 1rem;
+  }
+  main { width: min(680px, 100%); }
+  h1 { font-size: 1.15rem; font-weight: 600; margin: 0 0 .25rem; }
+  h1 .fold { color: var(--accent); }
+  p.sub { color: var(--muted); margin: 0 0 1.5rem; font-size: .85rem; }
+  .row { display: flex; gap: .5rem; margin-bottom: 1rem; }
+  input[type=text] {
+    flex: 1; background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+    padding: .55rem .75rem; border-radius: 6px; font: inherit;
+  }
+  button {
+    background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+    padding: .5rem .9rem; border-radius: 6px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  ul#tasks { list-style: none; padding: 0; margin: 0 0 1.25rem; display: grid; gap: .4rem; }
+  ul#tasks li {
+    display: flex; align-items: center; gap: .6rem; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 6px; padding: .45rem .6rem;
+  }
+  ul#tasks li .text { flex: 1; }
+  ul#tasks li.done .text { text-decoration: line-through; color: var(--muted); }
+  ul#tasks li button { padding: .15rem .5rem; }
+  ul#tasks li button[data-action=remove]:hover { border-color: var(--danger); color: var(--danger); }
+  code.prov { color: var(--muted); font-size: .72rem; }
+  .travel { display: grid; gap: .35rem; margin-bottom: 1rem; }
+  .travel label { color: var(--muted); font-size: .8rem; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  #status { color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); padding-top: .75rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PliegoRS · M4 — full stack: log → <span class="fold">fold</span> → view</h1>
+  <p class="sub">This page is built entirely BY the framework: ReactiveLog + incremental
+  Fold + surgical views. Every click appends a hash-chained event; the views that read
+  the fold wake themselves; the slider replays a prefix (undo = a cursor); each item
+  shows the event that created it (provenance).</p>
+
+  <div id="app"></div>
+</main>
+</body>
+</html>

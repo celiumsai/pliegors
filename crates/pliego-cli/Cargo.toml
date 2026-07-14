@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Unified PliegoRS build, dev, and inspect workflow."
+publish.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "pliego"
+path = "src/main.rs"
+
+[dependencies]
+pliego-starters = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tiny_http = { workspace = true }
+toml = { workspace = true }

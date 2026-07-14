@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">PliegoRS</title>
+  <rect width="64" height="64" rx="5" fill="#111411"/>
+  <path d="M27 8h29v20H40v8H8v20h32" fill="none" stroke="#f4f3ec" stroke-width="10"/>
+  <rect x="52" y="52" width="8" height="8" fill="#d7472f"/>
+</svg>

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-fold"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "THE PliegoRS primitive: the incremental fold as a first-class reactive node — a memo with an accumulator and a cursor into the append-only log."
+publish.workspace = true
+
+[dependencies]
+pliego-log = { workspace = true }
+pliego-reactive = { workspace = true }

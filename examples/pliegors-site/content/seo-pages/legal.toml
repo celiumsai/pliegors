@@ -1,0 +1,5 @@
+key = "legal"
+title = { en = "PliegoRS Legal Register | Current Website Policies", es = "Registro legal de PliegoRS | Políticas actuales del sitio" }
+description = { en = "Current terms, privacy, cookies, and acceptable-use policies for the PliegoRS website and private pre-release program.", es = "Términos, privacidad, cookies y uso aceptable actuales para el sitio de PliegoRS y el programa privado previo al release." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "A folded interface document representing the PliegoRS legal register", es = "Un documento de interfaz plegado que representa el registro legal de PliegoRS" }

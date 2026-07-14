@@ -1,0 +1,10 @@
+{
+  "baselineVersion": "2026-07-14-public-rc",
+  "measurementPlan": "phase-1/measurement-plan.json",
+  "targets": [
+    {
+      "id": "pliegors-site",
+      "manifest": "manifests/pliegors-site.asset-manifest.json"
+    }
+  ]
+}

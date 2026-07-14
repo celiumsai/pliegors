@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#e8ebe7" />
+    <title>Route Lab | PLIEGO</title>
+    <link rel="stylesheet" href="/_pliego/styles.css" />
+    <script type="module" src="/_pliego/app.js"></script>
+  </head>
+  <body>
+    <header class="lab-header">
+      <a class="brand" href="/_pliego/" aria-label="PLIEGO Route Lab">
+        <img src="/_pliego/pliego-mark.svg" alt="" />
+        <span>PLIEGO</span>
+      </a>
+      <nav aria-label="Measurement tools">
+        <a id="device-lab-link" href="#">Device fingerprint</a>
+        <span aria-current="page">Route run</span>
+      </nav>
+    </header>
+
+    <main>
+      <section class="run-register" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Route Lab 02 / Physical evidence</p>
+          <h1 id="page-title">One route. One device. One receipt.</h1>
+          <p id="source-revision" class="revision">Loading the Phase 1 contract.</p>
+        </div>
+        <div class="counter" aria-live="polite">
+          <span>Inbox runs</span>
+          <strong id="run-count">--</strong>
+          <small>review required</small>
+        </div>
+      </section>
+
+      <section class="control-surface" aria-labelledby="setup-title">
+        <div class="surface-heading">
+          <p class="eyebrow">Run setup</p>
+          <h2 id="setup-title">Bind the evidence row</h2>
+          <p id="setup-status" role="status">Reading devices, routes, and accepted fingerprints.</p>
+        </div>
+
+        <form id="run-form">
+          <label>
+            <span>Physical device</span>
+            <select id="device-id" name="deviceId" required></select>
+          </label>
+          <label>
+            <span>Accepted fingerprint</span>
+            <select id="hardware-fingerprint" name="hardwareFingerprint" required></select>
+          </label>
+          <label>
+            <span>Target</span>
+            <select id="target-id" name="targetId" required></select>
+          </label>
+          <label>
+            <span>Canonical route</span>
+            <select id="route" name="route" required></select>
+          </label>
+          <label>
+            <span>Performance tier</span>
+            <select id="tier" name="tier" required></select>
+          </label>
+          <label>
+            <span>Orientation</span>
+            <select id="orientation" name="orientation" required>
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </label>
+          <fieldset>
+            <legend>Cache</legend>
+            <label><input type="radio" name="cacheMode" value="cold" checked /> Cold</label>
+            <label><input type="radio" name="cacheMode" value="warm" /> Warm</label>
+          </fieldset>
+          <fieldset>
+            <legend>Motion</legend>
+            <label><input type="radio" name="motionMode" value="default" checked /> Default</label>
+            <label><input type="radio" name="motionMode" value="reduced" /> Reduced</label>
+          </fieldset>
+          <label>
+            <span>Power state</span>
+            <select id="power-state" name="powerState" required>
+              <option value="battery-over-50">Battery over 50%</option>
+              <option value="external-power">External power</option>
+              <option value="unknown">Not attested</option>
+            </select>
+          </label>
+          <label>
+            <span>Thermal state</span>
+            <select id="thermal-state" name="thermalState" required>
+              <option value="nominal">Nominal</option>
+              <option value="unknown">Unknown</option>
+              <option value="throttled">Throttled</option>
+            </select>
+          </label>
+          <label class="network-field">
+            <span>Network profile / plan locked</span>
+            <input id="network-profile" name="networkProfile" required readonly />
+          </label>
+          <button id="start-run" type="submit" disabled>
+            <span aria-hidden="true">START</span>
+            Open instrumented route
+          </button>
+        </form>
+      </section>
+
+      <section class="bound-row" aria-labelledby="bound-title">
+        <div>
+          <p class="eyebrow">Bound row</p>
+          <h2 id="bound-title">No route selected</h2>
+        </div>
+        <dl>
+          <div><dt>Renderer</dt><dd id="renderer-value">Pending</dd></div>
+          <div><dt>Upstream</dt><dd id="endpoint-value">Pending</dd></div>
+          <div><dt>Capture</dt><dd id="capture-value">Pending</dd></div>
+        </dl>
+      </section>
+    </main>
+
+    <footer>
+      <p>PLIEGO / Route Lab / Phase 1</p>
+      <p>Raw runs enter review. They are not accepted automatically.</p>
+    </footer>
+  </body>
+</html>

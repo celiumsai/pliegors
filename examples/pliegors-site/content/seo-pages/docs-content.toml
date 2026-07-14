@@ -1,0 +1,5 @@
+key = "docs-content"
+title = { en = "Typed Content in PliegoRS | Bounded Markdown, JSON and TOML", es = "Contenido tipado en PliegoRS | Markdown, JSON y TOML limitados" }
+description = { en = "Load typed, bounded, and diagnosable content collections with stable source identities in PliegoRS.", es = "Carga colecciones de contenido tipadas, limitadas y diagnosticables con identidades de fuente estables en PliegoRS." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "A PliegoRS material fold representing bounded typed content", es = "Un pliegue material de PliegoRS que representa contenido tipado y limitado" }

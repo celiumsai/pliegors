@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.trace-metrics.schema.json",
+  "title": "PLIEGO trace-derived physical metrics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metricsVersion",
+    "extractorVersion",
+    "sourceTraceSha256",
+    "runs"
+  ],
+  "properties": {
+    "metricsVersion": {
+      "const": "1.0.0"
+    },
+    "extractorVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceTraceSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/runMetrics"
+      }
+    }
+  },
+  "$defs": {
+    "durationSamples": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20000,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "runMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionId",
+        "decodeDurationsMs",
+        "mainThreadTaskDurationsMs"
+      ],
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{24}$"
+        },
+        "decodeDurationsMs": {
+          "$ref": "#/$defs/durationSamples"
+        },
+        "mainThreadTaskDurationsMs": {
+          "$ref": "#/$defs/durationSamples"
+        }
+      }
+    }
+  }
+}

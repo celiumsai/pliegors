@@ -1,0 +1,405 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.measurement-plan.schema.json",
+  "title": "PLIEGO measurement plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "planVersion",
+    "policy",
+    "devices",
+    "targets",
+    "metrics",
+    "budgets"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planVersion": {
+      "const": "1.0.0"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "devices": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/$defs/device"
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/metric"
+      }
+    },
+    "budgets": {
+      "$ref": "#/$defs/budgets"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "universal",
+        "lite",
+        "balanced",
+        "signature"
+      ]
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "warmupRuns",
+        "measuredRuns",
+        "aggregation",
+        "cacheModes",
+        "thermalRule",
+        "powerRule",
+        "motionRule"
+      ],
+      "properties": {
+        "warmupRuns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measuredRuns": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "aggregation": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "median",
+              "p75",
+              "p95"
+            ]
+          }
+        },
+        "cacheModes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "cold",
+              "warm"
+            ]
+          }
+        },
+        "thermalRule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "powerRule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "motionRule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "required",
+        "status",
+        "evidence",
+        "referenceClass",
+        "actualFingerprint",
+        "browsers",
+        "viewport",
+        "tiers",
+        "networkProfile",
+        "notes"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "modest-android",
+            "ipad-safari",
+            "integrated-gpu-laptop",
+            "capable-desktop",
+            "engineering-reference"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "pending-verification",
+            "ready"
+          ]
+        },
+        "evidence": {
+          "const": "physical-device"
+        },
+        "referenceClass": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actualFingerprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "browsers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/browser"
+          }
+        },
+        "viewport": {
+          "$ref": "#/$defs/viewport"
+        },
+        "tiers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/tier"
+          }
+        },
+        "networkProfile": {
+          "$ref": "#/$defs/identifier"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "browser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "engine",
+        "channel"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine": {
+          "type": "string",
+          "enum": [
+            "blink",
+            "webkit"
+          ]
+        },
+        "channel": {
+          "const": "stable"
+        }
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "orientation"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "native"
+          ]
+        },
+        "orientation": {
+          "type": "string",
+          "enum": [
+            "portrait",
+            "landscape"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 240
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 320
+        },
+        "deviceScaleFactor": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "additionalOrientations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "portrait",
+              "landscape"
+            ]
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "baseUrlEnvironment",
+        "localDefault",
+        "routes"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "baseUrlEnvironment": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]+$"
+        },
+        "localDefault": {
+          "type": "string",
+          "pattern": "^http://"
+        },
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^/"
+          }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "unit",
+        "collector",
+        "aggregation"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "bytes",
+            "milliseconds",
+            "count",
+            "ratio"
+          ]
+        },
+        "collector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aggregation": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "median",
+            "p75",
+            "p95"
+          ]
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "universalFirstViewportTransferBytes",
+        "capabilityBootstrapBrotliBytes",
+        "tier0ThreeRuntimeBytes",
+        "interactiveIslandBrotliBytes",
+        "liteDeferredSceneBytes",
+        "liteEstimatedVramBytes",
+        "liteFrameP95Ms",
+        "lcpP75Ms",
+        "inpP75Ms",
+        "clsP75"
+      ],
+      "properties": {
+        "universalFirstViewportTransferBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capabilityBootstrapBrotliBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tier0ThreeRuntimeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interactiveIslandBrotliBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "liteDeferredSceneBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "liteEstimatedVramBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "liteFrameP95Ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lcpP75Ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "inpP75Ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "clsP75": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

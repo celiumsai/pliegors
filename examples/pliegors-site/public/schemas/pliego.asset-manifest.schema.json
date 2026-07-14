@@ -1,0 +1,501 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.asset-manifest.schema.json",
+  "title": "PLIEGO asset manifest",
+  "description": "Deterministic inventory of a PliegoRS project and its distributable assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifestVersion",
+    "work",
+    "coverage",
+    "assets",
+    "budgetScopes"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manifestVersion": {
+      "const": "1.0.0"
+    },
+    "work": {
+      "$ref": "#/$defs/work"
+    },
+    "coverage": {
+      "$ref": "#/$defs/coverage"
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/asset"
+      }
+    },
+    "budgetScopes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/budgetScope"
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "universal",
+        "lite",
+        "balanced",
+        "signature"
+      ]
+    },
+    "work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "slug",
+        "title",
+        "owner"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "house",
+            "pliego"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "slug": {
+          "$ref": "#/$defs/identifier"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "signatura": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetRoot",
+        "trackedExtensions",
+        "excluded"
+      ],
+      "properties": {
+        "assetRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trackedExtensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^\\.[a-z0-9]+$"
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exclusion"
+          }
+        }
+      }
+    },
+    "exclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "reason"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "owner",
+        "source",
+        "rights",
+        "visualImportance",
+        "variants"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "owner": {
+          "$ref": "#/$defs/owner"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "rights": {
+          "$ref": "#/$defs/rights"
+        },
+        "visualImportance": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "supporting",
+            "decorative",
+            "utility"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/variant"
+          }
+        }
+      }
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity",
+        "role"
+      ],
+      "properties": {
+        "entity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "house",
+            "author",
+            "client",
+            "third-party"
+          ]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "locator"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "generated",
+            "commissioned",
+            "owned",
+            "licensed",
+            "system"
+          ]
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "generator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "createdFor": {
+          "$ref": "#/$defs/identifier"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "holder",
+        "transfer"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "owned",
+            "licensed",
+            "public-domain",
+            "system"
+          ]
+        },
+        "holder": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "transfer": {
+          "type": "string",
+          "enum": [
+            "included",
+            "excluded",
+            "conditional"
+          ]
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "mediaType",
+        "format",
+        "sha256",
+        "bytes",
+        "tiers",
+        "delivery",
+        "preload"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "mediaType": {
+          "type": "string",
+          "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$"
+        },
+        "format": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tiers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/tier"
+          }
+        },
+        "delivery": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "deferred",
+            "on-demand",
+            "download"
+          ]
+        },
+        "preload": {
+          "type": "boolean"
+        },
+        "dimensions": {
+          "$ref": "#/$defs/dimensions"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimatedVramBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "geometry": {
+          "$ref": "#/$defs/geometry"
+        },
+        "fallbackFor": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "triangles",
+        "drawCalls"
+      ],
+      "properties": {
+        "triangles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "drawCalls": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "budgetScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "route",
+        "tier",
+        "phase",
+        "variants",
+        "limits"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "tier": {
+          "$ref": "#/$defs/tier"
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "initial",
+            "deferred",
+            "on-demand"
+          ]
+        },
+        "variants": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "limits": {
+          "$ref": "#/$defs/assetLimits"
+        }
+      }
+    },
+    "assetLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "maxTransferBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxEstimatedVramBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxTriangles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxDrawCalls": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+origin = "https://pliegors.dev"
+siteName = "PliegoRS"
+legalName = "Celiums Solutions LLC"
+logo = "/icon-512.png"
+logoWidth = 512
+logoHeight = 512
+location = "Medellín, Colombia"
+defaultImage = "/media/pliegors/fold-hero.webp"
+contactEmail = "hello@pliegors.dev"
+organizationDescription = { en = "Creator of PliegoRS, a Rust-native framework for verifiable, replayable, durable web software.", es = "Creador de PliegoRS, un framework nativo en Rust para software web verificable, reproducible y durable." }
+websiteDescription = { en = "Official PliegoRS documentation, architecture, evidence, security guidance, and release information.", es = "Documentación oficial, arquitectura, evidencia, seguridad e información de releases de PliegoRS." }
+
+criticalAssets = [
+  "/favicon.svg",
+  "/icon-512.png",
+  "/media/pliegors/fold-hero.avif",
+  "/media/pliegors/fold-hero.webp",
+  "/media/pliegors/fold-portrait.avif",
+  "/media/pliegors/ledger-wide.webp",
+  "/robots.txt",
+  "/site.webmanifest",
+]

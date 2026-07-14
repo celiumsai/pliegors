@@ -1,0 +1,5 @@
+key = "docs-project-structure"
+title = { en = "PliegoRS Project Structure | Manifest, Site, WASM and Output", es = "Estructura de proyectos PliegoRS | Manifest, sitio, WASM y salida" }
+description = { en = "Understand pliego.toml, native site packages, optional Rust/WASM clients, public assets, and deterministic output ownership.", es = "Entiende pliego.toml, paquetes nativos de sitio, clientes Rust/WASM opcionales, assets públicos y propiedad determinista de la salida." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A material ledger representing the PliegoRS project structure", es = "Un ledger material que representa la estructura de un proyecto PliegoRS" }

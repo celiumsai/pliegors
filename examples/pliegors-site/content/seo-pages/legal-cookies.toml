@@ -1,0 +1,5 @@
+key = "legal-cookies"
+title = { en = "PliegoRS Cookies | Local Preferences Only", es = "Cookies de PliegoRS | Sólo preferencias locales" }
+description = { en = "The current PliegoRS website uses no advertising or cross-site tracking cookies and stores only an appearance preference locally.", es = "El sitio actual de PliegoRS no usa cookies publicitarias ni de rastreo y sólo guarda localmente una preferencia de apariencia." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "PliegoRS local preference document", es = "Documento de preferencias locales de PliegoRS" }

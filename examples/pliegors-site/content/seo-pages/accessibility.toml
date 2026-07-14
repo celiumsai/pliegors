@@ -1,0 +1,5 @@
+key = "accessibility"
+title = { en = "PliegoRS Accessibility | Progressive by Contract", es = "Accesibilidad de PliegoRS | Progresivo por contrato" }
+description = { en = "Accessibility principles for useful HTML first, keyboard operation, stable focus, reduced motion, adaptive media, and progressive enhancement.", es = "Principios de accesibilidad para HTML útil, teclado, foco estable, movimiento reducido, medios adaptativos y mejora progresiva." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "A complete folded PliegoRS artifact representing preserved meaning across modes", es = "Un artefacto PliegoRS plegado y completo que representa significado preservado entre modos" }

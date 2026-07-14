@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://pliegors.dev/security/
+    about: Report vulnerabilities privately using the security policy.
+  - name: Documentation
+    url: https://pliegors.dev/docs/
+    about: Read the framework guides before opening an issue.

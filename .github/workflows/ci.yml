@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  WASM_BINDGEN_CLI_VERSION: 0.2.126
+  # Published digest for the official x86_64-unknown-linux-musl release asset.
+  WASM_BINDGEN_CLI_SHA256: 064948d58e2d6c0a745216477a639ba696216d6309aaa902939d1b865b1d869d
+
+jobs:
+  quality:
+    name: Format, lint, test, and WASM check
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: >-
+          rustup toolchain install 1.85.0
+          --profile minimal
+          --component clippy
+          --component rustfmt
+          --target wasm32-unknown-unknown
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install measurement tooling
+        run: npm ci
+
+      - name: Install email Worker tooling
+        run: npm ci --prefix workers/pliegors-email
+
+      - name: Validate email Worker
+        run: npm run check:email-worker
+
+      - name: Audit Node dependencies
+        run: |
+          npm audit --audit-level=high
+          npm audit --prefix workers/pliegors-email --audit-level=high
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint all targets
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Test workspace
+        run: cargo test --workspace --all-targets --locked
+
+      - name: Audit Rust dependencies
+        run: |
+          cargo install cargo-audit --version 0.22.1 --locked
+          cargo audit
+
+      - name: Check Rust documentation
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+
+      - name: Verify source crate packages
+        run: |
+          cargo package -p pliego-content --locked
+          cargo package -p pliego-starters --locked
+
+      - name: Lint WASM target
+        run: >-
+          cargo clippy --target wasm32-unknown-unknown
+          -p pliegors-site-client
+          -p spike
+          --locked
+          -- -D warnings
+
+      - name: Check documentation links
+        run: npm run check:docs
+
+      - name: Validate official starters through the release CLI
+        shell: bash
+        run: |
+          cargo build -p pliego-cli --locked
+          for template in minimal editorial cinematic; do
+            project="$GITHUB_WORKSPACE/target/ci-starter-$template"
+            "$GITHUB_WORKSPACE/target/debug/pliego" new "$project" \
+              --template "$template" \
+              --name "CI $template" \
+              --framework-path "$GITHUB_WORKSPACE"
+            (
+              cd "$project"
+              CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/starter-cargo" \
+                "$GITHUB_WORKSPACE/target/debug/pliego" check
+              CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/starter-cargo" \
+                "$GITHUB_WORKSPACE/target/debug/pliego" build
+            )
+          done
+          node scripts/check-starter-builds.mjs \
+            target/ci-starter-minimal \
+            target/ci-starter-editorial \
+            target/ci-starter-cinematic
+
+      - name: Validate typed content reference
+        shell: bash
+        run: |
+          output="examples/content-collections-pliegors/target/site"
+          cargo run -p content-collections-pliegors --locked -- "$output"
+          first="$(sha256sum "$output/pliego.build.json" | cut -d ' ' -f 1)"
+          cargo run -p content-collections-pliegors --locked -- "$output"
+          second="$(sha256sum "$output/pliego.build.json" | cut -d ' ' -f 1)"
+          test "$first" = "$second"
+          node scripts/check-starter-builds.mjs examples/content-collections-pliegors
+
+      - name: Install pinned wasm-bindgen CLI
+        shell: bash
+        run: |
+          archive="wasm-bindgen-$WASM_BINDGEN_CLI_VERSION-x86_64-unknown-linux-musl.tar.gz"
+          base="https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$WASM_BINDGEN_CLI_VERSION"
+          curl --fail --silent --show-error --location --remote-name "$base/$archive"
+          echo "$WASM_BINDGEN_CLI_SHA256  $archive" | sha256sum --check --strict -
+          mkdir -p "$RUNNER_TEMP/wasm-bindgen"
+          tar -xzf "$archive" --strip-components=1 -C "$RUNNER_TEMP/wasm-bindgen"
+          echo "$RUNNER_TEMP/wasm-bindgen" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/wasm-bindgen/wasm-bindgen" --version
+
+      - name: Validate the official PliegoRS site
+        shell: bash
+        run: |
+          (
+            cd examples/pliegors-site
+            "$GITHUB_WORKSPACE/target/debug/pliego" check
+            "$GITHUB_WORKSPACE/target/debug/pliego" build
+            first="$(sha256sum target/site/pliego.build.json | cut -d ' ' -f 1)"
+            "$GITHUB_WORKSPACE/target/debug/pliego" build
+            second="$(sha256sum target/site/pliego.build.json | cut -d ' ' -f 1)"
+            test "$first" = "$second"
+          )
+          npm run check:site
+
+      - name: Test Phase 1 measurement tooling
+        run: npm run test:phase-1
+
+      - name: Check Phase 1 deterministic contract
+        run: npm run check:phase-1

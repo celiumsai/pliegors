@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.device-fingerprint.schema.json",
+  "title": "PLIEGO physical device fingerprint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reportVersion",
+    "capturedAt",
+    "deviceId",
+    "role",
+    "identity",
+    "viewport",
+    "preferences",
+    "network",
+    "webgl",
+    "frameProbe",
+    "server"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reportVersion": {
+      "const": "1.0.0"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deviceId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "modest-android",
+        "ipad-safari",
+        "integrated-gpu-laptop",
+        "capable-desktop",
+        "engineering-reference"
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "userAgent",
+        "platform",
+        "vendor",
+        "language",
+        "languages",
+        "hardwareConcurrency",
+        "maxTouchPoints"
+      ],
+      "properties": {
+        "userAgent": { "type": "string", "minLength": 1 },
+        "platform": { "type": "string", "minLength": 1 },
+        "vendor": { "type": "string" },
+        "language": { "type": "string", "minLength": 1 },
+        "languages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "hardwareConcurrency": { "type": "integer", "minimum": 1 },
+        "deviceMemoryGiB": { "type": "number", "exclusiveMinimum": 0 },
+        "maxTouchPoints": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "required": ["innerWidth", "innerHeight", "devicePixelRatio", "colorDepth"],
+      "properties": {
+        "innerWidth": { "type": "number", "minimum": 1 },
+        "innerHeight": { "type": "number", "minimum": 1 },
+        "devicePixelRatio": { "type": "number", "exclusiveMinimum": 0 },
+        "colorDepth": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "required": [
+        "reducedMotion",
+        "reducedTransparency",
+        "highContrast",
+        "darkScheme",
+        "wideColor",
+        "hdr",
+        "pointerCoarse",
+        "hover"
+      ],
+      "properties": {
+        "reducedMotion": { "type": "boolean" },
+        "reducedTransparency": { "type": "boolean" },
+        "highContrast": { "type": "boolean" },
+        "darkScheme": { "type": "boolean" },
+        "wideColor": { "type": "boolean" },
+        "hdr": { "type": "boolean" },
+        "pointerCoarse": { "type": "boolean" },
+        "hover": { "type": "boolean" }
+      }
+    },
+    "network": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "webgl": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": ["version", "renderer", "vendor"],
+      "properties": {
+        "version": { "type": "integer", "enum": [1, 2] },
+        "renderer": { "type": "string", "minLength": 1 },
+        "vendor": { "type": "string", "minLength": 1 }
+      }
+    },
+    "frameProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sampleCount",
+        "medianMs",
+        "p95Ms",
+        "maxMs",
+        "over33Ms"
+      ],
+      "properties": {
+        "sampleCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "medianMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95Ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "over33Ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimatedRefreshHz": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receivedAt",
+        "transport"
+      ],
+      "properties": {
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "transport": {
+          "const": "local-network"
+        }
+      }
+    }
+  }
+}

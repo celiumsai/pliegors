@@ -1,0 +1,5 @@
+key = "home"
+title = { en = "PliegoRS | Rust Web Framework for Verifiable Interfaces", es = "PliegoRS | Framework web en Rust para interfaces verificables" }
+description = { en = "Build expressive websites in Rust with deterministic SSG, typed content, Rust/WASM interaction, lifecycle adapters, and verifiable build evidence.", es = "Construye sitios expresivos en Rust con SSG determinista, contenido tipado, interacción Rust/WASM, adaptadores de lifecycle y evidencia verificable." }
+image = "/media/pliegors/fold-hero.webp"
+imageAlt = { en = "A folded glass and metal artifact representing the PliegoRS execution model", es = "Un artefacto plegado de vidrio y metal que representa el modelo de ejecución de PliegoRS" }

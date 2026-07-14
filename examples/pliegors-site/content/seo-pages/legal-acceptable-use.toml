@@ -1,0 +1,5 @@
+key = "legal-acceptable-use"
+title = { en = "PliegoRS Acceptable Use | Source, Binaries and Security", es = "Uso aceptable de PliegoRS | Código, binarios y seguridad" }
+description = { en = "Acceptable-use boundaries for PliegoRS source, private binaries, infrastructure, identity, security testing, and vulnerability reports.", es = "Límites de uso aceptable para código, binarios privados, infraestructura, identidad, pruebas de seguridad y reportes de PliegoRS." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "PliegoRS acceptable-use document", es = "Documento de uso aceptable de PliegoRS" }

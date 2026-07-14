@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "minimal-pliego"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "minimal-pliego"
+path = "src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+pliego-dom = { path = "../../crates/pliego-dom" }
+pliego-ssg = { path = "../../crates/pliego-ssg" }

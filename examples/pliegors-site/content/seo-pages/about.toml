@@ -1,0 +1,5 @@
+key = "about"
+title = { en = "About PliegoRS | Architecture with a Position", es = "Acerca de PliegoRS | Arquitectura con una posición" }
+description = { en = "Why PliegoRS treats events, schemas, effects, snapshots, output, and evidence as durable interfaces for authored web software.", es = "Por qué PliegoRS trata eventos, esquemas, efectos, snapshots, salida y evidencia como interfaces durables para software web con autoría." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "Layered glass and metal planes representing inspectable PliegoRS systems", es = "Planos estratificados de vidrio y metal que representan sistemas PliegoRS inspeccionables" }

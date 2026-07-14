@@ -1,0 +1,14 @@
+{
+  "descriptor":{"en":"Rust-native framework for the authored web","es":"Framework nativo en Rust para la web con autoría"},
+  "tagline":{"en":"Verifiable web software, without a house style.","es":"Software web verificable, sin un estilo impuesto."},
+  "skip":{"en":"Skip to content","es":"Saltar al contenido"},
+  "navigation":[
+    {"key":"framework","label":{"en":"PliegoRS","es":"PliegoRS"},"path":"/"},
+    {"key":"docs","label":{"en":"Docs","es":"Documentación"},"path":"/docs"},
+    {"key":"security","label":{"en":"Security","es":"Seguridad"},"path":"/security"},
+    {"key":"changes","label":{"en":"Changes","es":"Cambios"},"path":"/changelog"}
+  ],
+  "appearance":{"label":{"en":"Appearance","es":"Apariencia"},"system":{"en":"System","es":"Sistema"},"light":{"en":"Light","es":"Claro"},"dark":{"en":"Dark","es":"Oscuro"}},
+  "menu":{"open":{"en":"Open menu","es":"Abrir menú"},"close":{"en":"Close menu","es":"Cerrar menú"}},
+  "footer":{"line":{"en":"Expression on the surface. Evidence underneath.","es":"Expresión en la superficie. Evidencia debajo."},"endorsement":{"en":"PliegoRS is an independent Celiums Solutions LLC project.","es":"PliegoRS es un proyecto independiente de Celiums Solutions LLC."}}
+}

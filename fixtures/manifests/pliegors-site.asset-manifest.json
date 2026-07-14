@@ -1,0 +1,771 @@
+{
+  "$schema": "https://pliegors.dev/schemas/pliego.asset-manifest.schema.json",
+  "manifestVersion": "1.0.0",
+  "work": {
+    "kind": "house",
+    "id": "pliegors-site",
+    "slug": "pliegors-site",
+    "title": "PliegoRS Site",
+    "owner": "Celiums Solutions LLC / PliegoRS"
+  },
+  "coverage": {
+    "assetRoot": "public",
+    "trackedExtensions": [
+      ".avif",
+      ".ico",
+      ".jpg",
+      ".mp4",
+      ".pdf",
+      ".png",
+      ".svg",
+      ".webp",
+      ".woff2",
+      ".zip"
+    ],
+    "excluded": []
+  },
+  "assets": [
+    {
+      "id": "asset-apple-touch-icon-png",
+      "label": "Apple Touch Icon",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/apple-touch-icon.png",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "utility",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-apple-touch-icon-png",
+          "path": "apple-touch-icon.png",
+          "mediaType": "image/png",
+          "format": "png",
+          "sha256": "0fd6bef4997722c3a04f148de246f8b2d183ae3a5954d33d83aa28276cd2c4fd",
+          "bytes": 3039,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "on-demand",
+          "preload": false,
+          "dimensions": {
+            "width": 180,
+            "height": 180
+          },
+          "estimatedVramBytes": 129600
+        }
+      ]
+    },
+    {
+      "id": "asset-favicon-ico",
+      "label": "Favicon",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "owned",
+        "locator": "public/favicon.ico",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-favicon-ico",
+          "path": "favicon.ico",
+          "mediaType": "image/x-icon",
+          "format": "ico",
+          "sha256": "2ac9ce61ea604f2054687c758c44239105ebae874183ae99458bec0f7fea1eb3",
+          "bytes": 12918,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": false
+        }
+      ]
+    },
+    {
+      "id": "asset-favicon-svg",
+      "label": "Favicon",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "owned",
+        "locator": "public/favicon.svg",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-favicon-svg",
+          "path": "favicon.svg",
+          "mediaType": "image/svg+xml",
+          "format": "svg",
+          "sha256": "da14eb9bb2ab6af68a556001332b32f9f563f7df1f061e976953c7421187914d",
+          "bytes": 396,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": false
+        }
+      ]
+    },
+    {
+      "id": "asset-fonts-fragment-mono-regular-woff2",
+      "label": "Fragment Mono Regular",
+      "owner": {
+        "entity": "Respective typeface authors",
+        "role": "third-party"
+      },
+      "source": {
+        "kind": "licensed",
+        "locator": "public/fonts/fragment-mono-regular.woff2",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "licensed",
+        "holder": "Respective typeface authors",
+        "transfer": "excluded",
+        "license": "SIL Open Font License 1.1"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "font",
+        "third-party"
+      ],
+      "variants": [
+        {
+          "id": "v-fonts-fragment-mono-regular-woff2",
+          "path": "fonts/fragment-mono-regular.woff2",
+          "mediaType": "font/woff2",
+          "format": "woff2",
+          "sha256": "44c4e39bff5e76652a24a872cbebabccbcfb20f62c4633b27c1f2745cba86b56",
+          "bytes": 25224,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": false
+        }
+      ]
+    },
+    {
+      "id": "asset-fonts-instrument-sans-variable-italic-woff2",
+      "label": "Instrument Sans Variable Italic",
+      "owner": {
+        "entity": "Respective typeface authors",
+        "role": "third-party"
+      },
+      "source": {
+        "kind": "licensed",
+        "locator": "public/fonts/instrument-sans-variable-italic.woff2",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "licensed",
+        "holder": "Respective typeface authors",
+        "transfer": "excluded",
+        "license": "SIL Open Font License 1.1"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "font",
+        "third-party"
+      ],
+      "variants": [
+        {
+          "id": "v-fonts-instrument-sans-variable-italic-woff2",
+          "path": "fonts/instrument-sans-variable-italic.woff2",
+          "mediaType": "font/woff2",
+          "format": "woff2",
+          "sha256": "77210cdde0281b5ecb0d592e063a98656f1bc36993a3b98f506eb91ff4a433a5",
+          "bytes": 31828,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": false
+        }
+      ]
+    },
+    {
+      "id": "asset-fonts-instrument-sans-variable-woff2",
+      "label": "Instrument Sans Variable",
+      "owner": {
+        "entity": "Respective typeface authors",
+        "role": "third-party"
+      },
+      "source": {
+        "kind": "licensed",
+        "locator": "public/fonts/instrument-sans-variable.woff2",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "licensed",
+        "holder": "Respective typeface authors",
+        "transfer": "excluded",
+        "license": "SIL Open Font License 1.1"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "font",
+        "third-party"
+      ],
+      "variants": [
+        {
+          "id": "v-fonts-instrument-sans-variable-woff2",
+          "path": "fonts/instrument-sans-variable.woff2",
+          "mediaType": "font/woff2",
+          "format": "woff2",
+          "sha256": "2ee17598a98d8a59e4df8152d015bec9ab8e4d5672cc0ab42bef806b568e3971",
+          "bytes": 30092,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": true
+        }
+      ]
+    },
+    {
+      "id": "asset-fonts-instrument-serif-italic-woff2",
+      "label": "Instrument Serif Italic",
+      "owner": {
+        "entity": "Respective typeface authors",
+        "role": "third-party"
+      },
+      "source": {
+        "kind": "licensed",
+        "locator": "public/fonts/instrument-serif-italic.woff2",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "licensed",
+        "holder": "Respective typeface authors",
+        "transfer": "excluded",
+        "license": "SIL Open Font License 1.1"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "font",
+        "third-party"
+      ],
+      "variants": [
+        {
+          "id": "v-fonts-instrument-serif-italic-woff2",
+          "path": "fonts/instrument-serif-italic.woff2",
+          "mediaType": "font/woff2",
+          "format": "woff2",
+          "sha256": "5a51946dfffa82972bc98745359c46761515641fda557c25116459a9f83da4a7",
+          "bytes": 22128,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": false
+        }
+      ]
+    },
+    {
+      "id": "asset-fonts-instrument-serif-regular-woff2",
+      "label": "Instrument Serif Regular",
+      "owner": {
+        "entity": "Respective typeface authors",
+        "role": "third-party"
+      },
+      "source": {
+        "kind": "licensed",
+        "locator": "public/fonts/instrument-serif-regular.woff2",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "licensed",
+        "holder": "Respective typeface authors",
+        "transfer": "excluded",
+        "license": "SIL Open Font License 1.1"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "font",
+        "third-party"
+      ],
+      "variants": [
+        {
+          "id": "v-fonts-instrument-serif-regular-woff2",
+          "path": "fonts/instrument-serif-regular.woff2",
+          "mediaType": "font/woff2",
+          "format": "woff2",
+          "sha256": "5eb09b5ac0e28b67c2f041c8ba6d244604ca0c0980d65912ab2d47fed84ddc31",
+          "bytes": 21032,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": false
+        }
+      ]
+    },
+    {
+      "id": "asset-icon-192-png",
+      "label": "Icon 192",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/icon-192.png",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "utility",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-icon-192-png",
+          "path": "icon-192.png",
+          "mediaType": "image/png",
+          "format": "png",
+          "sha256": "d2ba85720974b6d99641c6421c8a645c6c545fb54a368a7dfa93b4995712b0a1",
+          "bytes": 2115,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "on-demand",
+          "preload": false,
+          "dimensions": {
+            "width": 192,
+            "height": 192
+          },
+          "estimatedVramBytes": 147456
+        }
+      ]
+    },
+    {
+      "id": "asset-icon-512-png",
+      "label": "Icon 512",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/icon-512.png",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "utility",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-icon-512-png",
+          "path": "icon-512.png",
+          "mediaType": "image/png",
+          "format": "png",
+          "sha256": "cdc28544a4db9faaf318a417ac436fa92a3e29e2cfbec9bae834a6f4374fa95d",
+          "bytes": 8476,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "on-demand",
+          "preload": false,
+          "dimensions": {
+            "width": 512,
+            "height": 512
+          },
+          "estimatedVramBytes": 1048576
+        }
+      ]
+    },
+    {
+      "id": "asset-media-pliegors-fold-hero-avif",
+      "label": "Fold Hero",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/media/pliegors/fold-hero.avif",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-media-pliegors-fold-hero-avif",
+          "path": "media/pliegors/fold-hero.avif",
+          "mediaType": "image/avif",
+          "format": "avif",
+          "sha256": "4f958e32b12602009ef452144f298d146b271fa58c96bceae2cff25aeb76c9a7",
+          "bytes": 19746,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": false,
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "estimatedVramBytes": 6293408
+        }
+      ]
+    },
+    {
+      "id": "asset-media-pliegors-fold-hero-webp",
+      "label": "Fold Hero",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/media/pliegors/fold-hero.webp",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "critical",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-media-pliegors-fold-hero-webp",
+          "path": "media/pliegors/fold-hero.webp",
+          "mediaType": "image/webp",
+          "format": "webp",
+          "sha256": "851a527d83c5aae8905f7929a7e74fd2178ba0dee567826ec3e0ed0feb951a20",
+          "bytes": 59306,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "initial",
+          "preload": false,
+          "dimensions": {
+            "width": 1672,
+            "height": 941
+          },
+          "estimatedVramBytes": 6293408,
+          "fallbackFor": [
+            "v-media-pliegors-fold-hero-avif"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "asset-media-pliegors-fold-portrait-avif",
+      "label": "Fold Portrait",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/media/pliegors/fold-portrait.avif",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "utility",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-media-pliegors-fold-portrait-avif",
+          "path": "media/pliegors/fold-portrait.avif",
+          "mediaType": "image/avif",
+          "format": "avif",
+          "sha256": "f48a8e92deed0c3c287637d71c2b2f36492efd2acaf518f0f514d24eb5c9c4e3",
+          "bytes": 20858,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "on-demand",
+          "preload": false,
+          "dimensions": {
+            "width": 1122,
+            "height": 1402
+          },
+          "estimatedVramBytes": 6292176
+        }
+      ]
+    },
+    {
+      "id": "asset-media-pliegors-fold-portrait-webp",
+      "label": "Fold Portrait",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/media/pliegors/fold-portrait.webp",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "utility",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-media-pliegors-fold-portrait-webp",
+          "path": "media/pliegors/fold-portrait.webp",
+          "mediaType": "image/webp",
+          "format": "webp",
+          "sha256": "6934d1c1cca486567adb6f4982d9aca77503c6c6ce7092710a4d9fbefdd2d050",
+          "bytes": 65194,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "on-demand",
+          "preload": false,
+          "dimensions": {
+            "width": 1122,
+            "height": 1402
+          },
+          "estimatedVramBytes": 6292176,
+          "fallbackFor": [
+            "v-media-pliegors-fold-portrait-avif"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "asset-media-pliegors-ledger-wide-avif",
+      "label": "Ledger Wide",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/media/pliegors/ledger-wide.avif",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "utility",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-media-pliegors-ledger-wide-avif",
+          "path": "media/pliegors/ledger-wide.avif",
+          "mediaType": "image/avif",
+          "format": "avif",
+          "sha256": "9d5466f694ad82b40d4b1d0a0265dbdb47c1a31067d161e8cc7ef4b6909279c2",
+          "bytes": 39082,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "on-demand",
+          "preload": false,
+          "dimensions": {
+            "width": 1536,
+            "height": 1024
+          },
+          "estimatedVramBytes": 6291456
+        }
+      ]
+    },
+    {
+      "id": "asset-media-pliegors-ledger-wide-webp",
+      "label": "Ledger Wide",
+      "owner": {
+        "entity": "Celiums Solutions LLC / PliegoRS",
+        "role": "house"
+      },
+      "source": {
+        "kind": "generated",
+        "locator": "public/media/pliegors/ledger-wide.webp",
+        "generator": "PliegoRS asset pipeline",
+        "createdFor": "pliegors-site"
+      },
+      "rights": {
+        "status": "owned",
+        "holder": "Celiums Solutions LLC",
+        "transfer": "excluded"
+      },
+      "visualImportance": "utility",
+      "tags": [
+        "visual",
+        "framework-surface"
+      ],
+      "variants": [
+        {
+          "id": "v-media-pliegors-ledger-wide-webp",
+          "path": "media/pliegors/ledger-wide.webp",
+          "mediaType": "image/webp",
+          "format": "webp",
+          "sha256": "5890da82e17bb11d69a81a401bbf223d3afbabf65474488b2602a7fc8a130cd7",
+          "bytes": 116196,
+          "tiers": [
+            "universal",
+            "lite",
+            "balanced",
+            "signature"
+          ],
+          "delivery": "on-demand",
+          "preload": false,
+          "dimensions": {
+            "width": 1536,
+            "height": 1024
+          },
+          "estimatedVramBytes": 6291456,
+          "fallbackFor": [
+            "v-media-pliegors-ledger-wide-avif"
+          ]
+        }
+      ]
+    }
+  ],
+  "budgetScopes": [
+    {
+      "id": "home-universal-initial",
+      "label": "PliegoRS home first viewport",
+      "route": "/",
+      "tier": "universal",
+      "phase": "initial",
+      "variants": [
+        "v-media-pliegors-fold-hero-webp",
+        "v-fonts-fragment-mono-regular-woff2",
+        "v-fonts-instrument-sans-variable-woff2",
+        "v-favicon-svg"
+      ],
+      "limits": {
+        "maxTransferBytes": 358400
+      }
+    }
+  ]
+}

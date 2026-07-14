@@ -1,0 +1,5 @@
+key = "docs-build-and-deploy"
+title = { en = "Build and Deploy PliegoRS | Verified Artifacts and GitHub Releases", es = "Build y despliegue de PliegoRS | Artefactos verificados y GitHub Releases" }
+description = { en = "Build, inspect, preview, verify, release, and deploy deterministic PliegoRS static output across supported targets.", es = "Compila, inspecciona, previsualiza, verifica, publica y despliega salida estática determinista de PliegoRS en targets soportados." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A precision PliegoRS ledger representing verified build artifacts", es = "Un ledger de precisión de PliegoRS que representa artefactos de build verificados" }

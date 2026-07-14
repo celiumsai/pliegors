@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f3f4ee" />
+    <title>Device Lab | PLIEGO</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header class="lab-header">
+      <a class="brand" href="/" aria-label="PLIEGO Device Lab">
+        <img src="/pliego-mark.svg" alt="" />
+        <span>PLIEGO</span>
+      </a>
+      <p>Physical evidence / Phase 1</p>
+    </header>
+
+    <main>
+      <section class="instrument" aria-labelledby="lab-title">
+        <div class="instrument-copy">
+          <p class="eyebrow">Device lab 01</p>
+          <h1 id="lab-title">Measure the machine in your hand.</h1>
+          <p class="lede">
+            This capture stays on Mario's local network and records the browser,
+            renderer, viewport, preferences, and five seconds of rAF cadence.
+            Cadence identifies refresh scheduling; it does not measure GPU
+            efficiency by itself.
+          </p>
+        </div>
+        <div class="live-register" aria-live="polite">
+          <span>rAF interval p95</span>
+          <strong id="hero-value">READY</strong>
+          <small id="hero-unit">physical device</small>
+        </div>
+      </section>
+
+      <section class="control-band" aria-labelledby="capture-title">
+        <div>
+          <p class="eyebrow">Acceptance row</p>
+          <h2 id="capture-title">Choose this device's role</h2>
+        </div>
+        <label>
+          <span>Device class</span>
+          <select id="device-role">
+            <option value="ipad-safari-physical|ipad-safari">iPad / Safari</option>
+            <option value="android-modest-physical|modest-android">Modest Android</option>
+            <option value="windows-arc-140t-igpu|integrated-gpu-laptop">Integrated GPU laptop</option>
+            <option value="capable-desktop-physical|capable-desktop">Capable desktop</option>
+            <option value="windows-rtx-5050-engineering|engineering-reference">Engineering reference</option>
+          </select>
+        </label>
+        <button id="run-probe" type="button">
+          <span aria-hidden="true">▶</span>
+          Run device probe
+        </button>
+      </section>
+
+      <section class="readout" aria-labelledby="readout-title">
+        <div class="readout-heading">
+          <p class="eyebrow">Live register</p>
+          <h2 id="readout-title">No capture yet</h2>
+          <p id="status" role="status">Select the correct device class, then run the probe.</p>
+        </div>
+        <dl id="summary" class="summary-grid">
+          <div><dt>Renderer</dt><dd>Pending</dd></div>
+          <div><dt>Viewport</dt><dd>Pending</dd></div>
+          <div><dt>rAF interval p95</dt><dd>Pending</dd></div>
+          <div><dt>Saved evidence</dt><dd>Pending</dd></div>
+        </dl>
+      </section>
+
+      <section class="raw-output" aria-labelledby="raw-title" hidden>
+        <div>
+          <p class="eyebrow">Raw fingerprint</p>
+          <h2 id="raw-title">Captured JSON</h2>
+        </div>
+        <pre id="raw-json"></pre>
+      </section>
+    </main>
+
+    <footer>
+      <p>PLIEGO / Device evidence is accepted only after manual review.</p>
+      <p id="clock">Awaiting capture</p>
+    </footer>
+  </body>
+</html>

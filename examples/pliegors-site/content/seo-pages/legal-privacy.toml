@@ -1,0 +1,5 @@
+key = "legal-privacy"
+title = { en = "PliegoRS Privacy | Current Data Handling", es = "Privacidad de PliegoRS | Tratamiento actual de datos" }
+description = { en = "How the current PliegoRS static website handles local appearance preferences, email correspondence, and provider access logs.", es = "Cómo el sitio estático de PliegoRS maneja preferencias locales de apariencia, correo y logs de acceso de proveedores." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "PliegoRS privacy document", es = "Documento de privacidad de PliegoRS" }

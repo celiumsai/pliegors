@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: Apache-2.0
+# PliegoRS workspace. Crates land as the roadmap advances (docs/00 §4/§6).
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/pliego-log",
+    "crates/pliego-reactive",
+    "crates/pliego-fold",
+    "crates/pliego-dom",
+    "crates/pliego-hyphae",
+    "crates/pliego-inspect",
+    "crates/pliego-assets",
+    "crates/pliego-content",
+    "crates/pliego-ssg",
+    "crates/pliego-macros",
+    "crates/pliego-resume",
+    "crates/pliego-adapters",
+    "crates/pliego-starters",
+    "crates/pliego-cli",
+    "examples/spike",
+    "examples/minimal-pliego",
+    "examples/content-collections-pliegors",
+    "examples/pliegors-site",
+    "examples/pliegors-site-client",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Celiums Solutions LLC <hello@pliegors.dev>"]
+license = "Apache-2.0"
+repository = "https://github.com/celiumsai/pliegors"
+description = "A Rust-native front-end framework where the UI is a fold of a verifiable event log."
+publish = false
+
+[workspace.dependencies]
+# The log's hash chain — same primitive family as Hyphae's journal.
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }
+tiny_http = "0.12"
+js-sys = "=0.3.103"
+wasm-bindgen = "=0.2.126"
+wasm-bindgen-futures = "=0.4.76"
+web-sys = "=0.3.103"
+
+# Internal crates are source-only and never resolve through a package registry.
+pliego-dom = { path = "crates/pliego-dom" }
+pliego-log = { path = "crates/pliego-log" }
+pliego-reactive = { path = "crates/pliego-reactive" }
+pliego-starters = { path = "crates/pliego-starters" }
+
+[profile.release]
+# WASM size discipline from day one (docs/00 §5).
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = "symbols"

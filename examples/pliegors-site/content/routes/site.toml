@@ -1,0 +1,140 @@
+siteOrigin = "https://pliegors.dev"
+notFound = "/404.html"
+
+[[routes]]
+path = "/"
+page = "home"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/about"
+page = "about"
+pageType = "about-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs"
+page = "docs"
+pageType = "collection-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/getting-started"
+page = "docs-getting-started"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/project-structure"
+page = "docs-project-structure"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/cli"
+page = "docs-cli"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/routing-and-pages"
+page = "docs-routing-and-pages"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/views"
+page = "docs-views"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/events-and-folds"
+page = "docs-events-and-folds"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/content"
+page = "docs-content"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/browser-runtime"
+page = "docs-browser-runtime"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/assets"
+page = "docs-assets"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/errors-and-diagnostics"
+page = "docs-errors-and-diagnostics"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/build-and-deploy"
+page = "docs-build-and-deploy"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/licensing"
+page = "docs-licensing"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/changelog"
+page = "changelog"
+pageType = "collection-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/security"
+page = "security"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/accessibility"
+page = "accessibility"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/legal"
+page = "legal"
+pageType = "collection-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/legal/terms"
+page = "legal-terms"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/legal/privacy"
+page = "legal-privacy"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/legal/cookies"
+page = "legal-cookies"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/legal/acceptable-use"
+page = "legal-acceptable-use"
+pageType = "web-page"
+robots = "index-follow"
