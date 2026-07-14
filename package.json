@@ -9,6 +9,7 @@
     "check:distribution": "node scripts/check-distribution.mjs",
     "check:email-worker": "npm --prefix workers/pliegors-email run check",
     "check:site": "node scripts/check-pliegors-site.mjs examples/pliegors-site/target/site",
+    "check:site-deployment": "npm --prefix workers/pliegors-site run check",
     "check:phase-1": "node scripts/check-phase-1.mjs",
     "check:phase-1-closure": "node scripts/check-phase-1-closure.mjs",
     "test:phase-1": "node --test tools/route-lab/*.test.mjs scripts/*.test.mjs crates/pliego-adapters/tests/*.test.mjs",

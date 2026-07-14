@@ -1,8 +1,8 @@
 # Distribution and release
 
 **Status:** GitHub Releases is the approved canonical distribution channel. The
-repository remains private, releases remain private or draft, and nothing has
-been deployed or published.
+repository remains private, releases remain private or draft, and the
+`pliegors.dev` documentation site is deployed only as a protected preview.
 
 ## Canonical ownership boundary
 
@@ -21,13 +21,14 @@ There is no third-party mirror with authority to create or rename a release.
 
 ## Private preview gate
 
-The first `pliegors.dev` deployment is not a public launch. When deployment is
-explicitly approved, it must sit behind Cloudflare Access with deny-by-default
-policy and admit only Mario's enrolled phone through a device-aware Zero Trust
-rule. Email identity alone is not the access boundary, and no origin route may
-bypass Access.
+The approved `pliegors.dev` deployment is active as a private preview, not a
+public launch. It sits behind Cloudflare Access with a deny-by-default policy.
+Admission requires Mario's approved identity together with enrolled iOS WARP
+and Gateway device posture; email identity alone is not the access boundary.
+The Worker exposes only the `pliegors.dev` Custom Domain: its `workers.dev`
+route and version preview URLs are disabled, and no `www` origin route exists.
 
-No deployment is authorized by this document. During the preview:
+During the preview:
 
 - the GitHub repository remains private;
 - candidate GitHub Releases remain private or draft;

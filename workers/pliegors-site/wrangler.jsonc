@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pliegors-site",
+  "compatibility_date": "2026-07-14",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "pliegors.dev",
+      "custom_domain": true,
+      "previews_enabled": false
+    }
+  ],
+  "assets": {
+    "directory": "../../examples/pliegors-site/target/site",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

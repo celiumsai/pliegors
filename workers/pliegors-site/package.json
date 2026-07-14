@@ -1,0 +1,13 @@
+{
+  "name": "@pliegors/site-deployment",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.110.0"
+  }
+}

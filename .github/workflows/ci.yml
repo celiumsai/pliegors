@@ -44,6 +44,9 @@ jobs:
       - name: Install email Worker tooling
         run: npm ci --prefix workers/pliegors-email
 
+      - name: Install site deployment tooling
+        run: npm ci --prefix workers/pliegors-site
+
       - name: Validate email Worker
         run: npm run check:email-worker
 
@@ -51,6 +54,7 @@ jobs:
         run: |
           npm audit --audit-level=high
           npm audit --prefix workers/pliegors-email --audit-level=high
+          npm audit --prefix workers/pliegors-site --audit-level=high
 
       - name: Check formatting
         run: cargo fmt --check
@@ -144,6 +148,9 @@ jobs:
             test "$first" = "$second"
           )
           npm run check:site
+
+      - name: Validate site deployment package
+        run: npm run check:site-deployment
 
       - name: Test Phase 1 measurement tooling
         run: npm run test:phase-1
