@@ -88,7 +88,9 @@ for the checked lockfile, not a permanent guarantee.
 
 GitHub Releases in `celiumsai/pliegors` is the only official distribution
 authority and download origin. The repository and candidate releases remain
-private or draft, and this review authorizes no deployment or public promotion.
+private or draft, and this review authorizes no public release or promotion.
+The separately approved `pliegors.dev` deployment is a private documentation
+preview behind Cloudflare Access; it is not a framework distribution origin.
 No secondary download origin exists in the distribution architecture.
 
 Production support is limited to Linux x64 and Linux arm64. macOS x64, macOS
