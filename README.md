@@ -1,8 +1,15 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# PliegoRS
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/pliegors-symbol-reversed.svg">
+    <img src="brand/pliegors-symbol.svg" alt="PliegoRS logo" width="112" height="112">
+  </picture>
+</p>
 
-**A Rust-native web framework for verifiable, replayable, durable interfaces.**
+<h1 align="center">PliegoRS</h1>
+
+<p align="center"><strong>A Rust-native web framework for verifiable, replayable, durable interfaces.</strong></p>
 
 PliegoRS folds append-only event logs into interfaces. State is projected from
 typed events, the projection advances as events arrive, and replay must produce
