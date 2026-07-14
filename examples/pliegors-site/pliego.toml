@@ -1,0 +1,9 @@
+[project]
+name = "PliegoRS"
+site_package = "pliegors-site"
+output = "target/site"
+
+[client]
+package = "pliegors-site-client"
+wasm_name = "pliegors_site_client"
+bindgen_output = "target/pliegors-site-client/pkg"

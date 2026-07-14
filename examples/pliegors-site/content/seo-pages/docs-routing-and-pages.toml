@@ -1,0 +1,5 @@
+key = "docs-routing-and-pages"
+title = { en = "Routing and Pages in PliegoRS | Complete Rust Documents", es = "Routing y páginas en PliegoRS | Documentos Rust completos" }
+description = { en = "Author complete pages, canonical metadata, normalized clean routes, and project-owned 404 error documents in PliegoRS.", es = "Crea páginas completas, metadata canónica, rutas limpias normalizadas y documentos de error 404 controlados por el proyecto en PliegoRS." }
+image = "/media/pliegors/fold-hero.webp"
+imageAlt = { en = "A folded execution plane representing PliegoRS route composition", es = "Un plano de ejecución plegado que representa la composición de rutas PliegoRS" }

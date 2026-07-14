@@ -1,0 +1,5 @@
+key = "docs-views"
+title = { en = "Rust Views in PliegoRS | Semantic DOM and Static-First HTML", es = "Vistas Rust en PliegoRS | DOM semántico y HTML static-first" }
+description = { en = "Compose escaped semantic HTML with PliegoRS builders and typed macros, then resume only owned browser behavior.", es = "Compón HTML semántico escapado con builders y macros tipadas de PliegoRS y reanuda sólo comportamiento controlado en el navegador." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "A vertical PliegoRS fold representing semantic view composition", es = "Un pliegue vertical de PliegoRS que representa composición semántica de vistas" }

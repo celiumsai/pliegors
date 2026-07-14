@@ -1,0 +1,5 @@
+key = "legal-terms"
+title = { en = "PliegoRS Terms | Pre-Release Website and Software", es = "Términos de PliegoRS | Sitio y software previo al release" }
+description = { en = "Terms governing access to the PliegoRS website, private repository, pre-release binaries, documentation, and evaluation materials.", es = "Términos que rigen el acceso al sitio, repositorio privado, binarios, documentación y materiales de evaluación de PliegoRS." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "PliegoRS interface document", es = "Documento de interfaz de PliegoRS" }

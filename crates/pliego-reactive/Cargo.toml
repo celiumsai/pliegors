@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-reactive"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "PliegoRS's reactive graph: runtime dependency tracking, two-phase coloring with equality gating, ownership/disposal. Lessons from Leptos/Reactively, our implementation."
+publish.workspace = true
+
+[dependencies]

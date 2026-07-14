@@ -1,0 +1,496 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.measurement-run.schema.json",
+  "title": "PLIEGO physical route measurement run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runVersion",
+    "planVersion",
+    "capturedAt",
+    "sessionId",
+    "deviceId",
+    "hardwareFingerprint",
+    "browserFingerprint",
+    "targetId",
+    "route",
+    "tier",
+    "cacheMode",
+    "motionMode",
+    "sourceRevision",
+    "observedRenderer",
+    "viewport",
+    "networkProfile",
+    "initialRouteResources",
+    "conditions",
+    "interaction",
+    "observations",
+    "availability",
+    "violations",
+    "server"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runVersion": {
+      "const": "1.1.0"
+    },
+    "planVersion": {
+      "const": "1.0.0"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sessionId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{24}$"
+    },
+    "deviceId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "hardwareFingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "browserFingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "route": {
+      "type": "string",
+      "pattern": "^/"
+    },
+    "tier": {
+      "$ref": "#/$defs/tier"
+    },
+    "cacheMode": {
+      "type": "string",
+      "enum": ["cold", "warm"]
+    },
+    "motionMode": {
+      "type": "string",
+      "enum": ["default", "reduced"]
+    },
+    "sourceRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observedRenderer": {
+      "type": ["string", "null"]
+    },
+    "viewport": {
+      "$ref": "#/$defs/viewport"
+    },
+    "networkProfile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "initialRouteResources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/resourceLedgerEntry"
+      },
+      "contains": {
+        "type": "object",
+        "required": ["entryType"],
+        "properties": {
+          "entryType": {
+            "const": "navigation"
+          }
+        }
+      },
+      "minContains": 1,
+      "maxContains": 1
+    },
+    "conditions": {
+      "$ref": "#/$defs/conditions"
+    },
+    "interaction": {
+      "$ref": "#/$defs/interaction"
+    },
+    "observations": {
+      "$ref": "#/$defs/observations"
+    },
+    "availability": {
+      "$ref": "#/$defs/availability"
+    },
+    "violations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "server": {
+      "$ref": "#/$defs/server"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["universal", "lite", "balanced", "signature"]
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "devicePixelRatio", "orientation"],
+      "properties": {
+        "width": {
+          "type": "number",
+          "minimum": 1
+        },
+        "height": {
+          "type": "number",
+          "minimum": 1
+        },
+        "devicePixelRatio": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "orientation": {
+          "type": "string",
+          "enum": ["portrait", "landscape"]
+        }
+      }
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "foreground",
+        "powerState",
+        "thermalState",
+        "cacheControl",
+        "reducedMotionMatched",
+        "serviceWorkerControlled"
+      ],
+      "properties": {
+        "foreground": {
+          "type": "boolean"
+        },
+        "powerState": {
+          "type": "string",
+          "enum": ["external-power", "battery-over-50", "unknown"]
+        },
+        "thermalState": {
+          "type": "string",
+          "enum": ["nominal", "throttled", "unknown"]
+        },
+        "cacheControl": {
+          "type": "string",
+          "enum": [
+            "clear-site-data-requested",
+            "warm-cache-preserved",
+            "manual-clear-attested"
+          ]
+        },
+        "reducedMotionMatched": {
+          "type": "boolean"
+        },
+        "serviceWorkerControlled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stepState": {
+      "type": "string",
+      "enum": ["complete", "not-applicable", "missed"]
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationMs", "steps"],
+      "properties": {
+        "durationMs": {
+          "type": "number",
+          "minimum": 1000
+        },
+        "steps": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ready",
+            "scroll",
+            "navigation",
+            "visualResponse",
+            "disclosure",
+            "sceneHold",
+            "returnToInitial"
+          ],
+          "properties": {
+            "ready": {
+              "$ref": "#/$defs/stepState"
+            },
+            "scroll": {
+              "$ref": "#/$defs/stepState"
+            },
+            "navigation": {
+              "$ref": "#/$defs/stepState"
+            },
+            "visualResponse": {
+              "$ref": "#/$defs/stepState"
+            },
+            "disclosure": {
+              "$ref": "#/$defs/stepState"
+            },
+            "sceneHold": {
+              "$ref": "#/$defs/stepState"
+            },
+            "returnToInitial": {
+              "$ref": "#/$defs/stepState"
+            }
+          }
+        }
+      }
+    },
+    "nullableMetric": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "resourceLedgerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entryType",
+        "scope",
+        "path",
+        "initiator",
+        "transferBytes",
+        "encodedBodyBytes",
+        "decodedBodyBytes",
+        "cacheState",
+        "durationMs"
+      ],
+      "properties": {
+        "entryType": {
+          "type": "string",
+          "enum": ["navigation", "resource"]
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["target-origin", "external"]
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^/(?!/)[^?#]*$"
+        },
+        "initiator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "transferBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "encodedBodyBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decodedBodyBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cacheState": {
+          "type": "string",
+          "enum": [
+            "network",
+            "local-cache",
+            "validated-cache",
+            "opaque",
+            "unknown"
+          ]
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3600000
+        }
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transferBytes",
+        "sessionTransferBytes",
+        "encodedBodyBytes",
+        "sessionEncodedBodyBytes",
+        "decodedBodyBytes",
+        "sessionDecodedBodyBytes",
+        "resourceCount",
+        "sessionResourceCount",
+        "cachedResponseCount",
+        "sessionCachedResponseCount",
+        "decodeP95Ms",
+        "postLoadDecodeP95Ms",
+        "mainThreadP95Ms",
+        "longTaskP95Ms",
+        "estimatedVramBytes",
+        "drawCalls",
+        "triangles",
+        "frameSampleCount",
+        "frameP95Ms",
+        "framesOver33Ms",
+        "lcpMs",
+        "inpMs",
+        "cls"
+      ],
+      "properties": {
+        "transferBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sessionTransferBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "encodedBodyBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sessionEncodedBodyBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decodedBodyBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sessionDecodedBodyBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resourceCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sessionResourceCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cachedResponseCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sessionCachedResponseCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decodeP95Ms": {
+          "$ref": "#/$defs/nullableMetric"
+        },
+        "postLoadDecodeP95Ms": {
+          "$ref": "#/$defs/nullableMetric"
+        },
+        "mainThreadP95Ms": {
+          "$ref": "#/$defs/nullableMetric"
+        },
+        "longTaskP95Ms": {
+          "$ref": "#/$defs/nullableMetric"
+        },
+        "estimatedVramBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "drawCalls": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "triangles": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "frameSampleCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frameP95Ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "framesOver33Ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lcpMs": {
+          "$ref": "#/$defs/nullableMetric"
+        },
+        "inpMs": {
+          "$ref": "#/$defs/nullableMetric"
+        },
+        "cls": {
+          "type": ["number", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decode", "mainThread", "scene", "lcp", "inp", "cls"],
+      "properties": {
+        "decode": {
+          "type": "string",
+          "enum": ["target-decode-marks", "post-load-probe-only", "unavailable"]
+        },
+        "mainThread": {
+          "type": "string",
+          "enum": ["target-task-slices", "longtask-probe-only", "unavailable"]
+        },
+        "scene": {
+          "type": "string",
+          "enum": ["pliego-scene-hook", "static-zero", "unavailable"]
+        },
+        "lcp": {
+          "type": "string",
+          "enum": ["largest-contentful-paint-observer", "unavailable"]
+        },
+        "inp": {
+          "type": "string",
+          "enum": ["event-timing-observer", "unavailable"]
+        },
+        "cls": {
+          "type": "string",
+          "enum": ["layout-shift-session-window", "unavailable"]
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receivedAt", "collectorVersion", "sha256"],
+      "properties": {
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "collectorVersion": {
+          "enum": [
+            "pliego-route-lab/0.2.0",
+            "pliego-route-lab/0.2.1",
+            "pliego-route-lab/0.2.2"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

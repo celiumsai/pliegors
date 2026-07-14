@@ -1,0 +1,58 @@
+name: Bug report
+description: Report reproducible PliegoRS behavior that differs from its contract.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not report vulnerabilities here. Follow SECURITY.md instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.0.1 or full commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - CLI and development server
+        - Static generation
+        - Views and components
+        - Events, folds, and reactive runtime
+        - Browser runtime and adapters
+        - Content and assets
+        - Hyphae protocol boundary
+        - Documentation or starter
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include commands, a minimal repository or code sample, and complete diagnostics.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, Rust version, browser, and relevant tool versions.
+    validations:
+      required: true

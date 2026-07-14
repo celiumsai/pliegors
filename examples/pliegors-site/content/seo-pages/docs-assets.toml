@@ -1,0 +1,5 @@
+key = "docs-assets"
+title = { en = "Adaptive Assets in PliegoRS | Images, Video, Fonts and 3D", es = "Assets adaptativos en PliegoRS | Imágenes, video, fuentes y 3D" }
+description = { en = "Create reproducible asset manifests, variants, device budgets, capability tiers, and meaningful fallbacks in PliegoRS.", es = "Crea manifests reproducibles de assets, variantes, presupuestos por dispositivo, capability tiers y fallbacks con significado en PliegoRS." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "A PliegoRS material object representing adaptive media variants", es = "Un objeto material de PliegoRS que representa variantes adaptativas de media" }

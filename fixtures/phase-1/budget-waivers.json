@@ -1,0 +1,5 @@
+{
+  "$schema": "../../schemas/pliego.budget-waivers.schema.json",
+  "waiverVersion": "1.0.0",
+  "waivers": []
+}

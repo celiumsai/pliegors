@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json",
+  "title": "PliegoRS adaptive asset execution plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "planVersion", "recipeSha256", "toolchains", "budgetProfiles", "sources", "jobs"],
+  "properties": {
+    "$schema": { "const": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json" },
+    "planVersion": { "const": "1.0.0" },
+    "recipeSha256": { "$ref": "#/$defs/sha256" },
+    "toolchains": {
+      "type": "array",
+      "items": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json#/$defs/toolchainPin" }
+    },
+    "budgetProfiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json#/$defs/budgetProfile" }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "jobs": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": { "$ref": "#/$defs/job" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "jobIdentifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*\\.[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "sha256", "bytes"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "path": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 2147483648 }
+      }
+    },
+    "artifactFormat": {
+      "type": "string",
+      "enum": ["avif", "webp", "jpeg", "mp4", "webm", "woff2", "glb"]
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "width", "height", "format", "quality"],
+          "properties": {
+            "kind": { "const": "image" },
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 },
+            "format": { "type": "string", "enum": ["avif", "webp", "jpeg"] },
+            "quality": { "type": "integer", "minimum": 1, "maximum": 100 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "width", "height", "format", "bitrateKbps", "maxFps", "audio"],
+          "properties": {
+            "kind": { "const": "video" },
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 },
+            "format": { "type": "string", "enum": ["mp4-h264", "mp4-av1", "webm-vp9"] },
+            "bitrateKbps": { "type": "integer", "minimum": 1 },
+            "maxFps": { "type": "integer", "minimum": 1, "maximum": 240 },
+            "audio": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "glyphs"],
+          "properties": {
+            "kind": { "const": "font-subset" },
+            "glyphs": { "type": "string", "minLength": 1, "maxLength": 8192 },
+            "unicodeRange": { "type": "string", "pattern": "^U\\+", "maxLength": 512 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "maxTriangles", "maxDrawCalls", "meshCompression", "textureCompression", "maxTextureDimension", "requiresBlender"],
+          "properties": {
+            "kind": { "const": "scene3d" },
+            "maxTriangles": { "type": "integer", "minimum": 1 },
+            "maxDrawCalls": { "type": "integer", "minimum": 1 },
+            "meshCompression": { "type": "string", "enum": ["none", "meshopt", "draco"] },
+            "textureCompression": { "type": "string", "enum": ["ktx2-etc1s", "ktx2-uastc"] },
+            "maxTextureDimension": { "type": "integer", "minimum": 1, "maximum": 16384 },
+            "requiresBlender": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sourceId",
+        "variantId",
+        "stagingPath",
+        "format",
+        "requiredToolchains",
+        "policy",
+        "operation",
+        "estimatedDecodedBytes",
+        "estimatedTriangles",
+        "estimatedDrawCalls"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/jobIdentifier" },
+        "sourceId": { "$ref": "#/$defs/identifier" },
+        "variantId": { "$ref": "#/$defs/identifier" },
+        "stagingPath": {
+          "type": "string",
+          "pattern": "^\\.pliego-assets/stage/[a-z0-9.-]+\\.[a-z0-9]+$"
+        },
+        "format": { "$ref": "#/$defs/artifactFormat" },
+        "selectionGroup": { "$ref": "#/$defs/identifier" },
+        "requiredToolchains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json#/$defs/toolchain" }
+        },
+        "policy": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json#/$defs/policy" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "estimatedDecodedBytes": { "type": "integer", "minimum": 0 },
+        "estimatedTriangles": { "type": "integer", "minimum": 0 },
+        "estimatedDrawCalls": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+key = "docs-cli"
+title = { en = "PliegoRS CLI Reference | new, check, build, dev and inspect", es = "Referencia del CLI PliegoRS | new, check, build, dev e inspect" }
+description = { en = "Reference for every PliegoRS command, development server option, diagnostic format, and stable exit code.", es = "Referencia de cada comando PliegoRS, opciones del servidor de desarrollo, formato diagnóstico y códigos de salida estables." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "The PliegoRS evidence ledger representing CLI commands and diagnostics", es = "El ledger de evidencia de PliegoRS que representa comandos y diagnósticos del CLI" }

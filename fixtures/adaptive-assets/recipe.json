@@ -1,0 +1,83 @@
+{
+  "$schema": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json",
+  "recipeVersion": "1.0.0",
+  "toolchains": [
+    {
+      "name": "ffmpeg",
+      "version": "7.1.1"
+    }
+  ],
+  "budgetProfiles": [
+    {
+      "id": "modest-mobile",
+      "device": "modest-mobile",
+      "tiers": [
+        {
+          "tier": "universal",
+          "maxInitialBytes": 4096,
+          "maxDeferredBytes": 0,
+          "maxOnDemandBytes": 0,
+          "maxDecodedBytes": 262144,
+          "maxTriangles": 0,
+          "maxDrawCalls": 0,
+          "maxPreloads": 1
+        },
+        {
+          "tier": "lite",
+          "maxInitialBytes": 4096,
+          "maxDeferredBytes": 0,
+          "maxOnDemandBytes": 0,
+          "maxDecodedBytes": 262144,
+          "maxTriangles": 0,
+          "maxDrawCalls": 0,
+          "maxPreloads": 1
+        },
+        {
+          "tier": "balanced",
+          "maxInitialBytes": 4096,
+          "maxDeferredBytes": 0,
+          "maxOnDemandBytes": 0,
+          "maxDecodedBytes": 262144,
+          "maxTriangles": 0,
+          "maxDrawCalls": 0,
+          "maxPreloads": 1
+        },
+        {
+          "tier": "signature",
+          "maxInitialBytes": 4096,
+          "maxDeferredBytes": 0,
+          "maxOnDemandBytes": 0,
+          "maxDecodedBytes": 262144,
+          "maxTriangles": 0,
+          "maxDrawCalls": 0,
+          "maxPreloads": 1
+        }
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "id": "hero",
+      "input": "hero.source",
+      "transform": {
+        "kind": "image",
+        "outputs": [
+          {
+            "id": "small",
+            "width": 256,
+            "height": 144,
+            "format": "webp",
+            "quality": 72,
+            "policy": {
+              "tiers": ["universal", "lite", "balanced", "signature"],
+              "delivery": "initial",
+              "preload": true,
+              "fetchPriority": "high",
+              "motion": "static"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

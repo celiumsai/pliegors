@@ -1,0 +1,83 @@
+{
+  "reportVersion": "1.0.0",
+  "baselineVersion": "2026-07-14-public-rc",
+  "measurementPlan": "phase-1/measurement-plan.json",
+  "measurementPlanSha256": "55ccf722e9e0245888e199a0f0748f3d67182a1a4363a48823a70d56917623fe",
+  "valid": true,
+  "budgetsPass": true,
+  "targetCount": 1,
+  "assetCount": 16,
+  "variantCount": 16,
+  "totalBytes": 477630,
+  "failedBudgetCount": 0,
+  "targets": [
+    {
+      "reportVersion": "1.0.0",
+      "manifestVersion": "1.0.0",
+      "manifestSha256": "5caa3b0a8f1cde10fc53767cf0f92fe88d6d6a72414136eab2d4fd5793a93994",
+      "work": {
+        "kind": "house",
+        "id": "pliegors-site",
+        "slug": "pliegors-site",
+        "title": "PliegoRS Site",
+        "owner": "Celiums Solutions LLC / PliegoRS",
+        "signatura": null
+      },
+      "integrityMode": "metadata",
+      "valid": true,
+      "budgetsPass": true,
+      "assetCount": 16,
+      "variantCount": 16,
+      "totalBytes": 477630,
+      "tierTotals": {
+        "balanced": {
+          "variants": 16,
+          "transferBytes": 477630,
+          "estimatedVramBytes": 39079712,
+          "triangles": 0,
+          "drawCalls": 0
+        },
+        "lite": {
+          "variants": 16,
+          "transferBytes": 477630,
+          "estimatedVramBytes": 39079712,
+          "triangles": 0,
+          "drawCalls": 0
+        },
+        "signature": {
+          "variants": 16,
+          "transferBytes": 477630,
+          "estimatedVramBytes": 39079712,
+          "triangles": 0,
+          "drawCalls": 0
+        },
+        "universal": {
+          "variants": 16,
+          "transferBytes": 477630,
+          "estimatedVramBytes": 39079712,
+          "triangles": 0,
+          "drawCalls": 0
+        }
+      },
+      "budgetResults": [
+        {
+          "id": "home-universal-initial",
+          "label": "PliegoRS home first viewport",
+          "route": "/",
+          "tier": "universal",
+          "phase": "initial",
+          "variantCount": 4,
+          "transferBytes": 115018,
+          "estimatedVramBytes": 6293408,
+          "triangles": 0,
+          "drawCalls": 0,
+          "limits": {
+            "maxTransferBytes": 358400
+          },
+          "passed": true
+        }
+      ],
+      "issues": []
+    }
+  ]
+}

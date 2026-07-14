@@ -1,0 +1,5 @@
+key = "docs"
+title = { en = "PliegoRS Documentation | Rust SSG, WASM, Events and Adapters", es = "Documentación PliegoRS | SSG Rust, WASM, eventos y adaptadores" }
+description = { en = "Current PliegoRS contracts for projects, Rust views, typed content, events, browser adapters, adaptive assets, build trust, and releases.", es = "Contratos actuales de PliegoRS para proyectos, vistas Rust, contenido tipado, eventos, adaptadores, assets, confianza y releases." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A precision material ledger representing PliegoRS documentation and diagnostics", es = "Un ledger material de precisión que representa la documentación y los diagnósticos de PliegoRS" }

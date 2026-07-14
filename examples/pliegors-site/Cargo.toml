@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliegors-site"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "pliegors-site"
+path = "src/main.rs"
+test = true
+bench = false
+
+[dependencies]
+pliego-adapters = { path = "../../crates/pliego-adapters" }
+pliego-content = { path = "../../crates/pliego-content" }
+pliego-dom = { path = "../../crates/pliego-dom" }
+pliego-ssg = { path = "../../crates/pliego-ssg" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }

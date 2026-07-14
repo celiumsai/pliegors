@@ -1,0 +1,5 @@
+key = "docs-licensing"
+title = { en = "PliegoRS Licensing | Apache-2.0, Trademarks and Project Policy", es = "Licenciamiento PliegoRS | Apache-2.0, marcas y políticas" }
+description = { en = "Understand the PliegoRS Apache-2.0 license, starter ownership, third-party notices, trademarks, security, support, and contributions.", es = "Entiende la licencia Apache-2.0 de PliegoRS, propiedad de starters, avisos de terceros, marcas, seguridad, soporte y contribuciones." }
+image = "/media/pliegors/fold-hero.webp"
+imageAlt = { en = "The PliegoRS execution fold representing source and policy ownership", es = "El pliegue de ejecución de PliegoRS que representa propiedad de fuente y políticas" }

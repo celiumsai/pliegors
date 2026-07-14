@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliegors-site-client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true, features = [
+  "Window", "Document", "Element", "HtmlElement", "HtmlButtonElement",
+  "HtmlFormElement", "HtmlInputElement", "HtmlTextAreaElement", "HtmlImageElement",
+  "HtmlVideoElement", "HtmlSourceElement", "Event", "EventTarget", "KeyboardEvent",
+  "MouseEvent", "PointerEvent", "Storage", "History", "Location", "Url",
+  "UrlSearchParams", "DomTokenList", "Node", "NodeList", "MediaQueryList",
+  "IntersectionObserver", "IntersectionObserverEntry", "IntersectionObserverInit",
+  "Navigator", "Clipboard", "Request", "RequestInit", "RequestMode", "Response",
+  "RequestCredentials", "Headers", "console", "CssStyleDeclaration", "HtmlDialogElement",
+  "FormData", "DomRect"
+] }

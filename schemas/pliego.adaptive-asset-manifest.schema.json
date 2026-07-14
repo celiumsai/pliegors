@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.adaptive-asset-manifest.schema.json",
+  "title": "PliegoRS adaptive asset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "manifestVersion", "recipeSha256", "toolchains", "sources", "variants", "budgetResults"],
+  "properties": {
+    "$schema": { "const": "https://pliegors.dev/schemas/pliego.adaptive-asset-manifest.schema.json" },
+    "manifestVersion": { "const": "1.0.0" },
+    "recipeSha256": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/sha256" },
+    "toolchains": {
+      "type": "array",
+      "items": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json#/$defs/toolchainPin" }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/source" }
+    },
+    "variants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/variant" }
+    },
+    "budgetResults": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/budgetResult" }
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sourceId",
+        "path",
+        "format",
+        "mediaType",
+        "requiredToolchains",
+        "operation",
+        "sha256",
+        "bytes",
+        "policy",
+        "estimatedDecodedBytes",
+        "estimatedTriangles",
+        "estimatedDrawCalls"
+      ],
+      "properties": {
+        "id": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/jobIdentifier" },
+        "sourceId": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/identifier" },
+        "path": {
+          "type": "string",
+          "pattern": "^assets/[a-z0-9-]+/[a-z0-9-]+\\.[a-f0-9]{16}\\.[a-z0-9]+$"
+        },
+        "format": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/artifactFormat" },
+        "mediaType": { "type": "string", "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$" },
+        "selectionGroup": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/identifier" },
+        "requiredToolchains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json#/$defs/toolchain" }
+        },
+        "operation": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/operation" },
+        "sha256": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 2147483648 },
+        "policy": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json#/$defs/policy" },
+        "estimatedDecodedBytes": { "type": "integer", "minimum": 0 },
+        "estimatedTriangles": { "type": "integer", "minimum": 0 },
+        "estimatedDrawCalls": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initialBytes", "deferredBytes", "onDemandBytes", "decodedBytes", "triangles", "drawCalls", "preloads"],
+      "properties": {
+        "initialBytes": { "type": "integer", "minimum": 0 },
+        "deferredBytes": { "type": "integer", "minimum": 0 },
+        "onDemandBytes": { "type": "integer", "minimum": 0 },
+        "decodedBytes": { "type": "integer", "minimum": 0 },
+        "triangles": { "type": "integer", "minimum": 0 },
+        "drawCalls": { "type": "integer", "minimum": 0 },
+        "preloads": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "budgetResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "tier", "pass", "totals"],
+      "properties": {
+        "profileId": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-plan.schema.json#/$defs/identifier" },
+        "tier": { "$ref": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json#/$defs/tier" },
+        "pass": { "const": true },
+        "totals": { "$ref": "#/$defs/totals" }
+      }
+    }
+  }
+}

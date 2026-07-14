@@ -1,0 +1,5 @@
+key = "docs-getting-started"
+title = { en = "Getting Started with PliegoRS | Install, Create and Build", es = "Primeros pasos con PliegoRS | Instalar, crear y compilar" }
+description = { en = "Install the PliegoRS CLI, create the default Rust starter, run the development server, and verify the first production build.", es = "Instala el CLI de PliegoRS, crea el starter Rust predeterminado, ejecuta el servidor de desarrollo y verifica el primer build de producción." }
+image = "/media/pliegors/fold-hero.webp"
+imageAlt = { en = "The PliegoRS execution fold representing the first project build", es = "El pliegue de ejecución de PliegoRS que representa el primer build del proyecto" }

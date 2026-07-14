@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-labelledby="title desc">
+  <title id="title">PLIEGO Signatura mark</title>
+  <desc id="desc">A continuous orthogonal route with two open ends.</desc>
+  <path d="M10 3H21V10H14V14H3V21H14" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter"/>
+</svg>

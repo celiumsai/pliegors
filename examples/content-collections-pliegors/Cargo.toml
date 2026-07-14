@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "content-collections-pliegors"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "content-collections-pliegors"
+path = "src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+pliego-content = { path = "../../crates/pliego-content" }
+pliego-dom = { path = "../../crates/pliego-dom" }
+pliego-ssg = { path = "../../crates/pliego-ssg" }
+serde = { workspace = true }

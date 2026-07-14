@@ -1,0 +1,4 @@
+[project]
+name = "Native Content Ledger"
+site_package = "content-collections-pliegors"
+output = "target/site"

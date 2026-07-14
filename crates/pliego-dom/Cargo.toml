@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-dom"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "PliegoRS's renderer: views as data, surgical DOM mounting (wasm) and HTML string rendering (native/SSR) over the same tree."
+publish.workspace = true
+
+[dependencies]
+pliego-reactive = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { workspace = true }
+web-sys = { workspace = true, features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "Text",
+    "Comment",
+    "Node",
+    "Event",
+    "EventTarget",
+] }

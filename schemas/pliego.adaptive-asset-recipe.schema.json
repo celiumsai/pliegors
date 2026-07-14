@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.adaptive-asset-recipe.schema.json",
+  "title": "PliegoRS adaptive asset recipe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["recipeVersion", "toolchains", "budgetProfiles", "assets"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "recipeVersion": { "const": "1.0.0" },
+    "toolchains": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/toolchainPin" }
+    },
+    "budgetProfiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/budgetProfile" }
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/asset" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^:]+$"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["universal", "lite", "balanced", "signature"]
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tiers", "delivery", "fetchPriority", "motion"],
+      "properties": {
+        "tiers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/tier" }
+        },
+        "delivery": {
+          "type": "string",
+          "enum": ["initial", "deferred", "on-demand"]
+        },
+        "preload": { "type": "boolean", "default": false },
+        "fetchPriority": {
+          "type": "string",
+          "enum": ["high", "auto", "low"]
+        },
+        "motion": {
+          "type": "string",
+          "enum": ["static", "suppress-when-reduced"]
+        }
+      }
+    },
+    "toolchain": {
+      "type": "string",
+      "enum": ["ffmpeg", "fonttools", "blender", "gltf-transform", "ktx2-encoder"]
+    },
+    "toolchainPin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "$ref": "#/$defs/toolchain" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "integrity": {
+          "type": "string",
+          "pattern": "^sha256-[a-f0-9]{64}$"
+        }
+      }
+    },
+    "tierBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tier",
+        "maxInitialBytes",
+        "maxDeferredBytes",
+        "maxOnDemandBytes",
+        "maxDecodedBytes",
+        "maxTriangles",
+        "maxDrawCalls",
+        "maxPreloads"
+      ],
+      "properties": {
+        "tier": { "$ref": "#/$defs/tier" },
+        "maxInitialBytes": { "type": "integer", "minimum": 0 },
+        "maxDeferredBytes": { "type": "integer", "minimum": 0 },
+        "maxOnDemandBytes": { "type": "integer", "minimum": 0 },
+        "maxDecodedBytes": { "type": "integer", "minimum": 0 },
+        "maxTriangles": { "type": "integer", "minimum": 0 },
+        "maxDrawCalls": { "type": "integer", "minimum": 0 },
+        "maxPreloads": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "budgetProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "device", "tiers"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "device": {
+          "type": "string",
+          "enum": ["modest-mobile", "tablet", "desktop"]
+        },
+        "tiers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/tierBudget" }
+        }
+      }
+    },
+    "imageOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "width", "height", "format", "quality", "policy"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "format": { "type": "string", "enum": ["avif", "webp", "jpeg"] },
+        "quality": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "policy": { "$ref": "#/$defs/policy" }
+      }
+    },
+    "videoOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "width", "height", "format", "bitrateKbps", "maxFps", "policy"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "format": { "type": "string", "enum": ["mp4-h264", "mp4-av1", "webm-vp9"] },
+        "bitrateKbps": { "type": "integer", "minimum": 1 },
+        "maxFps": { "type": "integer", "minimum": 1, "maximum": 240 },
+        "audio": { "type": "boolean", "default": false },
+        "policy": { "$ref": "#/$defs/policy" }
+      }
+    },
+    "fontOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "glyphs", "policy"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "glyphs": { "type": "string", "minLength": 1, "maxLength": 8192 },
+        "unicodeRange": { "type": "string", "pattern": "^U\\+", "maxLength": 512 },
+        "policy": { "$ref": "#/$defs/policy" }
+      }
+    },
+    "sceneOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "maxTriangles",
+        "maxDrawCalls",
+        "meshCompression",
+        "textureCompression",
+        "maxTextureDimension",
+        "policy"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "maxTriangles": { "type": "integer", "minimum": 1 },
+        "maxDrawCalls": { "type": "integer", "minimum": 1 },
+        "meshCompression": { "type": "string", "enum": ["none", "meshopt", "draco"] },
+        "textureCompression": { "type": "string", "enum": ["ktx2-etc1s", "ktx2-uastc"] },
+        "maxTextureDimension": { "type": "integer", "minimum": 1, "maximum": 16384 },
+        "requiresBlender": { "type": "boolean", "default": false },
+        "policy": { "$ref": "#/$defs/policy" }
+      }
+    },
+    "transform": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "outputs"],
+          "properties": {
+            "kind": { "const": "image" },
+            "outputs": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "$ref": "#/$defs/imageOutput" } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "outputs"],
+          "properties": {
+            "kind": { "const": "video" },
+            "outputs": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "$ref": "#/$defs/videoOutput" } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "outputs"],
+          "properties": {
+            "kind": { "const": "font" },
+            "outputs": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "$ref": "#/$defs/fontOutput" } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "outputs"],
+          "properties": {
+            "kind": { "const": "scene3d" },
+            "outputs": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "$ref": "#/$defs/sceneOutput" } }
+          }
+        }
+      ]
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "input", "transform"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "input": { "$ref": "#/$defs/relativePath" },
+        "transform": { "$ref": "#/$defs/transform" }
+      }
+    }
+  }
+}

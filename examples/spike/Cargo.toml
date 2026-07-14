@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "spike"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "M1 spike: a task list rendered as the fold of a real event log — append on click, undo via cursor, provenance per item."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pliego-log = { workspace = true }
+pliego-reactive = { path = "../../crates/pliego-reactive" }
+pliego-fold = { path = "../../crates/pliego-fold" }
+pliego-dom = { path = "../../crates/pliego-dom" }
+
+# Browser bindings only when compiling for the browser — the reducer and the
+# M1 gate tests stay native.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+pliego-hyphae = { path = "../../crates/pliego-hyphae" }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true, features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "HtmlInputElement",
+    "Event",
+    "EventTarget",
+    "Node",
+    "console",
+] }

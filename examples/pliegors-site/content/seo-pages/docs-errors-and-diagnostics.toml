@@ -1,0 +1,5 @@
+key = "docs-errors-and-diagnostics"
+title = { en = "PliegoRS Errors and Diagnostics | Browser Build Failures and PLG Codes", es = "Errores y diagnósticos PliegoRS | Fallos de build y códigos PLG" }
+description = { en = "Understand PliegoRS browser error pages, stable diagnostic codes, JSON output, HTTP failures, exit statuses, and recovery workflows.", es = "Entiende páginas de error PliegoRS, códigos diagnósticos estables, salida JSON, fallos HTTP, estados de salida y flujos de recuperación." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "The PliegoRS evidence plane representing actionable diagnostics", es = "El plano de evidencia de PliegoRS que representa diagnósticos accionables" }

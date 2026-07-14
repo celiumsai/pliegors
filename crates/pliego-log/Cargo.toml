@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-log"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The append-only, hash-chained event log PliegoRS folds into UI. Wire-compatible in spirit with Hyphae's journal."
+publish.workspace = true
+
+[dependencies]
+sha2 = { workspace = true }

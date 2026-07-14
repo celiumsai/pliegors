@@ -1,0 +1,36 @@
+# Rust
+/target/
+**/target/
+Cargo.lock.bak
+/node_modules/
+**/node_modules/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+.mf/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Unreviewed physical-device captures
+/measurements/inbox/*.json
+/measurements/runs/inbox/*.json
+/measurements/runs/rejected/*.json
+/measurements/runs/raw/
+
+# WASM build output
+dist/
+pkg/
+
+# editors / os
+.DS_Store
+*.swp

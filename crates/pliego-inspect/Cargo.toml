@@ -1,0 +1,24 @@
+[package]
+name = "pliego-inspect"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Deterministic asset manifest and performance-budget inspector for PliegoRS."
+publish.workspace = true
+
+[dependencies]
+cap-fs-ext = "=4.0.2"
+cap-std = "=4.0.2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "pliego-inspect"
+path = "src/main.rs"

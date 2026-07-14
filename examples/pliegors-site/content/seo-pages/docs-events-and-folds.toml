@@ -1,0 +1,5 @@
+key = "docs-events-and-folds"
+title = { en = "Events and Folds in PliegoRS | Replayable Rust State", es = "Eventos y folds en PliegoRS | Estado Rust reproducible" }
+description = { en = "Model typed events, deterministic projections, replay parity, snapshots, effects, receipts, and progressive durability modes.", es = "Modela eventos tipados, proyecciones deterministas, paridad de replay, snapshots, efectos, recibos y modos progresivos de durabilidad." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "Layered PliegoRS planes representing event history and deterministic folds", es = "Planos superpuestos de PliegoRS que representan historia de eventos y folds deterministas" }

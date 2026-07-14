@@ -1,0 +1,4 @@
+[project]
+name = "Minimal PliegoRS"
+site_package = "minimal-pliego"
+output = "target/site"

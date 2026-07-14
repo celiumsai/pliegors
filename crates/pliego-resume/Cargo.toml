@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-resume"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Declarative resumable islands and delegated standard actions for PliegoRS."
+publish.workspace = true
+
+[dependencies]
+pliego-dom = { workspace = true }
+serde_json = { workspace = true }

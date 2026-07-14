@@ -1,0 +1,24 @@
+{
+  "name": "@pliegors/email-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm run types && tsc --noEmit && vitest run",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "mimetext": "3.0.28"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.18.4",
+    "@types/node": "26.1.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.110.0"
+  }
+}

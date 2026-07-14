@@ -1,0 +1,225 @@
+{
+  "$schema": "../../schemas/pliego.measurement-plan.schema.json",
+  "planVersion": "1.0.0",
+  "policy": {
+    "warmupRuns": 1,
+    "measuredRuns": 5,
+    "aggregation": [
+      "median",
+      "p75",
+      "p95"
+    ],
+    "cacheModes": [
+      "cold",
+      "warm"
+    ],
+    "thermalRule": "Begin at nominal temperature; discard and repeat a run after thermal throttling or an OS thermal warning.",
+    "powerRule": "Use external power for computers and at least 50 percent charge with low-power mode disabled on mobile devices.",
+    "motionRule": "Run the default authored motion and a separate prefers-reduced-motion pass; never combine their samples."
+  },
+  "devices": [
+    {
+      "id": "android-reference",
+      "role": "modest-android",
+      "required": true,
+      "status": "pending",
+      "evidence": "physical-device",
+      "referenceClass": "Android handset with 4 GB RAM and an entry-level mobile GPU",
+      "actualFingerprint": null,
+      "browsers": [
+        {
+          "name": "Chrome for Android",
+          "engine": "blink",
+          "channel": "stable"
+        }
+      ],
+      "viewport": {
+        "mode": "native",
+        "orientation": "portrait"
+      },
+      "tiers": [
+        "universal",
+        "lite"
+      ],
+      "networkProfile": "mobile-wifi",
+      "notes": "Attach an anonymized physical-device fingerprint before accepting release evidence."
+    },
+    {
+      "id": "ipad-reference",
+      "role": "ipad-safari",
+      "required": true,
+      "status": "pending",
+      "evidence": "physical-device",
+      "referenceClass": "Currently supported iPad running stable Safari",
+      "actualFingerprint": null,
+      "browsers": [
+        {
+          "name": "Safari on iPadOS",
+          "engine": "webkit",
+          "channel": "stable"
+        }
+      ],
+      "viewport": {
+        "mode": "native",
+        "orientation": "landscape",
+        "additionalOrientations": [
+          "portrait"
+        ]
+      },
+      "tiers": [
+        "universal",
+        "lite",
+        "balanced"
+      ],
+      "networkProfile": "mobile-wifi",
+      "notes": "Capture both orientations on a physical device and publish only anonymized evidence."
+    },
+    {
+      "id": "integrated-gpu-reference",
+      "role": "integrated-gpu-laptop",
+      "required": true,
+      "status": "pending",
+      "evidence": "physical-device",
+      "referenceClass": "Current laptop with an integrated GPU and at least 8 GB system memory",
+      "actualFingerprint": null,
+      "browsers": [
+        {
+          "name": "Chrome",
+          "engine": "blink",
+          "channel": "stable"
+        }
+      ],
+      "viewport": {
+        "mode": "fixed",
+        "orientation": "landscape",
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "tiers": [
+        "universal",
+        "lite",
+        "balanced"
+      ],
+      "networkProfile": "desktop-broadband",
+      "notes": "Use a clean browser profile and attach an anonymized physical-device fingerprint."
+    },
+    {
+      "id": "discrete-gpu-reference",
+      "role": "capable-desktop",
+      "required": true,
+      "status": "pending",
+      "evidence": "physical-device",
+      "referenceClass": "Desktop-class discrete GPU with at least 8 GB dedicated VRAM",
+      "actualFingerprint": null,
+      "browsers": [
+        {
+          "name": "Chrome",
+          "engine": "blink",
+          "channel": "stable"
+        }
+      ],
+      "viewport": {
+        "mode": "fixed",
+        "orientation": "landscape",
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "tiers": [
+        "universal",
+        "lite",
+        "balanced",
+        "signature"
+      ],
+      "networkProfile": "desktop-broadband",
+      "notes": "Attach an anonymized physical-device fingerprint before accepting signature-tier evidence."
+    }
+  ],
+  "targets": [
+    {
+      "id": "pliegors-site",
+      "baseUrlEnvironment": "PLIEGORS_SITE_URL",
+      "localDefault": "http://127.0.0.1:5274",
+      "routes": [
+        "/",
+        "/docs",
+        "/security"
+      ]
+    }
+  ],
+  "metrics": [
+    {
+      "id": "transfer-bytes",
+      "unit": "bytes",
+      "collector": "Navigation and Resource Timing with cache state recorded",
+      "aggregation": "median"
+    },
+    {
+      "id": "decode-p95-ms",
+      "unit": "milliseconds",
+      "collector": "Image decode and video request-to-first-frame marks",
+      "aggregation": "p95"
+    },
+    {
+      "id": "main-thread-p95-ms",
+      "unit": "milliseconds",
+      "collector": "Performance trace long-task and task-duration slices",
+      "aggregation": "p95"
+    },
+    {
+      "id": "estimated-vram-bytes",
+      "unit": "bytes",
+      "collector": "Renderer instrumentation plus decoded texture dimensions",
+      "aggregation": "exact"
+    },
+    {
+      "id": "draw-calls",
+      "unit": "count",
+      "collector": "Three.js renderer.info.render.calls",
+      "aggregation": "p95"
+    },
+    {
+      "id": "triangles",
+      "unit": "count",
+      "collector": "Three.js renderer.info.render.triangles",
+      "aggregation": "p95"
+    },
+    {
+      "id": "frame-p95-ms",
+      "unit": "milliseconds",
+      "collector": "requestAnimationFrame deltas during the scripted interaction window",
+      "aggregation": "p95"
+    },
+    {
+      "id": "lcp-p75-ms",
+      "unit": "milliseconds",
+      "collector": "web-vitals observer in the lab interaction script",
+      "aggregation": "p75"
+    },
+    {
+      "id": "inp-p75-ms",
+      "unit": "milliseconds",
+      "collector": "web-vitals observer after the canonical interaction script",
+      "aggregation": "p75"
+    },
+    {
+      "id": "cls-p75",
+      "unit": "ratio",
+      "collector": "web-vitals observer over the complete route session",
+      "aggregation": "p75"
+    }
+  ],
+  "budgets": {
+    "universalFirstViewportTransferBytes": 358400,
+    "capabilityBootstrapBrotliBytes": 5120,
+    "tier0ThreeRuntimeBytes": 0,
+    "interactiveIslandBrotliBytes": 184320,
+    "liteDeferredSceneBytes": 921600,
+    "liteEstimatedVramBytes": 33554432,
+    "liteFrameP95Ms": 33,
+    "lcpP75Ms": 1800,
+    "inpP75Ms": 150,
+    "clsP75": 0.05
+  }
+}

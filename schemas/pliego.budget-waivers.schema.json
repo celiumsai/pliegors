@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.budget-waivers.schema.json",
+  "title": "PLIEGO temporary budget waivers",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["waiverVersion", "waivers"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "waiverVersion": {
+      "const": "1.0.0"
+    },
+    "waivers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "targetId",
+          "budgetId",
+          "introducedAtGate",
+          "mustPassByGate",
+          "reason",
+          "authority"
+        ],
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+          },
+          "budgetId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+          },
+          "introducedAtGate": {
+            "const": "phase-1"
+          },
+          "mustPassByGate": {
+            "const": "phase-2"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 20
+          },
+          "authority": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
