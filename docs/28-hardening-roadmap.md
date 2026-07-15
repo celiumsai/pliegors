@@ -33,6 +33,11 @@ objects, documents, or provenance are required.
 | P0-04 | The build ledger can be shallow or forged. | The final ledger binds all emitted bytes, source identities, toolchain pins, configuration, and previous ownership evidence. |
 | P0-05 | Hyphae replay can accept data without complete cryptographic and type verification. | Replay is type-gated and rejects invalid signatures, receipts, gaps, forks, authorities, and unsupported event versions. |
 
+P0-01 and P0-02 are closed by the committed
+[R0 reactive safety evidence](evidence/r0-reactive-safety.md) and runtime commit
+`ff60575f8c0f16164ecfc1754eac165ae776d33a`. The historical risks remain above
+so later changes can be checked against the original failure modes.
+
 ## P1 and P2 findings
 
 - Validate element and attribute names at DOM construction boundaries.
@@ -65,6 +70,7 @@ authority behind a value.
 ### R0 - Reactive safety
 
 Close ownership reclamation, panic safety, reentrancy, and scheduler invariants.
+Status: complete. See [R0 reactive safety evidence](evidence/r0-reactive-safety.md).
 
 ### R1 - Artifact trust
 

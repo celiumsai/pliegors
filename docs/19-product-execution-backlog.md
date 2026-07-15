@@ -13,7 +13,7 @@ candidate.
 
 | Order | Gate | Status | Acceptance evidence |
 | --- | --- | --- | --- |
-| 1 | R0 Reactive safety | Active | Ownership trees reclaim children, panics cannot poison the scheduler, and nested updates are deterministic. |
+| 1 | R0 Reactive safety | Complete | [Committed R0 evidence](evidence/r0-reactive-safety.md) covers ownership reclamation, unwind safety, deterministic nested updates, scheduler bounds, and arena plateau. |
 | 2 | R1 Artifact trust | Pending | Output paths are collision-safe; the ledger binds every byte, toolchain input, and source identity. |
 | 3 | R2 Verified sync | Pending | Hyphae replay rejects gaps, forks, invalid receipts, unknown authority, and incompatible event versions. |
 | 4 | R3 Snapshot and schema contract | Pending | Snapshot identity binds schema, reducer, history head, and canonical encoding; upcasters are explicit. |

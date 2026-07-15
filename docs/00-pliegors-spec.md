@@ -159,7 +159,10 @@ pliegors/
 ## 5. Targets
 
 - **Client:** `wasm32-unknown-unknown` via wasm-bindgen. Size-oriented release
-  profiles exist; `wasm-opt` and bundle budgets are not CI gates yet.
+  profiles exist; `wasm-opt` and bundle budgets are not CI gates yet. The stable
+  production target uses `panic=abort`, so a panic is a terminal WASM trap and
+  no post-panic recovery is promised for that instance. Reactive unwind safety
+  applies only to targets built with unwinding support.
 - **Server/SSR (planned):** the same folds will render HTML server-side. Hydration
   must be implemented and verified; deterministic reducers alone do not adopt or
   reconcile server DOM. Cloudflare Workers is the required deployment target.

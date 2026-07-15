@@ -61,6 +61,13 @@ site output.
 4. Run the declared site package with the configured output path.
 5. Require the site to emit the deterministic `pliego.build.json` ledger.
 
+The client build intentionally follows stable Rust's
+`wasm32-unknown-unknown` panic policy. A panic traps and terminates that WASM
+instance; `pliego build` does not currently produce an exception-handling build
+and does not promise post-panic recovery in the browser. Runtime recovery
+guarantees apply to unwind-capable targets. The R0 WASM EH suite is a separate
+Node.js verification path and is not part of the production client pipeline.
+
 `pliego dev [port]` performs a build, serves the output on `127.0.0.1`, watches
 project files, and rebuilds after a debounced change. A failed rebuild leaves
 the last valid site available and the watcher alive. Development HTML receives
