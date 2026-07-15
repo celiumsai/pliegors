@@ -43,6 +43,12 @@ P0-03 and P0-04 are closed by the committed
 commit `12ec7cead21003c6dee8d4a85b873adda3cf2779`. Their historical risks likewise
 remain above as regression targets.
 
+P0-05 is closed by the committed
+[R2 verified sync evidence](evidence/r2-verified-sync.md) and implementation
+commit `d617075e94305c8237dee4eaa8d7a161df065f17`. The historical risk remains
+above as a regression target; production transport, keys, and persistence stay
+outside the bounded R2 client contract.
+
 ## P1 and P2 findings
 
 - Validate element and attribute names at DOM construction boundaries.
@@ -87,11 +93,13 @@ Status: complete. See [R1 artifact trust evidence](evidence/r1-artifact-trust.md
 
 Make Hyphae receipts, authority, cursors, event versions, gaps, forks, and
 selective replay fail closed.
+Status: complete. See [R2 verified sync evidence](evidence/r2-verified-sync.md).
 
 ### R3 - Snapshot and schema contract
 
 Introduce explicit schema evolution and upcasters; bind snapshots to the exact
 history and projection contract.
+Status: active.
 
 ### R4 - DOM lifecycle
 

@@ -1,8 +1,8 @@
 # R2 Verified Sync Evidence
 
-**Status:** implementation documented; final acceptance commands and resulting
-commit are not recorded yet. R2 remains active until this record is completed
-against one committed implementation tree.
+**Status:** complete. The implementation and adversarial acceptance matrix were
+verified against commit `d617075e94305c8237dee4eaa8d7a161df065f17` on
+2026-07-15.
 
 ## Security objective and threat model
 
@@ -147,49 +147,68 @@ unknown pair; R3 owns upcasters, reducer identity, and snapshot schema evolution
 
 | ID | Evidence | Result |
 | --- | --- | --- |
-| R2-A01 | Six compile-fail typestate and sink-boundary doctests | NOT RECORDED |
-| R2-A02 | `v2_rejects_v1_and_unknown_selective_replay` | NOT RECORDED |
-| R2-A03 | `append_response_requires_exact_one_based_sequences`, `pull_page_rejects_sequence_gaps_and_zero` | NOT RECORDED |
-| R2-A04 | `append_attestation_rejects_receipt_set_mutation_before_receipt_verification` | NOT RECORDED |
-| R2-A05 | `append_attestation_blocks_batch_substitution_and_authority_mismatch` | NOT RECORDED |
-| R2-A06 | `empty_page_is_attested_and_never_calls_sink` | NOT RECORDED |
-| R2-A07 | `page_attestation_binds_request_snapshot_limit_completion_and_events` | NOT RECORDED |
-| R2-A08 | `signed_request_mutation_fails_verification`, `signed_snapshot_and_completion_mutation_fails_verification` | NOT RECORDED |
-| R2-A09 | `authority_errors_are_structured_and_fail_closed` | NOT RECORDED |
-| R2-A10 | `append_verification_accepts_key_rotation_within_one_authority` | NOT RECORDED |
-| R2-A11 | `invalid_receipt_signature_never_produces_verified_page` | NOT RECORDED |
-| R2-A12 | `unknown_event_version_fails_before_replay_sink_exists` | NOT RECORDED |
-| R2-A13 | `stream_and_future_cursor_substitution_fail_before_verification` | NOT RECORDED |
-| R2-A14 | `fork_verified_before_state_change_is_rejected_before_sink` | NOT RECORDED |
-| R2-A15 | `verified_replay_applies_once_and_deduplicates_absolute_overlap` | NOT RECORDED |
-| R2-A16 | `exact_snapshot_continuation_cannot_change_cycle_head` | NOT RECORDED |
-| R2-A17 | `authority_is_bound_to_replay_state` | NOT RECORDED |
-| R2-A18 | `reducer_error_leaves_replay_state_unchanged` | NOT RECORDED |
-| R2-A19 | `receipt_rejects_zero_hash_self_loop_and_impossible_journal_head` | NOT RECORDED |
-| R2-A20 | `canonical_signature_payloads_have_distinct_golden_vectors` | NOT RECORDED |
-| R2-A21 | `legacy_ack_is_explicitly_feature_gated_and_unverified` | NOT RECORDED |
+| R2-A01 | Six compile-fail typestate and sink-boundary doctests | PASS |
+| R2-A02 | `v2_rejects_v1_and_unknown_selective_replay` | PASS |
+| R2-A03 | `append_response_requires_exact_one_based_sequences`, `pull_page_rejects_sequence_gaps_and_zero` | PASS |
+| R2-A04 | `append_attestation_rejects_receipt_set_mutation_before_receipt_verification` | PASS |
+| R2-A05 | `append_attestation_blocks_batch_substitution_and_authority_mismatch` | PASS |
+| R2-A06 | `empty_page_is_attested_and_never_calls_sink` | PASS |
+| R2-A07 | `page_attestation_binds_request_snapshot_limit_completion_and_events` | PASS |
+| R2-A08 | `signed_request_mutation_fails_verification`, `signed_snapshot_and_completion_mutation_fails_verification` | PASS |
+| R2-A09 | `authority_errors_are_structured_and_fail_closed` | PASS |
+| R2-A10 | `append_verification_accepts_key_rotation_within_one_authority` | PASS |
+| R2-A11 | `invalid_receipt_signature_never_produces_verified_page` | PASS |
+| R2-A12 | `unknown_event_version_fails_before_replay_sink_exists` | PASS |
+| R2-A13 | `stream_and_future_cursor_substitution_fail_before_verification` | PASS |
+| R2-A14 | `fork_verified_before_state_change_is_rejected_before_sink` | PASS |
+| R2-A15 | `verified_replay_applies_once_and_deduplicates_absolute_overlap` | PASS |
+| R2-A16 | `exact_snapshot_continuation_cannot_change_cycle_head` | PASS |
+| R2-A17 | `authority_is_bound_to_replay_state` | PASS |
+| R2-A18 | `reducer_error_leaves_replay_state_unchanged` | PASS |
+| R2-A19 | `receipt_rejects_zero_hash_self_loop_and_impossible_journal_head` | PASS |
+| R2-A20 | `canonical_signature_payloads_have_distinct_golden_vectors` | PASS |
+| R2-A21 | `legacy_ack_is_explicitly_feature_gated_and_unverified` | PASS |
+| R2-A22 | `signature_shape_requires_canonical_base64url_padding` | PASS |
+| R2-A23 | `wire_limits_accept_max_and_reject_max_plus_one`, `replay_anchor_pruning_stays_at_the_exact_bound` | PASS |
 
 ## Verification record
 
 | Command | Result |
 | --- | --- |
-| `cargo fmt --all -- --check` | NOT RECORDED |
-| `cargo test -p pliego-hyphae --no-default-features --locked` | NOT RECORDED |
-| `cargo test -p pliego-hyphae --all-features --locked` | NOT RECORDED |
-| `cargo test -p pliego-hyphae --doc --locked` | NOT RECORDED |
-| `cargo clippy -p pliego-hyphae --all-targets --all-features --locked -- -D warnings` | NOT RECORDED |
-| `cargo clippy -p pliego-hyphae -p spike --target wasm32-unknown-unknown --all-features --locked -- -D warnings` | NOT RECORDED |
-| `cargo clippy --workspace --all-targets --locked -- -D warnings` | NOT RECORDED |
-| `cargo test --workspace --all-targets --locked` | NOT RECORDED |
-| `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked` | NOT RECORDED |
-| `npm run check:docs` | NOT RECORDED |
-| `npm run check:distribution` | NOT RECORDED |
-| `git diff --check` | NOT RECORDED |
+| `cargo fmt --all -- --check` | PASS on Debian WSL2 and Windows native. |
+| `cargo test -p pliego-hyphae --no-default-features --locked` | PASS on both hosts: 33 unit tests and 6 compile-fail doctests. |
+| `cargo test -p pliego-hyphae --all-features --locked` | PASS on both hosts: 34 unit tests and 6 compile-fail doctests. |
+| `cargo test -p pliego-hyphae --doc --locked` | PASS: 6 compile-fail doctests. |
+| `cargo clippy -p pliego-hyphae --all-targets --all-features --locked -- -D warnings` | PASS on Debian WSL2 and Windows native with zero warnings. |
+| `cargo clippy -p pliego-hyphae -p spike --target wasm32-unknown-unknown --all-features --locked -- -D warnings` | PASS on Debian WSL2. |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | PASS on the committed implementation tree. |
+| `cargo test --workspace --all-targets --locked` | PASS on the committed implementation tree. |
+| `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked` | PASS with zero rustdoc warnings. |
+| `npm run check:docs` | PASS: 43 Markdown files. |
+| `npm run check:distribution` | PASS: 15 source-only crates, 5 private candidates, and manual draft-release policy. |
+| `git diff --check` | PASS; the committed implementation tree was clean. |
 
-- Base commit: `5253950`
-- Resulting implementation commit: NOT RECORDED
-- Rust/Cargo/Node versions: NOT RECORDED
-- Targets checked: NOT RECORDED
+- Base commit: `52539502443975b37685113fe25cd3a2578791be`
+- Resulting implementation commit: `d617075e94305c8237dee4eaa8d7a161df065f17`
+- Debian WSL2: Rust `1.85.0`, Cargo `1.85.0`, Node `20.19.2`, npm `11.13.0`.
+- Windows 11 x64: Rust `1.85.0`, Cargo `1.85.0`, MSVC host.
+- Targets checked: `x86_64-unknown-linux-gnu`, `wasm32-unknown-unknown`, and
+  `x86_64-pc-windows-msvc`.
+
+The accepted WSL workspace run set
+`PLIEGORS_SOURCE_REV=d617075e94305c8237dee4eaa8d7a161df065f17` and used the
+fresh Linux target directory `/tmp/pliegors-r2-d617075-final`. An earlier run
+without the variable failed closed in the CLI source-revision test because this
+machine's WSL `git` command resolves to a Windows executable that cannot consume
+the Linux checkout path. No failing R2 test was bypassed; the explicit full SHA
+is the release-oriented, reproducible input required by the CLI contract.
+
+Two independent code audits found no P0/P1 issue or public typestate bypass.
+They specifically rechecked authority rotation and scope, signature padding,
+receipt journal-head semantics, pre-reducer transaction ordering, exact resource
+bounds, and replay-anchor pruning. A separate documentation audit found four
+P2 example/layout inconsistencies; all four were corrected before the
+implementation commit and the 43-file link check was rerun.
 
 ## Known residual risks
 
