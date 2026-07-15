@@ -43,6 +43,32 @@ pub struct NodeId {
     generation: u32,
 }
 
+/// A fail-closed error from an explicit [`Owner`] operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OwnerError {
+    /// The owner handle no longer resolves to its original arena slot.
+    Disposed,
+    /// The resource being adopted has already been disposed.
+    ResourceDisposed,
+    /// A running resource cannot change lifecycle ownership.
+    ResourceBusy,
+    /// A resource can belong to only one owner at a time.
+    AlreadyOwned,
+}
+
+impl std::fmt::Display for OwnerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disposed => f.write_str("reactive owner is disposed"),
+            Self::ResourceDisposed => f.write_str("reactive resource is disposed"),
+            Self::ResourceBusy => f.write_str("reactive resource is currently running"),
+            Self::AlreadyOwned => f.write_str("reactive resource already has an owner"),
+        }
+    }
+}
+
+impl std::error::Error for OwnerError {}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Color {
     /// Value is current.
@@ -55,6 +81,7 @@ enum Color {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
+    Owner,
     Signal,
     Memo,
     Effect,
@@ -74,6 +101,9 @@ struct Node {
     kind: Kind,
     color: Color,
     owner: Option<NodeId>,
+    /// An explicit owner requested disposal while one of its descendants was
+    /// running or updating. The runtime drains it at the next safe boundary.
+    dispose_requested: bool,
     queued: bool,
     updating: bool,
     running: bool,
@@ -126,6 +156,8 @@ struct Runtime {
     flushing: bool,
     /// User callbacks may nest writes. Effects flush when the outer batch ends.
     batch_depth: usize,
+    /// Owner roots waiting for their active descendant to reach a safe point.
+    deferred_disposals: VecDeque<NodeId>,
 }
 
 thread_local! {
@@ -149,11 +181,8 @@ impl Runtime {
         slot.node.as_mut()
     }
 
-    fn add_node(&mut self, mut node: Node) -> NodeId {
-        let owner = self.owner.filter(|owner| self.node(*owner).is_some());
-        node.owner = owner;
-
-        let id = if let Some(slot_index) = self.free.pop() {
+    fn allocate_node(&mut self, node: Node) -> NodeId {
+        if let Some(slot_index) = self.free.pop() {
             let slot = &mut self.slots[slot_index as usize];
             debug_assert!(slot.node.is_none());
             slot.node = Some(node);
@@ -171,7 +200,13 @@ impl Runtime {
                 slot,
                 generation: 0,
             }
-        };
+        }
+    }
+
+    fn add_node(&mut self, mut node: Node) -> NodeId {
+        let owner = self.owner.filter(|owner| self.node(*owner).is_some());
+        node.owner = owner;
+        let id = self.allocate_node(node);
 
         if let Some(owner) = owner {
             let frame = self
@@ -182,6 +217,47 @@ impl Runtime {
             frame.owned.push(id);
         }
         id
+    }
+
+    fn add_root_node(&mut self, mut node: Node) -> NodeId {
+        node.owner = None;
+        self.allocate_node(node)
+    }
+
+    fn add_owned_node(&mut self, mut node: Node, owner: NodeId) -> NodeId {
+        let owner_node = self
+            .node(owner)
+            .expect("explicit owner disappeared before resource allocation");
+        assert_eq!(owner_node.kind, Kind::Owner, "explicit owner kind changed");
+        assert!(
+            !owner_node.dispose_requested,
+            "cannot add a resource to an owner pending disposal"
+        );
+        node.owner = Some(owner);
+        let id = self.allocate_node(node);
+        self.node_mut(owner)
+            .expect("explicit owner disappeared during resource allocation")
+            .owned
+            .push(id);
+        id
+    }
+
+    fn defer_owner_disposal(&mut self, id: NodeId) {
+        let should_queue = match self.node_mut(id) {
+            Some(node) => {
+                assert_eq!(node.kind, Kind::Owner, "only owners may defer disposal");
+                if node.dispose_requested {
+                    false
+                } else {
+                    node.dispose_requested = true;
+                    true
+                }
+            }
+            None => false,
+        };
+        if should_queue {
+            self.deferred_disposals.push_back(id);
+        }
     }
 
     fn take_node(&mut self, id: NodeId) -> Option<Node> {
@@ -323,6 +399,20 @@ fn collect_disposal(rt: &mut Runtime, id: NodeId, batch: &mut DisposalBatch) {
     }
 }
 
+fn disposable_tree_is_busy(rt: &Runtime, id: NodeId) -> bool {
+    let mut pending = vec![id];
+    while let Some(id) = pending.pop() {
+        let Some(node) = rt.node(id) else {
+            continue;
+        };
+        if node.updating || node.running {
+            return true;
+        }
+        pending.extend(node.owned.iter().copied());
+    }
+    false
+}
+
 fn assert_disposable_tree(rt: &Runtime, id: NodeId) {
     let mut pending = vec![id];
     while let Some(id) = pending.pop() {
@@ -387,6 +477,55 @@ fn run_disposal(batch: DisposalBatch) -> Option<PanicPayload> {
         }
     }
 
+    first_panic
+}
+
+fn take_ready_deferred_disposal(rt: &mut Runtime) -> Option<DisposalBatch> {
+    let queued = rt.deferred_disposals.len();
+    for _ in 0..queued {
+        let id = rt
+            .deferred_disposals
+            .pop_front()
+            .expect("deferred disposal queue length changed");
+        let Some(node) = rt.node(id) else {
+            continue;
+        };
+        assert_eq!(node.kind, Kind::Owner, "deferred node is not an owner");
+        if !node.dispose_requested {
+            continue;
+        }
+        if disposable_tree_is_busy(rt, id) {
+            rt.deferred_disposals.push_back(id);
+            continue;
+        }
+
+        rt.node_mut(id)
+            .expect("deferred owner disappeared before collection")
+            .dispose_requested = false;
+        let mut batch = DisposalBatch::default();
+        collect_disposal(rt, id, &mut batch);
+        return Some(batch);
+    }
+    None
+}
+
+fn merge_panic(first: &mut Option<PanicPayload>, payload: Option<PanicPayload>) {
+    if let Some(payload) = payload {
+        if first.is_none() {
+            *first = Some(payload);
+        } else {
+            suppress_panic(payload);
+        }
+    }
+}
+
+fn drain_deferred_disposals() -> Option<PanicPayload> {
+    let mut first_panic = None;
+    loop {
+        let batch = RT.with(|rt| take_ready_deferred_disposal(&mut rt.borrow_mut()));
+        let Some(batch) = batch else { break };
+        merge_panic(&mut first_panic, run_disposal(batch));
+    }
     first_panic
 }
 
@@ -500,7 +639,9 @@ impl ComputationGuard {
     fn rollback(mut self) -> Option<PanicPayload> {
         let batch = self.take_rollback();
         self.active = false;
-        run_disposal(batch)
+        let mut cleanup_panic = run_disposal(batch);
+        merge_panic(&mut cleanup_panic, drain_deferred_disposals());
+        cleanup_panic
     }
 }
 
@@ -512,7 +653,9 @@ impl Drop for ComputationGuard {
         let batch = self.take_rollback();
         self.active = false;
         let already_panicking = std::thread::panicking();
-        if let Some(payload) = run_disposal(batch) {
+        let mut cleanup_panic = run_disposal(batch);
+        merge_panic(&mut cleanup_panic, drain_deferred_disposals());
+        if let Some(payload) = cleanup_panic {
             if !already_panicking {
                 resume_unwind(payload);
             } else {
@@ -635,6 +778,14 @@ impl Drop for UpdateGuard {
                     node.updating = false;
                 }
             });
+            let already_panicking = std::thread::panicking();
+            if let Some(payload) = drain_deferred_disposals() {
+                if already_panicking {
+                    suppress_panic(payload);
+                } else {
+                    resume_unwind(payload);
+                }
+            }
         }
     }
 }
@@ -856,6 +1007,11 @@ fn run_computation(id: NodeId) {
         };
         (new_value, changed)
     }));
+    // Keep user-owned captures anchored in the live node while deferred owner
+    // disposal is drained, so their final Drop is handled by `run_disposal`.
+    drop(compute);
+    drop(prev_value);
+    drop(eq);
     let (new_value, changed) = match outcome {
         Ok(result) => result,
         Err(primary) => {
@@ -875,7 +1031,8 @@ fn run_computation(id: NodeId) {
     };
     let frame = computation_guard.finish();
     let retired = commit_computation(id, frame, new_value, changed);
-    let cleanup_panic = run_disposal(retired);
+    let mut cleanup_panic = run_disposal(retired);
+    merge_panic(&mut cleanup_panic, drain_deferred_disposals());
     let should_flush = batch_guard.finish();
     if let Some(payload) = cleanup_panic {
         flush_while_preserving(payload, should_flush);
@@ -940,6 +1097,211 @@ fn diagnostic_panic_payload(message: String) -> PanicPayload {
 
 // ───────────────────────────── public API ─────────────────────────────
 
+/// An explicit lifecycle scope for reactive resources.
+///
+/// Owners never inherit the currently-running computation. A child owner or an
+/// owned effect is attached only through this handle, which makes mount
+/// lifetimes deterministic even when setup runs inside another computation.
+/// Dropping an owner recursively disposes its children and executes cleanups in
+/// LIFO order. Calling [`Owner::dispose`] first is safe; the later `Drop` is a
+/// no-op.
+///
+/// Do not strongly capture an owner (for example through `Rc<Owner>`) inside a
+/// resource owned by that same owner: that creates an application-level
+/// retention cycle. Capture only the signals a callback needs, or use a weak,
+/// non-owning application handle.
+///
+/// Owners are intentionally local to one browser thread:
+///
+/// ```compile_fail
+/// use pliego_reactive::Owner;
+/// fn require_send<T: Send>(_: T) {}
+/// require_send(Owner::new());
+/// ```
+pub struct Owner {
+    id: NodeId,
+    _local: PhantomData<Rc<()>>,
+}
+
+impl Owner {
+    /// Create an independent root scope.
+    pub fn new() -> Self {
+        let id = RT.with(|rt| {
+            rt.borrow_mut().add_root_node(Node {
+                kind: Kind::Owner,
+                color: Color::Clean,
+                owner: None,
+                dispose_requested: false,
+                queued: false,
+                updating: false,
+                running: false,
+                retry_notify: false,
+                value: None,
+                compute: None,
+                eq: None,
+                sources: Vec::new(),
+                subscribers: Vec::new(),
+                owned: Vec::new(),
+                cleanups: Vec::new(),
+            })
+        });
+        Self {
+            id,
+            _local: PhantomData,
+        }
+    }
+
+    /// Create a nested lifecycle scope owned by `self`.
+    pub fn child(&self) -> Result<Self, OwnerError> {
+        self.ensure_alive()?;
+        let id = RT.with(|rt| {
+            rt.borrow_mut().add_owned_node(
+                Node {
+                    kind: Kind::Owner,
+                    color: Color::Clean,
+                    owner: None,
+                    dispose_requested: false,
+                    queued: false,
+                    updating: false,
+                    running: false,
+                    retry_notify: false,
+                    value: None,
+                    compute: None,
+                    eq: None,
+                    sources: Vec::new(),
+                    subscribers: Vec::new(),
+                    owned: Vec::new(),
+                    cleanups: Vec::new(),
+                },
+                self.id,
+            )
+        });
+        Ok(Self {
+            id,
+            _local: PhantomData,
+        })
+    }
+
+    /// Register a cleanup directly on this scope, independent of ambient state.
+    pub fn on_cleanup(&self, f: impl FnOnce() + 'static) -> Result<(), OwnerError> {
+        self.ensure_alive()?;
+        RT.with(|rt| {
+            rt.borrow_mut()
+                .node_mut(self.id)
+                .expect("explicit owner disappeared before cleanup registration")
+                .cleanups
+                .push(Box::new(f));
+        });
+        Ok(())
+    }
+
+    /// Create a signal whose lifetime is immediately bound to this scope.
+    pub fn signal<T: 'static>(&self, value: T) -> Result<Signal<T>, OwnerError> {
+        self.ensure_alive()?;
+        Ok(Signal::new_in_owner(value, self.id))
+    }
+
+    /// Create a memo whose lifetime is immediately bound to this scope.
+    pub fn memo<T: PartialEq + 'static>(
+        &self,
+        f: impl Fn() -> T + 'static,
+    ) -> Result<Memo<T>, OwnerError> {
+        self.ensure_alive()?;
+        Ok(Memo::new_in_owner(f, self.id))
+    }
+
+    /// Create an effect whose lifetime is immediately bound to this scope.
+    pub fn effect(&self, f: impl Fn() + 'static) -> Result<Effect, OwnerError> {
+        self.ensure_alive()?;
+        Ok(Effect::new_in_owner(f, self.id))
+    }
+
+    /// Adopt an existing, live, unowned effect into this scope.
+    ///
+    /// Effects already owned by another computation or scope are rejected;
+    /// ownership is never silently stolen or duplicated.
+    pub fn adopt_effect(&self, effect: &Effect) -> Result<(), OwnerError> {
+        RT.with(|rt| {
+            let mut rt = rt.borrow_mut();
+            let Some(owner) = rt.node(self.id) else {
+                return Err(OwnerError::Disposed);
+            };
+            if owner.kind != Kind::Owner {
+                return Err(OwnerError::Disposed);
+            }
+            if owner.dispose_requested {
+                return Err(OwnerError::Disposed);
+            }
+
+            let Some(resource) = rt.node(effect.id) else {
+                return Err(OwnerError::ResourceDisposed);
+            };
+            debug_assert_eq!(resource.kind, Kind::Effect);
+            if resource.running {
+                return Err(OwnerError::ResourceBusy);
+            }
+            match resource.owner {
+                Some(current) if current == self.id => return Ok(()),
+                Some(_) => return Err(OwnerError::AlreadyOwned),
+                None => {}
+            }
+
+            rt.node_mut(effect.id)
+                .expect("effect disappeared during adoption")
+                .owner = Some(self.id);
+            rt.node_mut(self.id)
+                .expect("owner disappeared during adoption")
+                .owned
+                .push(effect.id);
+            Ok(())
+        })
+    }
+
+    /// Recursively dispose this scope. Repeated calls are no-ops.
+    ///
+    /// If a descendant is currently running or updating, the owner becomes
+    /// immediately unusable and teardown is deferred to that operation's safe
+    /// boundary. Cleanup panics are resumed from that boundary after every
+    /// sibling cleanup has run.
+    pub fn dispose(&self) {
+        dispose_owner(self.id);
+    }
+
+    /// Whether this handle no longer resolves to its original scope.
+    pub fn is_disposed(&self) -> bool {
+        self.ensure_alive().is_err()
+    }
+
+    fn ensure_alive(&self) -> Result<(), OwnerError> {
+        RT.with(|rt| match rt.borrow().node(self.id) {
+            Some(node) if node.kind == Kind::Owner && !node.dispose_requested => Ok(()),
+            _ => Err(OwnerError::Disposed),
+        })
+    }
+}
+
+impl Default for Owner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for Owner {
+    fn drop(&mut self) {
+        if RT.try_with(|_| ()).is_err() {
+            return;
+        }
+        let already_panicking = std::thread::panicking();
+        if let Err(payload) = catch_unwind(AssertUnwindSafe(|| dispose_owner(self.id))) {
+            if already_panicking {
+                suppress_panic(payload);
+            } else {
+                resume_unwind(payload);
+            }
+        }
+    }
+}
+
 /// A reactive, writable value — a root of the graph.
 ///
 /// In PliegoRS discipline there is ultimately ONE meaningful root (the log);
@@ -968,11 +1330,20 @@ impl<T> Copy for Signal<T> {}
 impl<T: 'static> Signal<T> {
     /// A new signal holding `value`.
     pub fn new(value: T) -> Self {
+        Self::install(value, None)
+    }
+
+    fn new_in_owner(value: T, owner: NodeId) -> Self {
+        Self::install(value, Some(owner))
+    }
+
+    fn install(value: T, explicit_owner: Option<NodeId>) -> Self {
         let id = RT.with(|rt| {
-            rt.borrow_mut().add_node(Node {
+            let node = Node {
                 kind: Kind::Signal,
                 color: Color::Clean,
                 owner: None,
+                dispose_requested: false,
                 queued: false,
                 updating: false,
                 running: false,
@@ -984,7 +1355,12 @@ impl<T: 'static> Signal<T> {
                 subscribers: Vec::new(),
                 owned: Vec::new(),
                 cleanups: Vec::new(),
-            })
+            };
+            let mut rt = rt.borrow_mut();
+            match explicit_owner {
+                Some(owner) => rt.add_owned_node(node, owner),
+                None => rt.add_node(node),
+            }
         });
         Signal {
             id,
@@ -1095,6 +1471,12 @@ impl<T: 'static> Signal<T> {
             Ok(candidate) => candidate,
             Err(primary) => {
                 update_guard.finish();
+                if let Err(secondary) = catch_unwind(AssertUnwindSafe(|| drop(stable))) {
+                    suppress_panic(secondary);
+                }
+                if let Some(secondary) = drain_deferred_disposals() {
+                    suppress_panic(secondary);
+                }
                 let should_flush = batch_guard.finish();
                 flush_while_preserving(primary, should_flush);
             }
@@ -1116,8 +1498,10 @@ impl<T: 'static> Signal<T> {
             drop(previous);
             drop(stable);
         }));
+        let mut post_update_panic = drop_result.err();
+        merge_panic(&mut post_update_panic, drain_deferred_disposals());
         let should_flush = batch_guard.finish();
-        if let Err(primary) = drop_result {
+        if let Some(primary) = post_update_panic {
             flush_while_preserving(primary, should_flush);
         }
         if should_flush {
@@ -1152,6 +1536,14 @@ impl<T> Copy for Memo<T> {}
 impl<T: PartialEq + 'static> Memo<T> {
     /// A memo computing `f`. Lazy: `f` first runs on first read.
     pub fn new(f: impl Fn() -> T + 'static) -> Self {
+        Self::install(f, None)
+    }
+
+    fn new_in_owner(f: impl Fn() -> T + 'static, owner: NodeId) -> Self {
+        Self::install(f, Some(owner))
+    }
+
+    fn install(f: impl Fn() -> T + 'static, explicit_owner: Option<NodeId>) -> Self {
         let compute: Compute = Rc::new(move || Rc::new(f()) as Value);
         let eq: EqFn = Rc::new(
             |a, b| match (a.downcast_ref::<T>(), b.downcast_ref::<T>()) {
@@ -1160,10 +1552,11 @@ impl<T: PartialEq + 'static> Memo<T> {
             },
         );
         let id = RT.with(|rt| {
-            rt.borrow_mut().add_node(Node {
+            let node = Node {
                 kind: Kind::Memo,
                 color: Color::Dirty, // never ran
                 owner: None,
+                dispose_requested: false,
                 queued: false,
                 updating: false,
                 running: false,
@@ -1175,7 +1568,12 @@ impl<T: PartialEq + 'static> Memo<T> {
                 subscribers: Vec::new(),
                 owned: Vec::new(),
                 cleanups: Vec::new(),
-            })
+            };
+            let mut rt = rt.borrow_mut();
+            match explicit_owner {
+                Some(owner) => rt.add_owned_node(node, owner),
+                None => rt.add_node(node),
+            }
         });
         Memo {
             id,
@@ -1203,6 +1601,20 @@ impl<T: PartialEq + 'static> Memo<T> {
         value.downcast_ref::<T>().expect("memo type").clone()
     }
 
+    /// Read if alive. A disposed owner makes all memo handles stale.
+    pub fn try_get(&self) -> Option<T>
+    where
+        T: Clone,
+    {
+        if RT.with(|rt| rt.borrow().node(self.id).is_none()) {
+            return None;
+        }
+        update_if_necessary(self.id);
+        track(self.id);
+        let value: Value = RT.with(|rt| rt.borrow().node(self.id)?.value.clone())?;
+        value.downcast_ref::<T>().cloned()
+    }
+
     pub fn dispose(&self) {
         dispose(self.id);
     }
@@ -1217,15 +1629,24 @@ pub struct Effect {
 impl Effect {
     /// Create and run once now; re-runs whenever tracked dependencies change.
     pub fn new(f: impl Fn() + 'static) -> Self {
+        Self::install(f, None)
+    }
+
+    fn new_in_owner(f: impl Fn() + 'static, owner: NodeId) -> Self {
+        Self::install(f, Some(owner))
+    }
+
+    fn install(f: impl Fn() + 'static, explicit_owner: Option<NodeId>) -> Self {
         let compute: Compute = Rc::new(move || {
             f();
             Rc::new(()) as Value
         });
         let id = RT.with(|rt| {
-            rt.borrow_mut().add_node(Node {
+            let node = Node {
                 kind: Kind::Effect,
                 color: Color::Dirty,
                 owner: None,
+                dispose_requested: false,
                 queued: false,
                 updating: false,
                 running: false,
@@ -1237,7 +1658,12 @@ impl Effect {
                 subscribers: Vec::new(),
                 owned: Vec::new(),
                 cleanups: Vec::new(),
-            })
+            };
+            let mut rt = rt.borrow_mut();
+            match explicit_owner {
+                Some(owner) => rt.add_owned_node(node, owner),
+                None => rt.add_node(node),
+            }
         });
         if let Err(payload) = catch_unwind(AssertUnwindSafe(|| run_computation(id))) {
             if let Err(disposal_panic) = catch_unwind(AssertUnwindSafe(|| dispose(id))) {
@@ -1290,7 +1716,36 @@ fn dispose(id: NodeId) {
         collect_disposal(&mut rt, id, &mut batch);
         batch
     });
-    let cleanup_panic = run_disposal(batch);
+    let mut cleanup_panic = run_disposal(batch);
+    merge_panic(&mut cleanup_panic, drain_deferred_disposals());
+    let should_flush = batch_guard.finish();
+    if let Some(payload) = cleanup_panic {
+        flush_while_preserving(payload, should_flush);
+    }
+    if should_flush {
+        flush_effects();
+    }
+}
+
+fn dispose_owner(id: NodeId) {
+    let batch_guard = BatchGuard::enter();
+    let batch = RT.with(|rt| {
+        let mut rt = rt.borrow_mut();
+        let node = rt.node(id)?;
+        if node.kind != Kind::Owner {
+            return None;
+        }
+        if disposable_tree_is_busy(&rt, id) {
+            rt.defer_owner_disposal(id);
+            return None;
+        }
+
+        let mut batch = DisposalBatch::default();
+        collect_disposal(&mut rt, id, &mut batch);
+        Some(batch)
+    });
+    let mut cleanup_panic = batch.and_then(run_disposal);
+    merge_panic(&mut cleanup_panic, drain_deferred_disposals());
     let should_flush = batch_guard.finish();
     if let Some(payload) = cleanup_panic {
         flush_while_preserving(payload, should_flush);
@@ -1307,6 +1762,7 @@ struct RuntimeStats {
     slots_live: usize,
     slots_free: usize,
     pending: usize,
+    deferred_disposals: usize,
     observer_present: bool,
     owner_present: bool,
     flushing: bool,
@@ -1341,6 +1797,7 @@ fn runtime_stats() -> RuntimeStats {
             slots_live,
             slots_free: rt.free.len(),
             pending: rt.pending.len(),
+            deferred_disposals: rt.deferred_disposals.len(),
             observer_present: rt.observer.is_some(),
             owner_present: rt.owner.is_some(),
             flushing: rt.flushing,
@@ -1368,6 +1825,10 @@ fn assert_runtime_invariants() {
         assert!(rt.frames.is_empty(), "computation frame leaked");
         assert!(!rt.flushing, "flushing leaked outside scheduler");
         assert_eq!(rt.batch_depth, 0, "batch depth leaked");
+        assert!(
+            rt.deferred_disposals.is_empty(),
+            "ready owner disposal was not drained"
+        );
 
         let free: HashSet<_> = rt.free.iter().copied().collect();
         assert_eq!(free.len(), rt.free.len(), "duplicate slots in free list");
@@ -1385,6 +1846,17 @@ fn assert_runtime_invariants() {
             assert_eq!(node.kind, Kind::Effect, "pending node is not an effect");
             assert!(node.queued, "pending effect is missing queued flag");
         }
+        let deferred: HashSet<_> = rt.deferred_disposals.iter().copied().collect();
+        assert_eq!(
+            deferred.len(),
+            rt.deferred_disposals.len(),
+            "duplicate deferred owner disposal"
+        );
+        for id in &rt.deferred_disposals {
+            let node = rt.node(*id).expect("deferred disposal contains stale ID");
+            assert_eq!(node.kind, Kind::Owner, "deferred node is not an owner");
+            assert!(node.dispose_requested, "deferred owner lacks request flag");
+        }
 
         for (slot_index, slot) in rt.slots.iter().enumerate() {
             let Some(node) = &slot.node else { continue };
@@ -1400,12 +1872,30 @@ fn assert_runtime_invariants() {
                 assert_eq!(node.color, Color::Dirty, "retry memo is not dirty");
             }
             assert_eq!(node.queued, pending.contains(&id), "queued flag mismatch");
+            assert_eq!(
+                node.dispose_requested,
+                deferred.contains(&id),
+                "deferred disposal flag mismatch"
+            );
             assert_unique(&node.sources, "sources");
             assert_unique(&node.subscribers, "subscribers");
             assert_unique(&node.owned, "owned children");
             assert!(!node.sources.contains(&id), "node sources itself");
             assert!(!node.subscribers.contains(&id), "node subscribes itself");
             assert!(!node.owned.contains(&id), "node owns itself");
+            if node.kind == Kind::Owner {
+                assert_eq!(node.color, Color::Clean, "owner color changed");
+                assert!(node.value.is_none(), "owner stores a reactive value");
+                assert!(node.compute.is_none(), "owner stores a computation");
+                assert!(node.eq.is_none(), "owner stores an equality callback");
+                assert!(node.sources.is_empty(), "owner has reactive sources");
+                assert!(node.subscribers.is_empty(), "owner has subscribers");
+            } else {
+                assert!(
+                    !node.dispose_requested,
+                    "non-owner requested deferred disposal"
+                );
+            }
 
             if let Some(owner) = node.owner {
                 let owner_node = rt.node(owner).expect("child has stale owner");
@@ -2315,6 +2805,562 @@ mod tests {
     }
 
     #[test]
+    fn explicit_owner_cleanups_are_lifo_and_disposal_is_idempotent() {
+        reset_runtime_for_test();
+        let order = Rc::new(RefCell::new(Vec::new()));
+        let owner = Owner::new();
+        for label in ["first", "second", "third"] {
+            let order = order.clone();
+            owner
+                .on_cleanup(move || order.borrow_mut().push(label))
+                .unwrap();
+        }
+
+        owner.dispose();
+        owner.dispose();
+        assert_eq!(&*order.borrow(), &["third", "second", "first"]);
+        drop(owner);
+        assert_eq!(order.borrow().len(), 3, "Drop repeated owner cleanup");
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicit_owner_disposes_children_newest_first_and_exactly_once() {
+        reset_runtime_for_test();
+        let order = Rc::new(RefCell::new(Vec::new()));
+        let root = Owner::new();
+        let root_order = order.clone();
+        root.on_cleanup(move || root_order.borrow_mut().push("root"))
+            .unwrap();
+
+        let first = root.child().unwrap();
+        let first_order = order.clone();
+        first
+            .on_cleanup(move || first_order.borrow_mut().push("first"))
+            .unwrap();
+        let grandchild = first.child().unwrap();
+        let grandchild_order = order.clone();
+        grandchild
+            .on_cleanup(move || grandchild_order.borrow_mut().push("grandchild"))
+            .unwrap();
+
+        let second = root.child().unwrap();
+        let second_order = order.clone();
+        second
+            .on_cleanup(move || second_order.borrow_mut().push("second"))
+            .unwrap();
+
+        root.dispose();
+        assert_eq!(&*order.borrow(), &["second", "grandchild", "first", "root"]);
+        assert!(first.is_disposed());
+        assert!(grandchild.is_disposed());
+        assert!(second.is_disposed());
+
+        drop(second);
+        drop(grandchild);
+        drop(first);
+        drop(root);
+        assert_eq!(order.borrow().len(), 4, "stale child handle cleaned twice");
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn dropping_child_owner_detaches_it_from_live_parent() {
+        reset_runtime_for_test();
+        let cleanups = Rc::new(Cell::new(0));
+        let root = Owner::new();
+        let child = root.child().unwrap();
+        let child_cleanups = cleanups.clone();
+        child
+            .on_cleanup(move || child_cleanups.set(child_cleanups.get() + 1))
+            .unwrap();
+        assert_eq!(runtime_stats().owned_edges, 1);
+
+        drop(child);
+        assert_eq!(cleanups.get(), 1);
+        assert_eq!(runtime_stats().owned_edges, 0);
+        root.dispose();
+        assert_eq!(cleanups.get(), 1, "parent repeated detached child cleanup");
+        drop(root);
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicit_owner_cleanup_panic_runs_remaining_work_and_restores_runtime() {
+        reset_runtime_for_test();
+        let source = Signal::new(0);
+        let observed = Rc::new(Cell::new(0));
+        let watcher = {
+            let observed = observed.clone();
+            Effect::new(move || observed.set(source.get()))
+        };
+        let order = Rc::new(RefCell::new(Vec::new()));
+        let owner = Owner::new();
+        let remaining_order = order.clone();
+        owner
+            .on_cleanup(move || {
+                remaining_order.borrow_mut().push("remaining");
+                source.set(1);
+            })
+            .unwrap();
+        owner
+            .on_cleanup(|| panic!("intentional explicit owner cleanup panic"))
+            .unwrap();
+        let before_order = order.clone();
+        owner
+            .on_cleanup(move || before_order.borrow_mut().push("before"))
+            .unwrap();
+
+        let outcome = catch_unwind(AssertUnwindSafe(|| owner.dispose()));
+        assert!(outcome.is_err());
+        assert_eq!(&*order.borrow(), &["before", "remaining"]);
+        assert_eq!(observed.get(), 1, "healthy queued work was not flushed");
+        owner.dispose();
+
+        let proof = Owner::new();
+        let runs = Rc::new(Cell::new(0));
+        let proof_effect = {
+            let runs = runs.clone();
+            proof.effect(move || runs.set(runs.get() + 1)).unwrap()
+        };
+        assert_eq!(
+            runs.get(),
+            1,
+            "runtime remained poisoned after cleanup panic"
+        );
+        drop(proof);
+        proof_effect.dispose();
+        watcher.dispose();
+        source.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicit_owner_drop_is_raii_without_double_cleanup() {
+        reset_runtime_for_test();
+        let cleanups = Rc::new(Cell::new(0));
+        {
+            let owner = Owner::new();
+            let cleanups = cleanups.clone();
+            owner
+                .on_cleanup(move || cleanups.set(cleanups.get() + 1))
+                .unwrap();
+        }
+        assert_eq!(cleanups.get(), 1);
+
+        let owner = Owner::new();
+        let cleanups_for_explicit = cleanups.clone();
+        owner
+            .on_cleanup(move || cleanups_for_explicit.set(cleanups_for_explicit.get() + 1))
+            .unwrap();
+        owner.dispose();
+        owner.dispose();
+        drop(owner);
+        assert_eq!(cleanups.get(), 2);
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicit_owner_drop_preserves_primary_panic_during_unwind() {
+        reset_runtime_for_test();
+        let remaining = Rc::new(Cell::new(false));
+        let remaining_after_panic = remaining.clone();
+        let outcome = catch_unwind(AssertUnwindSafe(move || {
+            let owner = Owner::new();
+            owner
+                .on_cleanup(move || remaining_after_panic.set(true))
+                .unwrap();
+            owner
+                .on_cleanup(|| panic!("secondary owner cleanup panic"))
+                .unwrap();
+            panic!("primary owner scope panic");
+        }));
+
+        let payload = outcome.expect_err("primary panic was swallowed");
+        assert_eq!(
+            payload.downcast_ref::<&str>(),
+            Some(&"primary owner scope panic"),
+            "owner Drop replaced the primary panic"
+        );
+        assert!(remaining.get(), "cleanup after secondary panic did not run");
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn last_owner_handle_dropped_by_owned_effect_is_drained_after_rerun() {
+        reset_runtime_for_test();
+        let trigger = Signal::new(0);
+        let holder = Signal::new(None::<Owner>);
+        let runs = Rc::new(Cell::new(0));
+        let cleanups = Rc::new(Cell::new(0));
+        let owner = Owner::new();
+        let cleanup_count = cleanups.clone();
+        owner
+            .on_cleanup(move || cleanup_count.set(cleanup_count.get() + 1))
+            .unwrap();
+        let effect = {
+            let runs = runs.clone();
+            owner
+                .effect(move || {
+                    runs.set(runs.get() + 1);
+                    if trigger.get() == 1 {
+                        holder.set(None);
+                    }
+                })
+                .unwrap()
+        };
+        holder.set(Some(owner));
+
+        trigger.set(1);
+        assert_eq!(runs.get(), 2);
+        assert_eq!(cleanups.get(), 1);
+        assert!(holder.with(Option::is_none));
+        let (owners, effects) = RT.with(|rt| {
+            let rt = rt.borrow();
+            let owners = rt
+                .slots
+                .iter()
+                .filter_map(|slot| slot.node.as_ref())
+                .filter(|node| node.kind == Kind::Owner)
+                .count();
+            let effects = rt
+                .slots
+                .iter()
+                .filter_map(|slot| slot.node.as_ref())
+                .filter(|node| node.kind == Kind::Effect)
+                .count();
+            (owners, effects)
+        });
+        assert_eq!((owners, effects), (0, 0));
+        assert_eq!(runtime_stats().deferred_disposals, 0);
+
+        trigger.set(2);
+        assert_eq!(runs.get(), 2, "disposed effect reacted again");
+        effect.dispose();
+        holder.dispose();
+        trigger.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn owner_disposal_requested_during_signal_update_drains_at_safe_point() {
+        reset_runtime_for_test();
+        let owner_slot = Rc::new(RefCell::new(None));
+        let cleanups = Rc::new(Cell::new(0));
+        let owner = Owner::new();
+        let cleanup_count = cleanups.clone();
+        owner
+            .on_cleanup(move || cleanup_count.set(cleanup_count.get() + 1))
+            .unwrap();
+        let signal = owner.signal(0_u32).unwrap();
+        *owner_slot.borrow_mut() = Some(owner);
+
+        let owner_slot_for_update = owner_slot.clone();
+        signal.update(move |value| {
+            *value = 1;
+            drop(owner_slot_for_update.borrow_mut().take());
+        });
+
+        assert_eq!(cleanups.get(), 1);
+        assert!(owner_slot.borrow().is_none());
+        assert_eq!(signal.try_get(), None);
+        assert_eq!(runtime_stats().deferred_disposals, 0);
+        signal.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn deferred_owner_cleanup_panic_cannot_replace_update_panic() {
+        reset_runtime_for_test();
+        let owner_slot = Rc::new(RefCell::new(None));
+        let remaining_cleanup = Rc::new(Cell::new(false));
+        let owner = Owner::new();
+        let remaining = remaining_cleanup.clone();
+        owner.on_cleanup(move || remaining.set(true)).unwrap();
+        owner
+            .on_cleanup(|| panic!("secondary deferred cleanup panic"))
+            .unwrap();
+        let signal = owner.signal(0_u32).unwrap();
+        *owner_slot.borrow_mut() = Some(owner);
+
+        let owner_slot_for_update = owner_slot.clone();
+        let outcome = catch_unwind(AssertUnwindSafe(|| {
+            signal.update(move |_| {
+                drop(owner_slot_for_update.borrow_mut().take());
+                panic!("primary signal update panic");
+            });
+        }));
+        let payload = outcome.expect_err("update panic was swallowed");
+        assert_eq!(
+            payload.downcast_ref::<&str>(),
+            Some(&"primary signal update panic")
+        );
+        assert!(remaining_cleanup.get());
+        assert_eq!(signal.try_get(), None);
+        assert_eq!(runtime_stats().slots_live, 0);
+        assert_eq!(runtime_stats().deferred_disposals, 0);
+        signal.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn owner_pending_disposal_rejects_new_resources_and_cleanups() {
+        reset_runtime_for_test();
+        let trigger = Signal::new(0);
+        let candidate = Rc::new(Effect::new(|| {}));
+        let owner = Rc::new(Owner::new());
+        let rejected = Rc::new(Cell::new(0));
+        let effect = {
+            let owner_for_effect = owner.clone();
+            let candidate = candidate.clone();
+            let rejected = rejected.clone();
+            owner
+                .effect(move || {
+                    if trigger.get() == 1 {
+                        owner_for_effect.dispose();
+                        rejected.set(
+                            usize::from(matches!(
+                                owner_for_effect.child(),
+                                Err(OwnerError::Disposed)
+                            )) + usize::from(
+                                owner_for_effect.on_cleanup(|| {}) == Err(OwnerError::Disposed),
+                            ) + usize::from(matches!(
+                                owner_for_effect.signal(1_u8),
+                                Err(OwnerError::Disposed)
+                            )) + usize::from(matches!(
+                                owner_for_effect.memo(|| 1_u8),
+                                Err(OwnerError::Disposed)
+                            )) + usize::from(matches!(
+                                owner_for_effect.effect(|| {}),
+                                Err(OwnerError::Disposed)
+                            )) + usize::from(
+                                owner_for_effect.adopt_effect(candidate.as_ref())
+                                    == Err(OwnerError::Disposed),
+                            ),
+                        );
+                    }
+                })
+                .unwrap()
+        };
+
+        trigger.set(1);
+        assert_eq!(rejected.get(), 6);
+        assert!(owner.is_disposed());
+        assert_eq!(runtime_stats().deferred_disposals, 0);
+        effect.dispose();
+        candidate.dispose();
+        trigger.dispose();
+        drop(owner);
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicit_owner_effect_stops_reacting_after_scope_disposal() {
+        reset_runtime_for_test();
+        let source = Signal::new(0);
+        let runs = Rc::new(Cell::new(0));
+        let seen = Rc::new(Cell::new(0));
+        let owner = Owner::new();
+        let effect = {
+            let runs = runs.clone();
+            let seen = seen.clone();
+            owner
+                .effect(move || {
+                    runs.set(runs.get() + 1);
+                    seen.set(source.get());
+                })
+                .unwrap()
+        };
+
+        source.set(1);
+        assert_eq!((runs.get(), seen.get()), (2, 1));
+        owner.dispose();
+        source.set(2);
+        assert_eq!((runs.get(), seen.get()), (2, 1));
+        effect.dispose();
+        source.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicitly_owned_signal_handle_is_stale_after_owner_disposal() {
+        reset_runtime_for_test();
+        let owner = Owner::new();
+        let signal = owner.signal(41_u32).unwrap();
+        assert_eq!(signal.try_get(), Some(41));
+
+        owner.dispose();
+        assert_eq!(signal.try_get(), None);
+        signal.dispose();
+
+        let replacement = Owner::new();
+        let current = replacement.signal(42_u32).unwrap();
+        assert_eq!(
+            signal.try_get(),
+            None,
+            "stale signal resolved a reused slot"
+        );
+        assert_eq!(current.try_get(), Some(42));
+        replacement.dispose();
+        current.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicitly_owned_memo_stops_and_is_stale_after_owner_disposal() {
+        reset_runtime_for_test();
+        let source = Signal::new(1_u32);
+        let runs = Rc::new(Cell::new(0));
+        let owner = Owner::new();
+        let memo = {
+            let runs = runs.clone();
+            owner
+                .memo(move || {
+                    runs.set(runs.get() + 1);
+                    source.get() * 2
+                })
+                .unwrap()
+        };
+
+        assert_eq!(memo.try_get(), Some(2));
+        source.set(2);
+        assert_eq!(memo.try_get(), Some(4));
+        assert_eq!(runs.get(), 2);
+        owner.dispose();
+        source.set(3);
+        assert_eq!(memo.try_get(), None);
+        assert_eq!(runs.get(), 2, "disposed memo recomputed");
+        memo.dispose();
+        source.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicit_owner_adoption_is_fail_closed() {
+        reset_runtime_for_test();
+        let source = Signal::new(0);
+        let runs = Rc::new(Cell::new(0));
+        let effect = {
+            let runs = runs.clone();
+            Effect::new(move || {
+                let _ = source.get();
+                runs.set(runs.get() + 1);
+            })
+        };
+        let owner = Owner::new();
+        let other = Owner::new();
+        assert_eq!(owner.adopt_effect(&effect), Ok(()));
+        assert_eq!(owner.adopt_effect(&effect), Ok(()));
+        assert_eq!(other.adopt_effect(&effect), Err(OwnerError::AlreadyOwned));
+
+        source.set(1);
+        assert_eq!(runs.get(), 2);
+        owner.dispose();
+        source.set(2);
+        assert_eq!(runs.get(), 2, "adopted effect escaped owner disposal");
+
+        let stale_effect = Effect::new(|| {});
+        stale_effect.dispose();
+        assert_eq!(
+            other.adopt_effect(&stale_effect),
+            Err(OwnerError::ResourceDisposed)
+        );
+        other.dispose();
+        stale_effect.dispose();
+        effect.dispose();
+        source.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn stale_explicit_owner_cannot_capture_reused_slots() {
+        reset_runtime_for_test();
+        let stale = Owner::new();
+        let stale_id = stale.id;
+        stale.dispose();
+        let current = Owner::new();
+        assert_eq!(stale_id.slot, current.id.slot, "test did not reuse a slot");
+        assert_ne!(stale_id.generation, current.id.generation);
+
+        assert!(matches!(stale.child(), Err(OwnerError::Disposed)));
+        assert_eq!(stale.on_cleanup(|| {}), Err(OwnerError::Disposed));
+        assert!(matches!(stale.signal(1_u8), Err(OwnerError::Disposed)));
+        assert!(matches!(stale.memo(|| 1_u8), Err(OwnerError::Disposed)));
+        assert!(matches!(stale.effect(|| {}), Err(OwnerError::Disposed)));
+        assert!(!current.is_disposed());
+        current.dispose();
+        drop(current);
+        drop(stale);
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicit_owner_does_not_inherit_ambient_computation() {
+        reset_runtime_for_test();
+        let slot = Rc::new(RefCell::new(None));
+        let parent = {
+            let slot = slot.clone();
+            Effect::new(move || {
+                if slot.borrow().is_none() {
+                    *slot.borrow_mut() = Some(Owner::new());
+                }
+            })
+        };
+        let owner = slot.borrow_mut().take().expect("owner was not created");
+        parent.dispose();
+        assert!(
+            !owner.is_disposed(),
+            "explicit owner inherited ambient scope"
+        );
+
+        let ran = Rc::new(Cell::new(false));
+        let owned = {
+            let ran = ran.clone();
+            owner.effect(move || ran.set(true)).unwrap()
+        };
+        assert!(ran.get());
+        owner.dispose();
+        owned.dispose();
+        assert_runtime_invariants();
+    }
+
+    #[test]
+    fn explicit_owner_arena_plateaus_after_ten_thousand_cycles() {
+        reset_runtime_for_test();
+        for value in 0..10_000_u32 {
+            let owner = Owner::new();
+            owner.on_cleanup(|| {}).unwrap();
+            let signal = owner.signal(value).unwrap();
+            let memo = owner.memo(move || signal.get() + 1).unwrap();
+            let effect = owner
+                .effect(move || {
+                    let _ = memo.get();
+                })
+                .unwrap();
+            owner.dispose();
+            effect.dispose();
+            memo.dispose();
+            signal.dispose();
+            drop(owner);
+        }
+
+        let stats = runtime_stats();
+        assert_eq!(stats.slots_live, 0);
+        assert_eq!(stats.slots_total, 4, "owner arena grew with cycle count");
+        assert_eq!(stats.slots_free, 4);
+        assert_eq!(stats.pending, 0);
+        assert_eq!(stats.deferred_disposals, 0);
+        assert_eq!(stats.owned_edges, 0);
+        assert_eq!(stats.source_edges, 0);
+        assert_eq!(stats.subscriber_edges, 0);
+        assert_eq!(stats.cleanup_count, 0);
+        assert!(!stats.observer_present);
+        assert!(!stats.owner_present);
+        assert!(!stats.flushing);
+        assert_runtime_invariants();
+    }
+
+    #[test]
     fn successful_replacement_commits_before_retiring_previous_scope() {
         reset_runtime_for_test();
         let source = Signal::new(0);
@@ -2636,6 +3682,7 @@ mod tests {
         );
         assert_eq!(final_stats.slots_free, 2);
         assert_eq!(final_stats.pending, 0);
+        assert_eq!(final_stats.deferred_disposals, 0);
         assert_eq!(final_stats.owned_edges, 0);
         assert_eq!(final_stats.source_edges, 0);
         assert_eq!(final_stats.subscriber_edges, 0);
