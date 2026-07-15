@@ -17,6 +17,12 @@ Versioning once a public release exists.
   manifests and installer lifecycle checks.
 - A Cloudflare Email Worker for the public project mailbox, with its production
   route and verified forwarding destination configured outside the repository.
+- Typed, versioned application events with bounded canonical JSON, exact
+  serialize/decode/value admission, exact local cursors, sealed schema catalogs,
+  stable mapper/upcaster identities, and explicit adjacent upcasting.
+- Transactional projections with reducer and codec identities, pre-commit state
+  encoding, bounded fail-closed snapshot restore, exact-tail replay, and
+  automatic reactive cleanup on drop.
 
 ### Security
 
@@ -27,6 +33,10 @@ Versioning once a public release exists.
   snapshot, and admits events only through a consuming typestate.
 - The unauthenticated M5 one-event ACK seam is disabled by default behind the
   `experimental-legacy` feature and cannot enter verified replay.
+- Projection snapshots bind the exact local content head, schema set, reducer,
+  codec configuration, and canonical state bytes. Their SHA-256 digests provide
+  integrity only; stream authority and signatures remain external trust
+  contracts.
 
 ## 0.0.1 - Not published
 

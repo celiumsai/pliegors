@@ -92,6 +92,45 @@ Cargo target directory, built-in Rust targets, configured `build.target`,
 output, bindgen directory, and private state must remain disjoint from
 Cargo-owned layout before compilation begins.
 
+## Event and projection contract
+
+Application events implement `EventSchema` with a bounded `app_*` kind,
+positive version, and stable schema ID. `Log::append_typed` is the application
+append path. It requires `Serialize + DeserializeOwned + PartialEq`, then
+canonicalizes, decodes through the same schema type, and checks exact value
+equality before mutating the log. Asymmetric `skip_serializing`/default behavior
+and recursively nested non-finite floats therefore fail before an `Event` is
+created. `ReactiveLog::append_typed` preserves the same bound and behavior.
+Untrusted stored history enters only through `Log::import_raw`, which
+canonicalizes payloads and verifies the complete local hash chain.
+
+`EventCatalogBuilder` registers one current typed mapping with a stable
+`mapping_id` and explicit adjacent upcasters with stable `step_id` values.
+Sealing validates the complete graph and produces an immutable,
+order-independent schema-set digest. Mapper/upcaster double execution and the
+bounded observation cache are divergence tripwires, not a sandbox or proof of
+purity.
+
+`Projection` resolves the exact local tail through a `SealedEventCatalog`, runs
+the reducer against candidate state, validates canonical state bytes with the
+selected codec, and only then publishes state, bytes, cursor, and counters
+together. `ProjectionSnapshot` binds the local history position/head, schema
+set, complete reducer identity, complete codec identity, state bytes, and
+digests. It is a rebuildable integrity cache, not a signature or authority
+claim. Hyphae stream identity and signer authority remain the separate R2
+boundary.
+
+Reducer and codec identities each include stable ID, semantic revision, and a
+canonical configuration digest. Applications must include initial state and
+all fold-affecting configuration in the reducer identity. The built-in JSON
+state codec preflights 8 MiB, depth 64, and 262,144 values. Custom reducers,
+mappers, upcasters, codecs, serializers, deserializers, and equality
+implementations remain trusted application code.
+Typed panic recovery requires an unwind-capable target; stable WASM without
+exception handling aborts instead. See the
+[R3 contract](docs/30-event-schema-and-snapshot-contract.md) and
+[acceptance record](docs/evidence/r3-snapshot-schema.md).
+
 ## Language boundary
 
 Rust owns product routing, rendering, content schemas, state, folds, persistence
@@ -118,7 +157,7 @@ Projects should expose only the mode they need:
 
 Static projects do not require Hyphae. Projects that enable sync must define
 an authenticated transport, authority and key policy, stream-bound replay
-state, reducer transaction policy, and explicit event-version admission.
+state, transactional projection policy, and explicit event-version admission.
 Protocol v2 requires append/page attestations and per-event receipts before an
 event can reach a reducer. This client guarantee is not a deployed gateway or
 Hyphae durability claim.

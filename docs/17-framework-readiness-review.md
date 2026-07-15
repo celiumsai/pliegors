@@ -16,6 +16,9 @@ Rust/WASM sites; not ready for a public compatibility or trust claim.
 - Hyphae client protocol v2 with idempotent batches, signed append/page
   attestations, receipt authority, snapshot-consistent pull, event-version
   admission, and type-gated replay.
+- Verified typed/versioned local events, explicit upcasting, transactional
+  projections, and history/contract-bound snapshots, with cross-target R3
+  acceptance evidence.
 - The official PliegoRS site and neutral references as native framework evidence.
 - Manual five-target GitHub Actions candidate workflow and installer lifecycle.
 

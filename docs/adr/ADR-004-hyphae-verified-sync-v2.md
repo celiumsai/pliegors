@@ -111,9 +111,11 @@ used as provenance or verified durability evidence.
 - The attestation proves what an authorized signer asserted at one checkpoint;
   it does not prove that the signer is honest or that the stream will never
   advance.
-- Application-state atomicity remains a reducer contract until R3 supplies the
-  transactional projection boundary. R2 guarantees that all framework trust
-  checks happen before that contract is invoked.
+- R3 supplies a transactional local `Projection` when the verified event is
+  represented in Pliego's typed local history. R2 still guarantees that all
+  stream, authority, receipt, page, and version-policy checks happen before any
+  application replay sink is invoked; arbitrary custom `ReplaySink` code keeps
+  its own atomicity obligation.
 
 ## Rejected alternatives
 

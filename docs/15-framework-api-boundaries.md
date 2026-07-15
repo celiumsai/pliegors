@@ -6,7 +6,9 @@
 
 - View and HTML escaping semantics.
 - Reactive ownership, equality gates, and disposal.
-- Event-chain hashing, replay, snapshots, and incremental folds.
+- Typed event-chain hashing, exact local cursors, sealed schema catalogs,
+  transactional projections, canonical state codecs, and contract-bound
+  projection snapshots.
 - Full-document generation and head metadata.
 - Route-to-file mapping, redirects, atomic output replacement, and build ledger.
 - Resumable standard action descriptions.

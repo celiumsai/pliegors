@@ -57,8 +57,10 @@ the client contract.
   exact DOM node that changed. No virtual DOM, no component re-runs.
 
 This mirrors Hyphae's architecture (journal → projections) in the client. The
-current crates implement the client-side log and fold independently; sharing a
-versioned event schema and reducer package with the engine is planned work.
+current crates implement typed/versioned local events, sealed schema catalogs,
+transactional projections, and contract-bound snapshots independently. Sharing
+the same reviewed schema and reducer package with the Hyphae engine remains
+planned integration work.
 
 History, replay, and cursor-based time travel work in the local spike because its
 log is retained. Protocol v2 now provides a fail-closed client verification
@@ -105,22 +107,25 @@ are typed against the owner; `try_` variants everywhere), hydration mismatches
 
 ## 3. The PliegoRS thesis and its implementation state
 
-1. **The incremental fold node (implemented, M3).** Leptos's `Memo` is the
+1. **The incremental projection node (verified, M3).** Leptos's `Memo` is the
    closest primitive to a materialized fold (derived + cached, equality-gated,
    and lazy), but when dirty it
-   **re-runs its closure from scratch**. Our `Fold` extends the memo with an
-   **accumulator + a cursor into the log**: on wake it folds **only the tail**
-   (`state = reduce(state, events[cursor..])`), then advances the cursor. Reducer
-   work is O(new events); cloning and equality checks can still scale with state
-   size in the current implementation. Snapshots (accumulator + cursor) make the
-   reducer consume only the tail on cold start.
+   **re-runs its closure from scratch**. Our `Projection` (`Fold` remains an
+   alias) extends the memo with candidate state, cached canonical state bytes,
+   and an exact `LogCursor` containing position plus content head. On wake it
+   resolves and folds only the checked tail, validates state through the codec,
+   then publishes state/bytes/cursor together. Reducer work is O(new events);
+   cloning, codec validation, and equality checks can still scale with state
+   size. Contract-bound snapshots let restore consume only the exact tail on
+   cold start.
 2. **The write discipline (application contract).** Domain interactions append
    events rather than mutate projected state. Reactive signals still expose
    setters because the runtime and UI need writable coordination state; a future
    public application API should make the log discipline harder to bypass.
-3. **Pure, deterministic reducers as a contract.** Replay must reproduce state
-   bit-for-bit. Tests can validate this property, but Rust's type system does not
-   currently enforce reducer purity.
+3. **Pure, deterministic reducers as a contract.** Replay must reproduce the
+   same canonical state bytes and cursor. Generated-case and golden tests can
+   validate observed behavior, but Rust's type system does not enforce reducer,
+   mapper, upcaster, serializer/deserializer, equality, or custom-codec purity.
 4. **Two tiers of "effect", separated explicitly.** A click handler is not an
    effect — it's an `append`. The only terminal effects are render effects (DOM)
    and declared side-effect ports. The loop: interaction → append → log red →
@@ -140,13 +145,13 @@ are typed against the owner; `try_` variants everywhere), hydration mismatches
 ```text
 pliegors/
 ├─ crates/
-│  ├─ pliego-log        the append-only, hash-chained client log (event model,
-│  │                    cursors, snapshots; not yet wire-identical to Hyphae)
+│  ├─ pliego-log        typed/versioned, hash-chained local history, exact
+│  │                    cursors, canonical payloads, and sealed schema catalogs
 │  ├─ pliego-reactive   the reactive graph: observer tracking, two-phase coloring,
 │  │                    equality gating, ownership/disposal  (lessons from
 │  │                    reactive_graph, our implementation)
-│  ├─ pliego-fold       the incremental fold node: accumulator + cursor + snapshot
-│  │                    (THE new primitive; shared semantics with hyphae projections)
+│  ├─ pliego-fold       transactional projection, canonical state codec, exact
+│  │                    cursor, and contract-bound projection snapshot
 │  ├─ pliego-dom        experimental HTML/DOM renderer with dynamic segments
 │  ├─ pliego-ssg        deterministic pages, head/SEO, routes, assets, manifests
 │  ├─ pliego-hyphae     protocol v2 append/pull, authority, and replay contract
@@ -184,7 +189,7 @@ M2  pliego-reactive: the graph (tracking, coloring, equality gate, ownership)
     GATE: diamond runs effect once; untaken branch not tracked.    ← implemented
     NOTE: disposal reclamation, scoped runtimes, and panic safety remain.
 M3  pliego-fold as a first-class node + snapshots
-    GATE: reducer consumes only the tail from a snapshot.          ← solid foundation
+    GATE: reducer consumes only the exact tail from a snapshot.    ← R3 complete
 M4  pliego-dom: HTML/DOM proof                                    ← experimental
     NEXT: retained/keyed rebuilds, properties/SVG, cleanup, hydration, macros.
 M5  Hyphae seam

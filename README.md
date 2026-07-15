@@ -24,7 +24,9 @@ channel is available yet.
 
 - deterministic static generation with typed heads, routes, assets, and ledgers;
 - escaped DOM/view construction and typed `view!` components;
-- signals, memos, effects, ownership scopes, event logs, folds, and snapshots;
+- signals, memos, effects, ownership scopes, typed/versioned events with exact
+  schema-value round trips, transactional projections, and contract-bound
+  snapshots;
 - typed Markdown, JSON, and TOML content with bounded discovery;
 - Rust/WASM clients and a versioned mount/update/unmount adapter contract;
 - lazy loading, capability policy, Save-Data, reduced motion, cancellation, and
@@ -52,8 +54,8 @@ candidate distribution, and R7 an external flagship. See the
 
 | Package | Responsibility |
 | --- | --- |
-| `pliego-log` | Verifiable local event log |
-| `pliego-fold` | Projection, replay, snapshots, and cursors |
+| `pliego-log` | Typed/versioned local history, canonical payloads, exact cursors, and sealed schema catalogs |
+| `pliego-fold` | Transactional projection, replay, canonical state codecs, and contract-bound snapshots |
 | `pliego-reactive` | Signals, memos, effects, ownership, and disposal |
 | `pliego-dom` | Escaped view and DOM construction |
 | `pliego-macros` | Typed `view!` and component props |
@@ -102,6 +104,9 @@ npm run check:site
 - [Founding specification](docs/00-pliegors-spec.md)
 - [PliegoRS and Hyphae target protocol](docs/01-hyphae-protocol.md)
 - [Hyphae verified sync guide](docs/29-hyphae-verified-sync-guide.md)
+- [Event schema and projection snapshot contract](docs/30-event-schema-and-snapshot-contract.md)
+- [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
+- [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)
 - [Framework API boundaries](docs/15-framework-api-boundaries.md)
 - [Native migration gate](docs/16-native-migration-gate.md)
 - [Framework readiness review](docs/17-framework-readiness-review.md)

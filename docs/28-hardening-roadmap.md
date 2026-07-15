@@ -99,12 +99,15 @@ Status: complete. See [R2 verified sync evidence](evidence/r2-verified-sync.md).
 
 Introduce explicit schema evolution and upcasters; bind snapshots to the exact
 history and projection contract.
-Status: active.
+Status: complete. The [R3 contract](30-event-schema-and-snapshot-contract.md) and
+[acceptance record](evidence/r3-snapshot-schema.md) bind the verified
+implementation and its cross-target gates.
 
 ### R4 - DOM lifecycle
 
 Validate names, make mounted scopes own listeners and nodes, prove keyed
 reconciliation, and demonstrate cleanup plateaus.
+Status: active.
 
 ### R5 - Golden developer experience
 

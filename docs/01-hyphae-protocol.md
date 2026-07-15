@@ -305,8 +305,10 @@ not application compatibility. `EventVersionPolicy` must explicitly admit each
 `(kind, schema_version)` before a page becomes `VerifiedPullPage`. An unknown
 pair returns `EventVersionError` and never reaches the reducer.
 
-R2 implements rejection, not migration. Upcasters, reducer identity, snapshot
-schema sets, and transactional projections belong to R3.
+R2 implements rejection, not migration. The local upcaster, reducer identity,
+schema-set, and transactional projection boundary is specified by the
+[R3 event and snapshot contract](30-event-schema-and-snapshot-contract.md).
+R2 still owns stream identity, signer authority, and verified replay admission.
 
 ## Limits
 
