@@ -11,3 +11,6 @@ description = "PliegoRS's reactive graph: runtime dependency tracking, two-phase
 publish.workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+wasm-bindgen-test = "=0.3.76"
