@@ -20,7 +20,7 @@ use std::fmt;
 
 #[cfg(feature = "experimental-legacy")]
 use pliego_log::Log;
-use pliego_log::{Event, hex};
+use pliego_log::{Event, SealedEventCatalog, hex};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -414,20 +414,18 @@ impl EventEnvelope {
         event: &Event,
         client_event_id: impl Into<String>,
         stream_id: impl Into<String>,
-        schema_version: u32,
         created_at: impl Into<String>,
     ) -> Result<Self, ValidationError> {
         let envelope = Self {
             protocol: PROTOCOL_V2.to_owned(),
             client_event_id: client_event_id.into(),
             stream_id: stream_id.into(),
-            schema_version,
-            kind: durable_kind(&event.kind),
-            payload: serde_json::to_string(&event.payload)
-                .map_err(|_| ValidationError::new("payload", "could not encode JSON"))?,
-            local_seq: event.seq,
-            local_prev_hash: hex(&event.prev_hash),
-            local_hash: hex(&event.hash),
+            schema_version: event.schema_version(),
+            kind: event.kind().to_owned(),
+            payload: event.payload().as_str().to_owned(),
+            local_seq: event.seq(),
+            local_prev_hash: hex(event.prev_hash()),
+            local_hash: hex(event.hash()),
             causal_parents: Vec::new(),
             created_at: created_at.into(),
         };
@@ -1571,6 +1569,20 @@ pub trait EventVersionPolicy {
     fn validate(&self, kind: &str, schema_version: u32) -> Result<(), EventVersionError>;
 }
 
+impl<E> EventVersionPolicy for SealedEventCatalog<E> {
+    fn validate(&self, kind: &str, schema_version: u32) -> Result<(), EventVersionError> {
+        if self.supports(kind, schema_version) {
+            Ok(())
+        } else {
+            Err(EventVersionError::new(
+                kind,
+                schema_version,
+                "not admitted by the sealed application event catalog",
+            ))
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ReplayAnchor {
     head_hash: String,
@@ -2189,15 +2201,24 @@ pub fn push_pending<T: JournalTransport>(
     transport: &mut T,
 ) -> Result<u64, String> {
     log.verify()
-        .map_err(|tampered| format!("local log tampered at {}", tampered.0))?;
+        .map_err(|tampered| format!("local log rejected: {tampered}"))?;
+    let cursor = log
+        .cursor_at(sync.next_to_push())
+        .map_err(|error| format!("legacy sync cursor rejected: {error}"))?;
     let mut pushed = 0;
     let events: Vec<(u64, String, String)> = log
-        .tail(sync.next_to_push())
+        .tail(&cursor)
+        .map_err(|error| format!("legacy sync tail rejected: {error}"))?
         .iter()
-        .map(|event| (event.seq, event.kind.clone(), event.payload.clone()))
+        .map(|event| {
+            (
+                event.seq(),
+                event.kind().to_owned(),
+                event.payload().as_str().to_owned(),
+            )
+        })
         .collect();
     for (seq, kind, payload) in events {
-        let kind = durable_kind(&kind);
         validate_kind(&kind).map_err(|error| error.to_string())?;
         if payload.len() > MAX_EVENT_PAYLOAD_BYTES {
             return Err("legacy payload exceeds event limit".to_owned());

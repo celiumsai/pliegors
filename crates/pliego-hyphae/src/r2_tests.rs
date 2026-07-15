@@ -1,7 +1,8 @@
 use std::cell::Cell;
 use std::collections::BTreeMap;
 
-use pliego_log::Log;
+use pliego_log::{EventCatalogBuilder, EventSchema, Log, SealedEventCatalog};
+use serde::{Deserialize, Serialize};
 
 use super::*;
 
@@ -16,6 +17,28 @@ const AUTHORITY_B: &str = "hyphae-secondary";
 const KEY_A: &str = "key-a";
 const KEY_A_ROTATED: &str = "key-a-rotated";
 const SIGNATURE_PLACEHOLDER: &str = "cGxhY2Vob2xkZXItc2lnbmF0dXJl";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct TaskAdded(String);
+
+impl EventSchema for TaskAdded {
+    const KIND: &'static str = "app_task_added";
+    const VERSION: u32 = 1;
+    const SCHEMA_ID: &'static str = "pliego.test/task-added/1";
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum FixtureEvent {
+    TaskAdded(TaskAdded),
+}
+
+fn fixture_catalog() -> SealedEventCatalog<FixtureEvent> {
+    let mut builder = EventCatalogBuilder::new();
+    builder
+        .register_current::<TaskAdded, _>(FixtureEvent::TaskAdded)
+        .unwrap();
+    builder.seal().unwrap()
+}
 
 fn authority(value: &str) -> AuthorityId {
     AuthorityId::try_new(value).unwrap()
@@ -37,13 +60,13 @@ fn payload_digest(payload: &[u8]) -> String {
 
 fn envelopes() -> Vec<EventEnvelope> {
     let mut log = Log::new();
-    log.append("task_added", "first");
-    log.append("task_added", "second");
+    log.append_typed(&TaskAdded("first".to_owned())).unwrap();
+    log.append_typed(&TaskAdded("second".to_owned())).unwrap();
     [ID_1, ID_2]
         .into_iter()
         .zip(log.events())
         .map(|(id, event)| {
-            EventEnvelope::from_local_event(event, id, STREAM, 1, "2026-07-12T20:00:00Z").unwrap()
+            EventEnvelope::from_local_event(event, id, STREAM, "2026-07-12T20:00:00Z").unwrap()
         })
         .collect()
 }
@@ -244,22 +267,6 @@ impl ReceiptVerifier for TestVerifier {
     }
 }
 
-struct AllowV1;
-
-impl EventVersionPolicy for AllowV1 {
-    fn validate(&self, kind: &str, schema_version: u32) -> Result<(), EventVersionError> {
-        if kind == "app_task_added" && schema_version == 1 {
-            Ok(())
-        } else {
-            Err(EventVersionError::new(
-                kind,
-                schema_version,
-                "not installed",
-            ))
-        }
-    }
-}
-
 #[derive(Default)]
 struct RecordingSink {
     calls: usize,
@@ -289,10 +296,11 @@ impl ReplaySink for RecordingSink {
 }
 
 fn verified(state: &ReplayState, request: PullRequest, page: PullPage) -> VerifiedPullPage {
+    let catalog = fixture_catalog();
     UntrustedPullPage::new(request, page)
         .validate(state)
         .unwrap()
-        .verify(&TestVerifier::default(), &AllowV1)
+        .verify(&TestVerifier::default(), &catalog)
         .unwrap()
 }
 
@@ -694,10 +702,11 @@ fn signed_request_mutation_fails_verification() {
     let mut substituted = request.clone();
     substituted.request_id = REQUEST_ID_2.to_owned();
     let state = ReplayState::new(STREAM).unwrap();
+    let catalog = fixture_catalog();
     let error = UntrustedPullPage::new(substituted, page)
         .validate(&state)
         .unwrap()
-        .verify(&TestVerifier::default(), &AllowV1)
+        .verify(&TestVerifier::default(), &catalog)
         .unwrap_err();
     assert!(matches!(
         error,
@@ -714,10 +723,11 @@ fn signed_snapshot_and_completion_mutation_fails_verification() {
     };
     page.complete = false;
     let state = ReplayState::new(STREAM).unwrap();
+    let catalog = fixture_catalog();
     let error = UntrustedPullPage::new(request, page)
         .validate(&state)
         .unwrap()
-        .verify(&TestVerifier::default(), &AllowV1)
+        .verify(&TestVerifier::default(), &catalog)
         .unwrap_err();
     assert!(matches!(
         error,
@@ -740,10 +750,11 @@ fn authority_errors_are_structured_and_fail_closed() {
         page.attestation.key_id = key.to_owned();
         page.attestation.signature = SIGNATURE_PLACEHOLDER.to_owned();
         let state = ReplayState::new(STREAM).unwrap();
+        let catalog = fixture_catalog();
         let error = UntrustedPullPage::new(request, page)
             .validate(&state)
             .unwrap()
-            .verify(&TestVerifier::default(), &AllowV1)
+            .verify(&TestVerifier::default(), &catalog)
             .unwrap_err();
         assert_eq!(error, SyncError::Verification(expected));
     }
@@ -756,10 +767,11 @@ fn invalid_receipt_signature_never_produces_verified_page() {
     sign_page(&request, &mut page);
     let state = ReplayState::new(STREAM).unwrap();
     let verifier = TestVerifier::default();
+    let catalog = fixture_catalog();
     let error = UntrustedPullPage::new(request, page)
         .validate(&state)
         .unwrap()
-        .verify(&verifier, &AllowV1)
+        .verify(&verifier, &catalog)
         .unwrap_err();
     assert!(matches!(
         error,
@@ -774,6 +786,12 @@ fn invalid_receipt_signature_never_produces_verified_page() {
 
 #[test]
 fn unknown_event_version_fails_before_replay_sink_exists() {
+    let catalog = fixture_catalog();
+    assert!(EventVersionPolicy::validate(&catalog, "app_task_added", 1).is_ok());
+    let catalog_error = EventVersionPolicy::validate(&catalog, "app_task_added", 2).unwrap_err();
+    assert_eq!(catalog_error.kind(), "app_task_added");
+    assert_eq!(catalog_error.schema_version(), 2);
+
     struct RejectAll;
     impl EventVersionPolicy for RejectAll {
         fn validate(&self, kind: &str, version: u32) -> Result<(), EventVersionError> {
@@ -1179,16 +1197,16 @@ fn canonical_signature_payloads_have_distinct_golden_vectors() {
     );
     let page_digest = payload_digest(&page.attestation.signing_payload(&request, &page).unwrap());
     assert_eq!(
-        receipt_digest,
-        "f4c2dda54d73b241ac084be9999a017076e9b01a569b8268fbf3852368f876ed"
-    );
-    assert_eq!(
-        append_digest,
-        "4144060a52ed1e5128f873286de76727229ee9fd3d137392ed9bd4aae4b41661"
-    );
-    assert_eq!(
-        page_digest,
-        "ba09cfa20e4941f76403342ab46ec41a61922a671879097a88ccc35aa97f01e0"
+        (
+            receipt_digest.as_str(),
+            append_digest.as_str(),
+            page_digest.as_str(),
+        ),
+        (
+            "5eb2840c73ea66328886b1ddd24f2daba0470934aa988aeb7360de7c266acb2e",
+            "fcdbd9db10656fda8ae0fe705a48fff7c0e997d1285ddef656d1460b103a185a",
+            "2af67e0403817cb43824250e933fcf8153f643163db8bf03aef1b6a6fd03ccdf",
+        )
     );
     assert_eq!(
         BTreeSet::from([receipt_digest, append_digest, page_digest]).len(),

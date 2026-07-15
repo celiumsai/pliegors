@@ -6,7 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "M1 spike: a task list rendered as the fold of a real event log — append on click, undo via cursor, provenance per item."
+description = "Typed task-list spike using a sealed event catalog, transactional projection, snapshots, and cursor-based time travel."
 publish = false
 
 [lib]
@@ -17,9 +17,10 @@ pliego-log = { workspace = true }
 pliego-reactive = { path = "../../crates/pliego-reactive" }
 pliego-fold = { path = "../../crates/pliego-fold" }
 pliego-dom = { path = "../../crates/pliego-dom" }
+serde = { workspace = true }
 
 # Browser bindings only when compiling for the browser — the reducer and the
-# M1 gate tests stay native.
+# Projection gate tests stay native.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 pliego-hyphae = { path = "../../crates/pliego-hyphae", features = ["experimental-legacy"] }
 wasm-bindgen = { workspace = true }

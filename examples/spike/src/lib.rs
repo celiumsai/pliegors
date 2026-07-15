@@ -1,155 +1,356 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Celiums Solutions LLC
 
-//! M1 spike — the PliegoRS thesis on one screen (docs/00 §6).
+//! A typed task-list spike for PliegoRS.
 //!
-//! A task list where **the UI is a fold of an event log**:
-//! - Clicking never mutates state; it `append`s an event (`task_added`,
-//!   `task_toggled`, `task_removed`) to a hash-chained [`pliego_log::Log`].
-//! - The list on screen is [`TaskList`], the incremental fold of that log.
-//! - **Undo/time-travel** is a cursor: replaying a prefix rebuilds "the world as
-//!   of event N" — no undo stack, the log *is* the undo stack.
-//! - **Provenance**: each task's id IS the seq of the event that created it;
-//!   the UI shows the event's hash. Values trace to their origin.
-//!
-//! The reducer + gate tests are native (run `cargo test -p spike`); the DOM code
-//! compiles only for wasm32. Rendering here is deliberately hand-rolled — the
-//! surgical renderer is M4; M1 proves the *model*.
+//! Every interaction appends an [`EventSchema`] payload. A sealed catalog
+//! resolves stored versions into [`TaskEvent`], and one transactional
+//! [`Projection`] materializes [`TaskList`]. Time travel rebuilds an exact
+//! prefix through the same typed append and projection APIs used by the live
+//! application. No free-form event or state/cursor tuple bypass exists.
 
-use pliego_log::Event;
+use pliego_fold::{
+    CanonicalJsonCodec, Projection, ProjectionError, ReactiveLog, Reducer, ReducerError,
+    ReducerIdentity,
+};
+use pliego_log::{EventCatalogBuilder, EventSchema, SealedEventCatalog};
+use serde::{Deserialize, Serialize};
 
-// ───────────────────────── the state and its reducer ─────────────────────────
+#[cfg(any(test, target_arch = "wasm32"))]
+use pliego_log::{Log, LogError};
 
-/// One task. `id` is the seq of the `task_added` event — identity *is*
-/// provenance.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One task. Its identifier is chosen from the next local sequence before the
+/// `TaskAdded` event is appended, preserving event-level provenance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
     pub id: u64,
     pub text: String,
     pub done: bool,
 }
 
-/// The folded state of the task list.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+/// The materialized task-list state.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskList {
     pub items: Vec<Task>,
+    events_seen: u64,
 }
 
-/// The pure reducer: one event, one state transition. Deterministic by
-/// construction — no clock, no randomness, no I/O (docs/00 §3.3).
-pub fn reduce(state: &mut TaskList, e: &Event) {
-    match e.kind.as_str() {
-        "task_added" => state.items.push(Task {
-            id: e.seq,
-            text: e.payload.clone(),
-            done: false,
-        }),
-        "task_toggled" => {
-            if let Ok(id) = e.payload.parse::<u64>() {
-                if let Some(t) = state.items.iter_mut().find(|t| t.id == id) {
-                    t.done = !t.done;
-                }
-            }
+/// Version 1 payload for creating a task.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskAddedV1 {
+    pub id: u64,
+    pub text: String,
+}
+
+impl EventSchema for TaskAddedV1 {
+    const KIND: &'static str = "app_task_added";
+    const VERSION: u32 = 1;
+    const SCHEMA_ID: &'static str = "pliego.example/task-added/1";
+}
+
+/// Version 1 payload for toggling a task.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskToggledV1 {
+    pub id: u64,
+}
+
+impl EventSchema for TaskToggledV1 {
+    const KIND: &'static str = "app_task_toggled";
+    const VERSION: u32 = 1;
+    const SCHEMA_ID: &'static str = "pliego.example/task-toggled/1";
+}
+
+/// Version 1 payload for removing a task.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskRemovedV1 {
+    pub id: u64,
+}
+
+impl EventSchema for TaskRemovedV1 {
+    const KIND: &'static str = "app_task_removed";
+    const VERSION: u32 = 1;
+    const SCHEMA_ID: &'static str = "pliego.example/task-removed/1";
+}
+
+/// Reducer-facing event set produced only by the sealed schema catalog.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskEvent {
+    Added(TaskAddedV1),
+    Toggled(TaskToggledV1),
+    Removed(TaskRemovedV1),
+}
+
+impl TaskEvent {
+    #[cfg(any(test, target_arch = "wasm32"))]
+    fn append_to_log(&self, log: &mut Log) -> Result<(), LogError> {
+        match self {
+            Self::Added(event) => log.append_typed(event).map(|_| ()),
+            Self::Toggled(event) => log.append_typed(event).map(|_| ()),
+            Self::Removed(event) => log.append_typed(event).map(|_| ()),
         }
-        "task_removed" => {
-            if let Ok(id) = e.payload.parse::<u64>() {
-                state.items.retain(|t| t.id != id);
-            }
-        }
-        _ => {}
     }
+
+    #[cfg(test)]
+    fn append_to_reactive(&self, log: ReactiveLog) -> Result<(), LogError> {
+        match self {
+            Self::Added(event) => log.append_typed(event),
+            Self::Toggled(event) => log.append_typed(event),
+            Self::Removed(event) => log.append_typed(event),
+        }
+    }
+}
+
+/// The immutable application schema and upcaster graph.
+#[must_use]
+pub fn task_catalog() -> SealedEventCatalog<TaskEvent> {
+    let mut builder = EventCatalogBuilder::new();
+    builder
+        .register_current::<TaskAddedV1, _>(TaskEvent::Added)
+        .expect("static task-added schema is valid")
+        .register_current::<TaskToggledV1, _>(TaskEvent::Toggled)
+        .expect("static task-toggled schema is valid")
+        .register_current::<TaskRemovedV1, _>(TaskEvent::Removed)
+        .expect("static task-removed schema is valid");
+    builder
+        .seal()
+        .expect("static task catalog is complete and deterministic")
+}
+
+/// Pure, fallible task reducer. Rejections occur before state is published by
+/// `Projection`, so a malformed history tail cannot partially mutate the UI.
+pub fn reduce(state: &mut TaskList, event: &TaskEvent) -> Result<(), ReducerError> {
+    let next_events_seen = state
+        .events_seen
+        .checked_add(1)
+        .ok_or_else(|| ReducerError::new("event counter overflow"))?;
+    match event {
+        TaskEvent::Added(event) => {
+            if event.id != state.events_seen {
+                return Err(ReducerError::new(
+                    "task identifier does not match its origin sequence",
+                ));
+            }
+            if state.items.iter().any(|task| task.id == event.id) {
+                return Err(ReducerError::new("duplicate task identifier"));
+            }
+            state.items.push(Task {
+                id: event.id,
+                text: event.text.clone(),
+                done: false,
+            });
+        }
+        TaskEvent::Toggled(event) => {
+            let task = state
+                .items
+                .iter_mut()
+                .find(|task| task.id == event.id)
+                .ok_or_else(|| ReducerError::new("toggle references an unknown task"))?;
+            task.done = !task.done;
+        }
+        TaskEvent::Removed(event) => {
+            let index = state
+                .items
+                .iter()
+                .position(|task| task.id == event.id)
+                .ok_or_else(|| ReducerError::new("remove references an unknown task"))?;
+            state.items.remove(index);
+        }
+    }
+    state.events_seen = next_events_seen;
+    Ok(())
+}
+
+fn task_reducer() -> Reducer<TaskList, TaskEvent> {
+    let identity = ReducerIdentity::new("pliego.example/task-list", 1, [0; 32])
+        .expect("static reducer identity is valid");
+    Reducer::new(identity, reduce)
+}
+
+/// Build the live transactional task projection at genesis.
+pub fn task_projection(
+    log: ReactiveLog,
+) -> Result<Projection<TaskList, TaskEvent>, ProjectionError> {
+    Projection::new(
+        log,
+        TaskList::default(),
+        task_catalog(),
+        task_reducer(),
+        CanonicalJsonCodec::default(),
+    )
+}
+
+#[cfg(target_arch = "wasm32")]
+fn append_task(log: ReactiveLog, text: impl Into<String>) -> Result<u64, LogError> {
+    let id = log.len();
+    log.append_typed(&TaskAddedV1 {
+        id,
+        text: text.into(),
+    })?;
+    Ok(id)
+}
+
+/// Materialize an exact prefix without constructing raw events. The source is
+/// first verified, each event crosses the sealed catalog, and the rebuilt log
+/// uses only `append_typed` before entering a fresh `Projection`.
+#[cfg(any(test, target_arch = "wasm32"))]
+fn replay_prefix(source: &Log, position: u64) -> Result<TaskList, String> {
+    source
+        .verify()
+        .map_err(|error| format!("source log rejected: {error}"))?;
+    source
+        .cursor_at(position)
+        .map_err(|error| format!("prefix cursor rejected: {error}"))?;
+    let end = usize::try_from(position).map_err(|_| "prefix exceeds platform size".to_owned())?;
+    let catalog = task_catalog();
+    let mut prefix = Log::new();
+    for stored in &source.events()[..end] {
+        catalog
+            .decode(stored)
+            .map_err(|error| format!("schema rejected prefix: {error}"))?
+            .append_to_log(&mut prefix)
+            .map_err(|error| format!("typed prefix append rejected: {error}"))?;
+    }
+    task_projection(ReactiveLog::from_log(prefix))
+        .and_then(|projection| projection.try_get())
+        .map_err(|error| format!("prefix projection rejected: {error}"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pliego_log::{Fold, Log};
 
     fn demo_log() -> Log {
         let mut log = Log::new();
-        log.append("task_added", "buy milk"); // seq 0
-        log.append("task_added", "call Ana"); // seq 1
-        log.append("task_toggled", "0");
-        log.append("task_added", "pay power bill"); // seq 3
-        log.append("task_removed", "1");
+        for event in [
+            TaskEvent::Added(TaskAddedV1 {
+                id: 0,
+                text: "buy milk".into(),
+            }),
+            TaskEvent::Added(TaskAddedV1 {
+                id: 1,
+                text: "call Ana".into(),
+            }),
+            TaskEvent::Toggled(TaskToggledV1 { id: 0 }),
+            TaskEvent::Added(TaskAddedV1 {
+                id: 3,
+                text: "pay power bill".into(),
+            }),
+            TaskEvent::Removed(TaskRemovedV1 { id: 1 }),
+        ] {
+            event.append_to_log(&mut log).unwrap();
+        }
         log
     }
 
     #[test]
-    fn reducer_builds_the_expected_state() {
-        let mut fold = Fold::new(TaskList::default(), reduce);
-        let log = demo_log();
-        fold.sync(&log);
-        let s = fold.state();
-        assert_eq!(s.items.len(), 2);
+    fn projection_builds_the_expected_state() {
+        let projection = task_projection(ReactiveLog::from_log(demo_log())).unwrap();
+        let state = projection.try_get().unwrap();
         assert_eq!(
-            s.items[0],
-            Task {
+            state.items,
+            vec![
+                Task {
+                    id: 0,
+                    text: "buy milk".into(),
+                    done: true,
+                },
+                Task {
+                    id: 3,
+                    text: "pay power bill".into(),
+                    done: false,
+                },
+            ]
+        );
+        assert_eq!(projection.history().unwrap().position, 5);
+    }
+
+    #[test]
+    fn gate_typed_replay_equals_live_at_every_prefix() {
+        let log = ReactiveLog::new();
+        let live = task_projection(log).unwrap();
+        let script = [
+            TaskEvent::Added(TaskAddedV1 {
                 id: 0,
-                text: "buy milk".into(),
-                done: true
-            }
-        );
-        assert_eq!(
-            s.items[1],
-            Task {
+                text: "a".into(),
+            }),
+            TaskEvent::Added(TaskAddedV1 {
+                id: 1,
+                text: "b".into(),
+            }),
+            TaskEvent::Toggled(TaskToggledV1 { id: 0 }),
+            TaskEvent::Added(TaskAddedV1 {
                 id: 3,
-                text: "pay power bill".into(),
-                done: false
-            }
-        );
-    }
-
-    /// THE M1 GATE on the real app state: live fold == replay, at every prefix.
-    #[test]
-    fn gate_replay_equals_live_on_tasklist() {
-        let mut log = Log::new();
-        let mut live = Fold::new(TaskList::default(), reduce);
-        let script: &[(&str, String)] = &[
-            ("task_added", "a".into()),
-            ("task_added", "b".into()),
-            ("task_toggled", "0".into()),
-            ("task_added", "c".into()),
-            ("task_removed", "1".into()),
-            ("task_toggled", "0".into()),
-            ("task_toggled", "3".into()),
-            ("task_removed", "0".into()),
+                text: "c".into(),
+            }),
+            TaskEvent::Removed(TaskRemovedV1 { id: 1 }),
+            TaskEvent::Toggled(TaskToggledV1 { id: 0 }),
+            TaskEvent::Toggled(TaskToggledV1 { id: 3 }),
+            TaskEvent::Removed(TaskRemovedV1 { id: 0 }),
         ];
-        for (i, (kind, payload)) in script.iter().enumerate() {
-            log.append(*kind, payload.clone());
-            live.sync(&log);
-            let replayed: TaskList = Fold::replay(&log, log.len(), reduce);
-            assert_eq!(live.state(), &replayed, "diverged after step {i}");
+        for (index, event) in script.iter().enumerate() {
+            event.append_to_reactive(log).unwrap();
+            let live_state = live.sync().unwrap();
+            let source = log.with(Clone::clone);
+            assert_eq!(
+                live_state,
+                replay_prefix(&source, source.len()).unwrap(),
+                "diverged after step {index}"
+            );
         }
-        assert!(log.verify().is_ok());
+        assert!(log.with(Log::verify).is_ok());
     }
 
-    /// Undo is a prefix: the world as of event N.
     #[test]
-    fn undo_via_cursor() {
+    fn time_travel_is_an_exact_typed_prefix() {
         let log = demo_log();
-        // before the removal (first 4 events): milk(done) + call Ana + power bill
-        let at4: TaskList = Fold::replay(&log, 4, reduce);
-        assert_eq!(at4.items.len(), 3);
-        // as of event 2: both tasks, milk toggled
-        let at3: TaskList = Fold::replay(&log, 3, reduce);
-        assert_eq!(at3.items.len(), 2);
-        assert!(at3.items[0].done);
+        let at_four = replay_prefix(&log, 4).unwrap();
+        assert_eq!(at_four.items.len(), 3);
+        let at_three = replay_prefix(&log, 3).unwrap();
+        assert_eq!(at_three.items.len(), 2);
+        assert!(at_three.items[0].done);
+        assert!(replay_prefix(&log, 6).is_err());
+    }
+
+    #[test]
+    fn projection_snapshot_restores_with_bound_contracts() {
+        let log = ReactiveLog::from_log(demo_log());
+        let live = task_projection(log).unwrap();
+        let expected = live.try_get().unwrap();
+        let bytes = live.snapshot().unwrap().encode();
+        let restored = Projection::restore_bytes(
+            log,
+            &bytes,
+            task_catalog(),
+            task_reducer(),
+            CanonicalJsonCodec::default(),
+        )
+        .unwrap();
+        assert_eq!(restored.try_get().unwrap(), expected);
+        assert_eq!(restored.history().unwrap(), log.with(Log::cursor));
+    }
+
+    #[test]
+    fn forged_origin_sequence_fails_without_publishing_state() {
+        let log = ReactiveLog::new();
+        let projection = task_projection(log).unwrap();
+        log.append_typed(&TaskAddedV1 {
+            id: 7,
+            text: "forged".into(),
+        })
+        .unwrap();
+        assert!(projection.try_get().is_err());
+        assert_eq!(projection.stable_state(), TaskList::default());
+        assert_eq!(projection.stable_history().position, 0);
     }
 }
 
-// ───────────────────────── the browser shell (wasm32 only) ─────────────────────────
-//
-// M4 rewrite: the ENTIRE page is now built by the framework itself —
-// ReactiveLog (pliego-fold) + Fold (the incremental node) + el()/dyn_text/
-// dyn_view (pliego-dom). No hand-rolled innerHTML, no manual render calls:
-// appends wake the folds, the folds wake exactly the views that read them.
-
 #[cfg(target_arch = "wasm32")]
 mod web {
-    use super::{TaskList, reduce};
+    use super::{
+        TaskList, TaskRemovedV1, TaskToggledV1, append_task, replay_prefix, task_projection,
+    };
     use pliego_dom::{IntoView, View, dyn_text, dyn_view, el, mount_to};
-    use pliego_fold::{Fold, ReactiveLog};
+    use pliego_fold::ReactiveLog;
     use pliego_hyphae::Ack;
     use pliego_log::hex;
     use pliego_reactive::Signal;
@@ -159,14 +360,11 @@ mod web {
     use wasm_bindgen::JsCast;
     use wasm_bindgen::prelude::*;
 
-    /// Where the Hyphae engine lives (the SSH tunnel to the fleet in dev).
     const HYPHAE_BASE: &str = "http://127.0.0.1:18091";
 
-    /// Push the log's tail through the experimental, unverified Hyphae seam;
-    /// the UI does not await
-    /// this. Each ack lands in the `synced` signal, waking exactly the status
-    /// chips that read it.
-    fn sync_now(
+    /// Experimental compatibility transport. Its ACK is a UI preview only: it
+    /// is neither a verified R2 receipt nor authority-bound durable evidence.
+    fn sync_preview(
         log: ReactiveLog,
         synced: Signal<HashMap<u64, Ack>>,
         next_push: Rc<Cell<u64>>,
@@ -178,24 +376,25 @@ mod web {
         pushing.set(true);
         wasm_bindgen_futures::spawn_local(async move {
             loop {
-                let seq = next_push.get();
-                let Some((kind, payload)) =
-                    log.with(|l| l.get(seq).map(|e| (e.kind.clone(), e.payload.clone())))
-                else {
-                    break; // fully synced
+                let sequence = next_push.get();
+                let Some((kind, payload)) = log.with(|raw| {
+                    raw.get(sequence)
+                        .map(|event| (event.kind().to_owned(), event.payload().as_str().to_owned()))
+                }) else {
+                    break;
                 };
                 match pliego_hyphae::fetch::append_remote(HYPHAE_BASE, &kind, &payload).await {
                     Ok(ack) => {
-                        synced.update(|m| {
-                            m.insert(seq, ack);
+                        synced.update(|entries| {
+                            entries.insert(sequence, ack);
                         });
-                        next_push.set(seq + 1);
+                        next_push.set(sequence + 1);
                     }
-                    Err(e) => {
+                    Err(error) => {
                         web_sys::console::warn_1(
-                            &format!("hyphae sync parked at #{seq}: {e}").into(),
+                            &format!("hyphae preview parked at #{sequence}: {error}").into(),
                         );
-                        break; // retry on the next append
+                        break;
                     }
                 }
             }
@@ -216,40 +415,40 @@ mod web {
 
     #[wasm_bindgen(start)]
     pub fn start() {
-        // the whole app model: ONE log, ONE live fold, one view cursor — plus the
-        // Experimental sync map (local seq -> unverified legacy ACK).
         let log = ReactiveLog::new();
-        let live = Rc::new(Fold::new(log, TaskList::default(), reduce));
+        let live = Rc::new(task_projection(log).expect("static task projection is valid"));
         let view_at: Signal<Option<u64>> = Signal::new(None);
         let synced: Signal<HashMap<u64, Ack>> = Signal::new(HashMap::new());
-        let next_push = Rc::new(Cell::new(0u64));
+        let next_push = Rc::new(Cell::new(0_u64));
         let pushing = Rc::new(Cell::new(false));
         let kick_sync = {
             let (next_push, pushing) = (next_push.clone(), pushing.clone());
-            move || sync_now(log, synced, next_push.clone(), pushing.clone())
+            move || sync_preview(log, synced, next_push.clone(), pushing.clone())
         };
 
-        // current state: live fold, or a prefix replay when time-traveling
         let current = {
             let live = live.clone();
             move || -> (TaskList, bool) {
                 match view_at.get() {
-                    Some(n) if n < log.len() => {
-                        (log.with(|l| pliego_log::Fold::replay(l, n, reduce)), true)
-                    }
+                    Some(position) if position < log.len() => (
+                        log.with(|raw| {
+                            replay_prefix(raw, position)
+                                .expect("verified local prefix must project deterministically")
+                        }),
+                        true,
+                    ),
                     _ => (live.get(), false),
                 }
             }
         };
 
-        // ── the view: data all the way down ──
         let header = el("div")
             .class("row")
             .child(
                 el("input")
                     .id("new-task")
                     .attr("type", "text")
-                    .attr("placeholder", "new task → append('task_added', …)"),
+                    .attr("placeholder", "new task"),
             )
             .child(el("button").child("append").on("click", {
                 let kick = kick_sync.clone();
@@ -257,8 +456,9 @@ mod web {
                     let input = input_by_id("new-task");
                     let text = input.value();
                     if !text.trim().is_empty() {
+                        append_task(log, text.trim())
+                            .expect("typed task append must satisfy its static schema");
                         input.set_value("");
-                        log.append("task_added", text.trim().to_string());
                         view_at.set(None);
                         kick();
                     }
@@ -271,45 +471,44 @@ mod web {
             dyn_view(move || {
                 let (state, _) = current();
                 let mut items: Vec<View> = Vec::new();
-                for t in &state.items {
-                    let id = t.id;
-                    let h = log.with(|l| hex(&l.get(id).expect("origin event").hash));
-                    let kick_t = kick.clone();
-                    let kick_r = kick.clone();
+                for task in &state.items {
+                    let id = task.id;
+                    let hash =
+                        log.with(|raw| hex(raw.get(id).expect("task origin event exists").hash()));
+                    let toggle_kick = kick.clone();
+                    let remove_kick = kick.clone();
                     items.push(
                         el("li")
-                            .class(if t.done { "done" } else { "" })
-                            .child(el("button").child(if t.done { "☑" } else { "☐" }).on(
+                            .class(if task.done { "done" } else { "" })
+                            .child(el("button").child(if task.done { "☑" } else { "☐" }).on(
                                 "click",
                                 move |_| {
-                                    log.append("task_toggled", id.to_string());
+                                    log.append_typed(&TaskToggledV1 { id })
+                                        .expect("typed toggle satisfies its static schema");
                                     view_at.set(None);
-                                    kick_t();
+                                    toggle_kick();
                                 },
                             ))
-                            .child(el("span").class("text").child(t.text.clone()))
+                            .child(el("span").class("text").child(task.text.clone()))
                             .child(el("button").child("×").on("click", move |_| {
-                                log.append("task_removed", id.to_string());
+                                log.append_typed(&TaskRemovedV1 { id })
+                                    .expect("typed removal satisfies its static schema");
                                 view_at.set(None);
-                                kick_r();
+                                remove_kick();
                             }))
                             .child(
                                 el("code")
                                     .class("prov")
-                                    .attr("title", format!("event #{id} · local {h}"))
-                                    .child(format!("#{id} · {}…", &h[..12]))
-                                    // The experimental ACK patches in when the
-                                    // legacy endpoint answers for THIS event.
+                                    .attr("title", format!("event #{id} · local {hash}"))
+                                    .child(format!("#{id} · {}…", &hash[..12]))
                                     .child(dyn_text(move || {
-                                        synced.with(|m| match m.get(&id) {
-                                            Some(a) => {
-                                                format!(
-                                                    " hyphae preview #{} {}…",
-                                                    a.seq,
-                                                    &a.hash[..8]
-                                                )
-                                            }
-                                            None => " ⛓ …".to_string(),
+                                        synced.with(|entries| match entries.get(&id) {
+                                            Some(ack) => format!(
+                                                " hyphae preview/unverified #{} {}…",
+                                                ack.seq,
+                                                &ack.hash[..8]
+                                            ),
+                                            None => " ⛓ …".to_owned(),
                                         })
                                     })),
                             )
@@ -325,7 +524,7 @@ mod web {
             .child(
                 el("label")
                     .attr("for", "cursor")
-                    .child("time-travel cursor — the world as of event N (right edge = live)"),
+                    .child("time-travel cursor — exact typed event prefix"),
             )
             .child(
                 el("input")
@@ -335,32 +534,37 @@ mod web {
                     .attr("step", "1")
                     .attr_dyn("max", move || log.len().to_string())
                     .attr_dyn("value", move || match view_at.get() {
-                        Some(n) => n.to_string(),
+                        Some(position) => position.to_string(),
                         None => log.len().to_string(),
                     })
-                    .on("input", move |ev| {
-                        let Some(target) = ev.target() else { return };
+                    .on("input", move |event| {
+                        let Some(target) = event.target() else {
+                            return;
+                        };
                         let Ok(input) = target.dyn_into::<web_sys::HtmlInputElement>() else {
                             return;
                         };
-                        let n: u64 = input.value().parse().unwrap_or(0);
-                        // len untracked here (listeners run outside computations)
-                        view_at.set(if n >= log.len() { None } else { Some(n) });
+                        let position = input.value().parse().unwrap_or(0);
+                        view_at.set(if position >= log.len() {
+                            None
+                        } else {
+                            Some(position)
+                        });
                     }),
             );
 
         let status = el("div").id("status").child(dyn_text(move || {
             let len = log.len();
-            let (head, ok) = log.with(|l| (hex(&l.head()), l.verify().is_ok()));
+            let (head, valid) = log.with(|raw| (hex(&raw.head()), raw.verify().is_ok()));
             let acknowledged = synced.with(HashMap::len) as u64;
             let mode = match view_at.get() {
-                Some(n) if n < len => format!("⏪ viewing as of event {n}"),
-                _ => "live".to_string(),
+                Some(position) if position < len => format!("viewing prefix {position}"),
+                _ => "live".to_owned(),
             };
             format!(
-                "{len} events · head {}… · chain {} · hyphae preview {acknowledged}/{len} unverified · {mode}",
+                "{len} typed events · head {}… · chain {} · hyphae preview/unverified {acknowledged}/{len} · {mode}",
                 &head[..12],
-                if ok { "✓ intact" } else { "✗ BROKEN" },
+                if valid { "intact" } else { "BROKEN" },
             )
         }));
 
@@ -372,13 +576,11 @@ mod web {
             .into_view();
         mount_to("app", &app);
 
-        // Seed so the screen speaks on load, then start the preview sync.
-        log.append(
-            "task_added",
-            "estudiar Leptos (hecho: se observa, no se copia)",
-        );
-        log.append("task_added", "plegar el log en interfaz");
-        log.append("task_toggled", "0");
+        append_task(log, "estudiar Leptos (se observa, no se copia)")
+            .expect("seed task schema is valid");
+        append_task(log, "plegar el log tipado en interfaz").expect("seed task schema is valid");
+        log.append_typed(&TaskToggledV1 { id: 0 })
+            .expect("seed toggle schema is valid");
         kick_sync();
     }
 }
