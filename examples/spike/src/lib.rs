@@ -162,7 +162,8 @@ mod web {
     /// Where the Hyphae engine lives (the SSH tunnel to the fleet in dev).
     const HYPHAE_BASE: &str = "http://127.0.0.1:18091";
 
-    /// Push the log's tail to Hyphae in the background; the UI does not await
+    /// Push the log's tail through the experimental, unverified Hyphae seam;
+    /// the UI does not await
     /// this. Each ack lands in the `synced` signal, waking exactly the status
     /// chips that read it.
     fn sync_now(
@@ -216,7 +217,7 @@ mod web {
     #[wasm_bindgen(start)]
     pub fn start() {
         // the whole app model: ONE log, ONE live fold, one view cursor — plus the
-        // sync map (local seq -> durable ack). All Copy/cheap handles.
+        // Experimental sync map (local seq -> unverified legacy ACK).
         let log = ReactiveLog::new();
         let live = Rc::new(Fold::new(log, TaskList::default(), reduce));
         let view_at: Signal<Option<u64>> = Signal::new(None);
@@ -297,12 +298,16 @@ mod web {
                                     .class("prov")
                                     .attr("title", format!("event #{id} · local {h}"))
                                     .child(format!("#{id} · {}…", &h[..12]))
-                                    // dual provenance: the durable ack patches in
-                                    // surgically when Hyphae confirms THIS event
+                                    // The experimental ACK patches in when the
+                                    // legacy endpoint answers for THIS event.
                                     .child(dyn_text(move || {
                                         synced.with(|m| match m.get(&id) {
                                             Some(a) => {
-                                                format!(" ⛓ hyphae #{} {}…", a.seq, &a.hash[..8])
+                                                format!(
+                                                    " hyphae preview #{} {}…",
+                                                    a.seq,
+                                                    &a.hash[..8]
+                                                )
                                             }
                                             None => " ⛓ …".to_string(),
                                         })
@@ -347,13 +352,13 @@ mod web {
         let status = el("div").id("status").child(dyn_text(move || {
             let len = log.len();
             let (head, ok) = log.with(|l| (hex(&l.head()), l.verify().is_ok()));
-            let confirmed = synced.with(HashMap::len) as u64;
+            let acknowledged = synced.with(HashMap::len) as u64;
             let mode = match view_at.get() {
                 Some(n) if n < len => format!("⏪ viewing as of event {n}"),
                 _ => "live".to_string(),
             };
             format!(
-                "{len} events · head {}… · chain {} · ⛓ hyphae {confirmed}/{len} durable · {mode}",
+                "{len} events · head {}… · chain {} · hyphae preview {acknowledged}/{len} unverified · {mode}",
                 &head[..12],
                 if ok { "✓ intact" } else { "✗ BROKEN" },
             )
@@ -367,7 +372,7 @@ mod web {
             .into_view();
         mount_to("app", &app);
 
-        // seed so the screen speaks on load, then start the durable sync
+        // Seed so the screen speaks on load, then start the preview sync.
         log.append(
             "task_added",
             "estudiar Leptos (hecho: se observa, no se copia)",

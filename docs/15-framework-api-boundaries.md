@@ -38,8 +38,11 @@ contract.
 
 ## Current limitations
 
-- `pliego-hyphae` is an optimistic one-way foundation, not the final shared-log
-  protocol.
+- `pliego-hyphae` implements the protocol v2 client trust boundary: append and
+  page attestations, receipt verification, event-version admission, and
+  stream-bound replay typestate. The authenticated transport, production
+  gateway/service, key distribution, durable outbox, and replay persistence are
+  not implemented by that client crate.
 - DOM keyed reconciliation and complete arena reclamation still require
   hardening before application-scale 1.0.
 - The current production proof is static generation plus Rust/WASM; streaming

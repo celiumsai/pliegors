@@ -30,8 +30,8 @@ channel is available yet.
 - lazy loading, capability policy, Save-Data, reduced motion, cancellation, and
   automatic cleanup for external browser libraries;
 - reproducible image, video, font, and 3D asset plans with device budgets;
-- a versioned Hyphae client protocol for batches, cursors, receipts, pull, and
-  replay without claiming a production gateway;
+- a protocol v2 Hyphae client boundary with signed append/page attestations,
+  stream-bound typestate replay, and no claim of a production gateway;
 - `pliego new`, `check`, `build`, `dev`, `preview`, `inspect`, and maintained
   default onboarding, minimal, editorial, and cinematic starters;
 - an official bilingual site authored by PliegoRS itself.
@@ -64,7 +64,7 @@ candidate distribution, and R7 an external flagship. See the
 | `pliego-adapters` | External ESM lifecycle and WASM bootstrap |
 | `pliego-assets` | Adaptive media plans, budgets, and manifests |
 | `pliego-inspect` | Artifact integrity and budget inspection |
-| `pliego-hyphae` | Versioned Hyphae client protocol and verified replay boundary |
+| `pliego-hyphae` | Protocol v2 attestations, authority policy, and type-gated verified replay |
 | `pliego-starters` | Maintained embedded starter projects |
 | `pliego-cli` | Project creation, build, dev server, preview, and inspection |
 
@@ -101,6 +101,7 @@ npm run check:site
 
 - [Founding specification](docs/00-pliegors-spec.md)
 - [PliegoRS and Hyphae target protocol](docs/01-hyphae-protocol.md)
+- [Hyphae verified sync guide](docs/29-hyphae-verified-sync-guide.md)
 - [Framework API boundaries](docs/15-framework-api-boundaries.md)
 - [Native migration gate](docs/16-native-migration-gate.md)
 - [Framework readiness review](docs/17-framework-readiness-review.md)

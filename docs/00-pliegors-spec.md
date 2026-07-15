@@ -18,12 +18,14 @@ on top. The experience bar the whole roadmap serves: *"loads in microseconds,
 powerful, secure, beautiful."* Its unfair advantage remains data-alive apps (the
 fold, provenance, memory), but the destination is the full web.
 
-**Current implementation boundary:** PliegoRS does not yet run as one machine or
-one log with Hyphae. M5 sends event content from a client hash chain to Hyphae,
-which appends it to a separate durable hash chain and returns a different hash.
-There is no shared reducer package, authentication, idempotency key, pull/merge,
-or field-level provenance yet. Those are protocol and product milestones, not
-properties of the current spike.
+**Current implementation boundary:** PliegoRS does not yet run as one deployed
+machine or one log with Hyphae. The client crate now defines protocol v2 for
+idempotent append, signed receipts and append/page attestations,
+snapshot-consistent pull, authority verification, and type-gated replay. There
+is still no production gateway, key distribution, durable browser outbox,
+shared reducer package, deployed v2 Hyphae service, or field-level provenance.
+Those remain product and infrastructure milestones, not properties implied by
+the client contract.
 
 ---
 
@@ -59,9 +61,10 @@ current crates implement the client-side log and fold independently; sharing a
 versioned event schema and reducer package with the engine is planned work.
 
 History, replay, and cursor-based time travel work in the local spike because its
-log is retained. Durable audit and provenance require the unfinished client ↔
-Hyphae protocol plus value/field-level lineage; they do not fall out of the
-current implementation automatically.
+log is retained. Protocol v2 now provides a fail-closed client verification
+boundary, but durable audit and provenance still require a conforming deployed
+service, production authority policy, persistent client state, and value/field
+lineage. They do not follow from local replay or green client tests alone.
 
 ## 2. What we learned from Leptos (and keep, conceptually)
 
@@ -122,16 +125,15 @@ are typed against the owner; `try_` variants everywhere), hydration mismatches
    effect — it's an `append`. The only terminal effects are render effects (DOM)
    and declared side-effect ports. The loop: interaction → append → log red →
    folds green → lazy pull → surgical rebuild.
-5. **Provenance as a UI primitive (planned).** M5 can display the local creation
-   event and the durable acknowledgement hash. A future provenance model must
-   track which event range produced each value or field and preserve source
-   metadata through the durable fold.
-6. **The Hyphae seam (experimental, M5).** The client can push `kind` and
-   `payload` to Hyphae and receive its durable sequence and hash. Client and
-   server hashes intentionally differ today because they are separate chains.
-   A versioned envelope, shared reducers, tenant authentication, client event
-   IDs, idempotent batches, pull cursors, persistence, merge, and conflict rules
-   are required before this can be called one log or local-first.
+5. **Provenance as a UI primitive (planned).** The legacy M5 spike can display a
+   local creation event and an unverified acknowledgement hash. Protocol v2 can
+   establish verified event and checkpoint authority, but a future provenance
+   model must still track which event range produced each value or field.
+6. **The Hyphae seam.** The default client surface is now the v2 envelope,
+   idempotent batch, exact cursor, signed append/page attestation, receipt,
+   snapshot pull, and verified replay contract. The old `{kind,payload}` seam is
+   isolated behind `experimental-legacy`. Production tenant authentication,
+   transport, persistence, shared reducers, and field-level provenance remain.
 
 ## 4. Crate layout
 
@@ -147,13 +149,13 @@ pliegors/
 │  │                    (THE new primitive; shared semantics with hyphae projections)
 │  ├─ pliego-dom        experimental HTML/DOM renderer with dynamic segments
 │  ├─ pliego-ssg        deterministic pages, head/SEO, routes, assets, manifests
-│  └─ pliego-hyphae     experimental one-way HTTP append seam
-├─ planned/
+│  ├─ pliego-hyphae     protocol v2 append/pull, authority, and replay contract
 │  ├─ pliego-macros     view! RSX + #[component]
-│  ├─ pliego            umbrella crate and user-facing framework surface
-│  └─ pliego-cli        create/dev/build/test/preview/deploy workflow
+│  └─ pliego-cli        create/dev/build/test/preview workflow
+├─ planned/
+│  └─ pliego            umbrella crate and user-facing framework surface
 └─ examples/
-   └─ spike/            M1: one component = fold of a real Hyphae log (see §6)
+   └─ spike/            local event fold plus experimental Hyphae ACK preview
 ```
 
 ## 5. Targets
@@ -185,9 +187,10 @@ M3  pliego-fold as a first-class node + snapshots
     GATE: reducer consumes only the tail from a snapshot.          ← solid foundation
 M4  pliego-dom: HTML/DOM proof                                    ← experimental
     NEXT: retained/keyed rebuilds, properties/SVG, cleanup, hydration, macros.
-M5  one-way client event push + durable Hyphae acknowledgement    ← experimental
-    NEXT: versioned protocol, auth/tenant, idempotency, persistence, pull/merge,
-    shared reducers, and field-level provenance.
+M5  Hyphae seam
+    protocol v2 client verification boundary                      ← implemented
+    NEXT: production auth/tenant gateway, v2 service, durable outbox/replay
+    persistence, shared reducers, and field-level provenance.
 M6  SSR + SSG on Cloudflare Workers, islands (near-zero WASM for static pages),
     streaming HTML — deterministic SSG, resumable islands, adapter lifecycle,
     file routes, redirects, and the first CLI slice are implemented. Streaming

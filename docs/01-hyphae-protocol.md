@@ -1,208 +1,312 @@
 # PliegoRS / Hyphae Client Protocol
 
-**Wire version:** `pliego-hyphae/1`
+**Wire version:** `pliego-hyphae/2`
 **Client implementation:** `crates/pliego-hyphae`
-**Status:** validated client and transport contract; production service boundary
-not implemented in this repository
-**Last reviewed:** 2026-07-12
+**Status:** fail-closed client contract; authenticated production transport,
+gateway, key distribution, and Hyphae service are not implemented here
+**Last reviewed:** 2026-07-15
 
 ## Boundary
 
-PliegoRS is a general-purpose web framework. Hyphae is its privileged data and
-provenance platform, not a mandatory dependency for static sites or applications
-that choose another backend.
+PliegoRS is a general-purpose web framework. Hyphae is its privileged durable
+data and provenance platform when an application needs synchronization; static
+projects and applications using another backend do not depend on it.
 
-`pliego-hyphae` now implements the stable client-side protocol surface:
+Protocol v2 closes the client-side trust path:
 
-- strict Serde wire types with unknown-field rejection;
-- version, UUIDv7, stream, kind, hash, timestamp, signature-shape, and limit
-  validation;
-- immutable idempotent append batches and typed cursor conflicts;
-- typed receipts plus a cryptographic verifier boundary;
-- bounded retry that resends the identical batch after a lost ACK;
-- bounded pull pages, chain continuity checks, overlap deduplication, and replay;
-- the old `JournalTransport` / `push_pending` seam for compatibility.
+```text
+untrusted wire values
+  -> request- and state-bound structural validation
+  -> page/append attestation and receipt verification
+  -> application event-version policy
+  -> single-use replay application
+```
 
-It does **not** implement or imply production credentials, tenant resolution,
-authorization, key distribution, durable idempotency storage, rate limiting, or
-a Hyphae service. Passing local tests proves the client contract, not that a
-remote deployment honors it.
+The Rust type system prevents a raw or merely validated pull page from entering
+`ReplaySink`. This proves a property of the client library. It does not prove
+that a deployed gateway authenticates tenants correctly, that signing keys are
+stored securely, or that a remote Hyphae implementation is durable.
 
 ## Production Network Shape
 
 ```text
-PliegoRS app
-  local event log + durable outbox (future)
+PliegoRS application
+  durable outbox + stream-bound replay state (production persistence pending)
         |
-        | authenticated, versioned sync
+        | authenticated protocol v2 transport (pending)
         v
-Cloudflare gateway (not implemented here)
+Cloudflare gateway or equivalent trusted boundary (pending)
   identity -> tenant -> scope -> quotas -> exact CORS
         |
-        | private service request
+        | private authenticated service request
         v
-Hyphae API (not implemented here)
-  idempotency -> expected cursor -> durable append -> signed receipt
-        |
-        v
-Hyphae journal + projections
+Hyphae service (pending)
+  idempotency -> cursor compare -> append/pull -> signed attestations
 ```
 
 A browser must never receive raw Hyphae credentials or call an unscoped journal
-endpoint. The production gateway derives tenant, actor, permissions, and limits
-from authenticated server state. Those authority fields are deliberately absent
-from every client envelope.
+endpoint. Tenant, actor, permission, quota, and key-distribution policy belong
+to the trusted gateway and are deliberately absent from client-authored event
+envelopes.
+
+## Version 2 And Downgrade Policy
+
+Modern values carry `protocol: "pliego-hyphae/2"`. Unknown versions and v1
+values fail validation; there is no silent downgrade. Version 2 is an
+intentional pre-release wire and Rust API break because page completeness,
+snapshot identity, and append transaction identity could not be added safely to
+the v1 signature boundary.
+
+The historical single-event M5 transport is isolated behind the non-default
+`experimental-legacy` Cargo feature. It does not implement protocol v2 and its
+ACK values can never become `VerifiedPullPage` or `VerifiedAppendResponse`.
 
 ## Event Envelope
 
-`EventEnvelope` is the accepted client shape:
+`EventEnvelope` is the client-authored event shape:
 
 ```json
 {
-  "protocol": "pliego-hyphae/1",
+  "protocol": "pliego-hyphae/2",
   "client_event_id": "01890f3e-9b4a-7cc0-8a1a-0123456789ab",
   "stream_id": "project:alpha",
   "schema_version": 1,
   "kind": "app_task_added",
   "payload": "{\"title\":\"First task\"}",
   "local_seq": 41,
-  "local_prev_hash": "64 lowercase hex characters",
-  "local_hash": "64 lowercase hex characters",
+  "local_prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "local_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "causal_parents": [],
-  "created_at": "2026-07-12T20:00:00Z"
+  "created_at": "2026-07-15T20:00:00Z"
 }
 ```
 
-The payload field contains one serialized JSON value and is opaque to the sync
-crate. `EventEnvelope::from_local_event` safely serializes an existing
-`pliego_log::Event` payload as a JSON string. A product that uses structured
-payloads may construct the envelope directly and must call `validate`.
+Validation requires the exact protocol, canonical lowercase UUIDv7 event ID, a
+bounded traversal-free stream ID, an `app_*` kind, a non-zero schema version,
+valid JSON payload, RFC3339 timestamp, canonical hashes, and at most 16 unique
+non-self causal parents. One payload is capped at 64 KiB. Unknown JSON fields
+are rejected.
 
-Validation rules are intentionally narrow:
+`EventEnvelope::wire_hash` is SHA-256 over a length-delimited canonical encoding
+of every envelope field, including schema version, local chain, causal parents,
+and timestamp. A receipt must bind this exact hash.
 
-- protocol must equal `pliego-hyphae/1` exactly;
-- event and batch ids are canonical lowercase UUIDv7;
-- stream ids contain 1..128 safe ASCII token/path characters, never traversal;
-- client kinds must use `app_*` and lowercase ASCII; engine opcodes never pass;
-- local and durable hashes are 64-character lowercase SHA-256 hex;
-- `EventEnvelope::wire_hash` canonically binds identity, kind, payload, local
-  chain, causal metadata, and timestamp for the durable receipt;
-- schema versions start at 1;
-- event payload is valid JSON and at most 64 KiB;
-- at most 16 unique, non-self causal parents are accepted;
-- unknown JSON fields are rejected rather than ignored.
+## Append Contract
 
-## Append Batch And Retry
-
-`AppendBatch` is the unit of idempotency:
+`AppendBatch` is the immutable unit of idempotency:
 
 ```json
 {
-  "protocol": "pliego-hyphae/1",
+  "protocol": "pliego-hyphae/2",
   "batch_id": "01890f3e-9b4a-7cc2-8a1a-0123456789ab",
   "stream_id": "project:alpha",
   "expected_cursor": {
     "position": 9182,
-    "head_hash": "64 lowercase hex characters"
+    "head_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   },
-  "events": []
+  "events": [
+    {
+      "protocol": "pliego-hyphae/2",
+      "client_event_id": "01890f3e-9b4a-7cc0-8a1a-0123456789ab",
+      "stream_id": "project:alpha",
+      "schema_version": 1,
+      "kind": "app_task_added",
+      "payload": "{\"title\":\"First task\"}",
+      "local_seq": 41,
+      "local_prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "local_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "causal_parents": [],
+      "created_at": "2026-07-15T20:00:00Z"
+    }
+  ]
 }
 ```
 
-The real wire transport should map this value to an authenticated endpoint such
-as `POST /v1/sync/append`, using `batch_id` as its idempotency identity. A batch
-contains 1..128 events, no more than 512 KiB of aggregate payload, one stream,
-unique event ids, contiguous local sequences, and linked local hashes.
+The expected cursor is always explicit. Genesis is position zero with the
+all-zero hash; there is no blind append. A batch contains 1..128 events, no more
+than 512 KiB of aggregate payload, one stream, unique event IDs, and a contiguous
+local chain.
 
 `append_with_retry` validates before I/O, retries only
-`TransportError::Retryable`, and resends the same borrowed `AppendBatch`. It
-never retries cursor conflicts or permanent rejections. The adversarial fake
-server test commits a batch, loses the first ACK, receives the exact retry, and
-returns the original receipts without a second durable append.
+`TransportError::Retryable`, and resends the same borrowed batch. Cursor
+conflicts and permanent rejections are never retried. A successful call returns
+`ValidatedAppendResponse`, not an authenticated result:
 
-That test defines the required server behavior; it is not a server
-implementation. Crash-safe retry also requires the application to persist the
-complete in-flight batch before the first request. An in-memory retry cannot
-survive reload or process loss.
+```rust
+let validated = append_with_retry(&mut transport, &batch, 3)?;
+let verified: VerifiedAppendResponse = validated.verify(&authority_verifier)?;
+let durable_cursor = verified.next_cursor();
+```
 
-`expected_cursor` is an optimistic concurrency precondition. A server must
-atomically compare it with the authorized stream head, append the whole batch,
-and store the idempotency response. Divergence returns
-`TransportError::CursorConflict`; it never silently creates or overwrites a
-branch.
+The raw `AppendResponse` contains one receipt per event, an exact next cursor,
+and a mandatory `AppendAttestation`. Structural validation requires absolute
+one-based `server_seq` values, contiguous durable hash links, exact envelope
+identity, and a final cursor matching the signed journal head.
 
-An absent `expected_cursor` means verifiable genesis, not "accept any current
-head": the first durable sequence must be one and the previous hash must be the
-zero hash. Clients that do not know a non-empty remote head must pull it before
-appending. `next_cursor.position` must equal the final signed `server_seq`, so a
-transport cannot substitute cursor position while preserving valid receipts.
+The append-attestation signing domain is `pliego-hyphae/2/append`. Its canonical
+payload binds:
 
-## Receipt And Verification
+- protocol, logical authority, batch ID, and stream;
+- expected and resulting cursors;
+- event count and ordered digest of envelopes plus complete receipts;
+- authoritative commit time and attestation key ID.
 
-Each event receives one typed `Receipt`:
+Every per-event receipt is verified separately. All receipt and attestation
+keys must resolve to the same logical `AuthorityId`.
+
+## Receipts And Authority
+
+A `Receipt` carries client event ID, stream, envelope hash, absolute server
+sequence, server hash and previous hash, journal head, authoritative commit
+time, key ID, and detached base64url signature.
+
+Its signing domain is `pliego-hyphae/2/receipt`. The canonical payload uses
+big-endian numeric fields and length-prefixed UTF-8 fields in the order defined
+by `Receipt::signing_payload`. The signature itself is excluded from its own
+payload and is included in the enclosing ordered event digest.
+
+`ReceiptVerifier` is the trust-injection boundary. It receives canonical bytes
+plus `VerificationContext` containing `SignaturePurpose`, claimed authority,
+stream, signed time, and key ID. It must return a stable `AuthorityId` or one of
+the fail-closed `VerificationError` variants:
+
+- `UnknownKey`;
+- `RevokedKey`;
+- `UnauthorizedStream`;
+- `InvalidSignature`;
+- `Unavailable`;
+- `AuthorityMismatch`.
+
+The crate deliberately does not select a signature algorithm or ship a public
+key store. A production verifier must pin or securely discover keys, enforce
+stream scope, apply revocation at the signed timestamp, and map rotated keys to
+one stable logical authority.
+
+## Snapshot-Consistent Pull
+
+`PullRequest` binds every response to a UUIDv7 request ID, stream, exact current
+cursor, snapshot policy, selection, and bounded page size:
 
 ```json
 {
-  "client_event_id": "01890f3e-9b4a-7cc0-8a1a-0123456789ab",
+  "protocol": "pliego-hyphae/2",
+  "request_id": "01890f3e-9b4a-7cc3-8a1a-0123456789ab",
   "stream_id": "project:alpha",
-  "envelope_hash": "canonical hash of the exact accepted envelope",
-  "server_seq": 9182,
-  "server_hash": "64 lowercase hex characters",
-  "server_prev_hash": "64 lowercase hex characters",
-  "journal_head": "64 lowercase hex characters",
-  "committed_at": "2026-07-12T20:00:01Z",
-  "key_id": "hyphae-receipt-2026-01",
-  "signature": "base64url"
+  "after": {
+    "position": 9182,
+    "head_hash": "64 lowercase hex characters"
+  },
+  "snapshot": { "mode": "latest" },
+  "selection": "whole_stream",
+  "limit": 256
 }
 ```
 
-`AppendResponse::validate_against` checks exact batch and stream identity,
-receipt cardinality and order, cursor extension, durable hash continuity, and
-the final journal head. This is untrusted-input shape validation only.
+The first request uses `SnapshotSelection::Latest`. Its signed response fixes a
+`snapshot_cursor`. Continuations use
+`SnapshotSelection::Exact(snapshot_cursor)` and a new request ID. Protocol v2
+supports only `PullSelection::WholeStream`; selective sync is not inferred from
+unknown fields or client-side filtering.
 
-Cryptographic trust is explicit. `Receipt::signing_payload` produces canonical
-bytes in this order:
+`PullPage` contains ordered `AcceptedEvent` values, a `next_cursor`, the fixed
+`snapshot_cursor`, derived `complete`, and a mandatory `PageAttestation`:
 
-1. length-prefixed `pliego-hyphae/1`, client event id, stream id, and canonical
-   envelope hash;
-2. big-endian `server_seq` as `u64`;
-3. length-prefixed server hash, previous hash, journal head, committed time, and
-   key id.
+```json
+{
+  "protocol": "pliego-hyphae/2",
+  "stream_id": "project:alpha",
+  "events": [],
+  "next_cursor": {
+    "position": 9182,
+    "head_hash": "64 lowercase hex characters"
+  },
+  "snapshot_cursor": {
+    "position": 9182,
+    "head_hash": "64 lowercase hex characters"
+  },
+  "complete": true,
+  "attestation": {
+    "authority_id": "hyphae:production",
+    "issued_at": "2026-07-15T20:00:01Z",
+    "key_id": "hyphae-page-2026-07",
+    "signature": "base64url"
+  }
+}
+```
 
-Each string length is a big-endian `u32` followed by its UTF-8 bytes. The
-signature field is excluded. `verify_receipt` delegates those bytes to a
-`ReceiptVerifier` implemented by the production key store. This crate does not
-select a signature algorithm, ship public keys, or pretend a shape-valid
-signature is authentic. Provenance UI may claim durability only after
-verification against a pinned or securely rotated trusted key.
+The page-attestation domain is `pliego-hyphae/2/page`. Its canonical payload
+binds the authority, request ID, stream, request cursor, requested snapshot,
+whole-stream selection, limit, next cursor, fixed snapshot cursor, completion,
+event count, ordered event digest, issued time, and key ID.
 
-## Pull And Replay
+The ordered event digest uses the domain
+`pliego-hyphae/2/accepted-events`, the event count, each envelope wire hash,
+each complete canonical receipt payload, and each receipt signature.
 
-`PullRequest` carries protocol, stream, an optional `after` cursor, and a limit
-in `1..=256`. `PullPage` returns ordered `AcceptedEvent` pairs, a next cursor,
-and an explicit completeness flag.
+These invariants hold before signature verification:
 
-Before replay, `PullPage::validate_against` enforces:
+- every receipt sequence equals `request.after.position + index + 1`;
+- every receipt extends the preceding signed durable hash;
+- `next_cursor` equals the final returned receipt, or the request cursor for an
+  empty page;
+- `next_cursor` never passes `snapshot_cursor`;
+- `complete` is true exactly when both cursors are equal;
+- an incomplete page is non-empty and advances;
+- an exact continuation cannot change the fixed snapshot.
 
-- exact protocol and stream;
-- requested page bound;
-- envelope/receipt identity equality;
-- no duplicate event ids inside a page;
-- increasing server sequence and continuous durable hashes;
-- cursor position equal to start plus returned event count;
-- an incomplete page must return at least one event and advance.
+An empty complete page still requires a valid page attestation. It proves that
+the requested cursor equaled the authority's fixed checkpoint when issued; it
+does not prove that the stream can never receive another event.
 
-`apply_pull_page` sends unseen events to `ReplaySink::apply_batch` as one bounded
-transaction; returning an error must leave application state unchanged. An
-overlapping page with the same event id and durable hash is a no-op. Reusing an
-event id with another hash is rejected as equivocation. Replay cursors cannot
-move backward or change hash at the same position. The dedupe window retains
-only the latest validated page (at most 256 entries); stale replay outside that
-window is rejected instead of growing memory without bound.
+## Pull Typestate
 
-Receipt signatures must be verified before a product marks replayed state as
-trusted. The pure replay helper intentionally does not hide that policy behind
-an implicit global key store.
+The public application path is linear and consuming:
+
+```rust
+let validated: ValidatedPullPage =
+    UntrustedPullPage::new(request, raw_page).validate(&replay_state)?;
+let verified: VerifiedPullPage =
+    validated.verify(&authority_verifier, &event_versions)?;
+let applied: AppliedPullPage = verified.apply(&mut replay_state, &mut reducer)?;
+```
+
+`ValidatedPullPage`, `VerifiedPullPage`, and their authenticated event values
+have private fields and cannot be deserialized or constructed by consumers.
+Only `VerifiedPullPage::apply` accepts a `ReplaySink`, and the sink receives
+`&[VerifiedAcceptedEvent]`, never raw `AcceptedEvent` values. Applying consumes
+the verified page, so it cannot be applied twice.
+
+## Replay State, Gaps, Forks, And Overlap
+
+`ReplayState::new(stream_id)` starts at explicit genesis and is permanently
+bound to that stream. Its first applied page binds one logical authority. It
+stores the authenticated cursor, active snapshot, and a bounded window of
+absolute-position anchors containing durable head and event identity.
+
+Before a reducer runs, replay rejects:
+
+- another stream or logical authority;
+- a request cursor ahead of local state;
+- an unknown overlap position outside the bounded anchor window;
+- a different hash at a known position;
+- a snapshot rollback or change during an active pull cycle;
+- a fresh position gap, moved event identity, or divergent overlap.
+
+An exact repeated overlap is a no-op. Fresh events are collected first, the
+candidate framework state is computed without mutation, and only then is
+`ReplaySink::apply_batch` called. A reducer error does not advance
+`ReplayState`. The sink contract itself requires application state to remain
+unchanged on error; arbitrary user code cannot be rolled back by this crate.
+
+## Event-Version Policy
+
+Structural validation accepts positive schema versions because wire validity is
+not application compatibility. `EventVersionPolicy` must explicitly admit each
+`(kind, schema_version)` before a page becomes `VerifiedPullPage`. An unknown
+pair returns `EventVersionError` and never reaches the reducer.
+
+R2 implements rejection, not migration. Upcasters, reducer identity, snapshot
+schema sets, and transactional projections belong to R3.
 
 ## Limits
 
@@ -210,62 +314,51 @@ an implicit global key store.
 | --- | ---: |
 | Events per append batch | 128 |
 | Payload per event | 64 KiB |
-| Aggregate batch payload | 512 KiB |
+| Aggregate append payload | 512 KiB |
 | Causal parents per event | 16 |
 | Events per pull page | 256 |
-| Stream id | 128 bytes |
+| Stream ID | 128 bytes |
 | Signature encoding | 512 bytes |
-| Legacy in-memory acknowledgements | 1,000,000 |
+| Retained replay anchors | 1,025 |
 
-The production gateway may enforce smaller tenant-scoped limits. It must reject,
-not truncate, oversized values. Network response-body limits, request timeouts,
-backoff, and rate quotas belong to concrete transports and the gateway.
+Concrete transports must additionally bound response bodies, timeouts,
+cancellation, retry backoff, and tenant quotas before allocating full wire
+values.
 
-## Legacy Compatibility
+## Experimental Legacy Feature
 
-`JournalTransport`, `Ack`, `SyncState`, `push_pending`, and WASM
-`fetch::append_remote` remain available for the existing M5 spike.
-`push_pending` now validates the local hash chain, namespaced kind, payload size,
-ordered ack cursor, ack hash, and a defensive allocation ceiling.
+The `experimental-legacy` feature exposes the historical `Ack`, `SyncState`,
+`JournalTransport`, `push_pending`, and WASM `fetch::append_remote` API. It is
+disabled by default and exists only for the maintained M5 spike.
 
-The legacy one-event route has no batch id and therefore cannot deduplicate a
-lost ACK. It must remain experimental and private. New product code should use
-the batch contract. Its WASM compatibility transport still enforces a 64 KiB
-ACK ceiling incrementally through `ReadableStream` (and rejects an oversized
-`Content-Length`) before accumulating the response body.
+Legacy ACKs validate shape and ordering but have no page/append attestation,
+logical authority, snapshot, idempotent batch identity, or verified-replay
+typestate. They must not be shown as provenance, imported into `ReplayState`, or
+described as verified durability. There is no automatic v1-to-v2 trust upgrade.
 
-## Adversarial Coverage
+See the [verified sync guide](29-hyphae-verified-sync-guide.md) for migration.
 
-The native crate tests cover:
+## What R2 Does Not Claim
 
-- stream traversal, forged authority fields, reserved kinds, malformed hashes,
-  invalid protocol versions, invalid UUIDs, and oversized payloads;
-- duplicate ids, reordered events, broken local links, response substitution,
-  discontinuous receipt chains, and forged cursors;
-- bounded retry, lost-ACK idempotency, and non-retryable cursor conflict;
-- discontinuous/non-advancing pull pages, replay overlap deduplication, and
-  receipt claim tampering;
-- legacy retry compatibility, ack gaps, conflicting acks, and allocation guards.
-
-These are pure client/fake-transport tests. Before production, the same contract
-suite must run against the authenticated Cloudflare gateway and a real Hyphae
-instance, including tenant isolation, quota, revoke, timeout, partial write,
-crash recovery, and signing-key rotation cases.
-
-## Remaining Production Work
+The crate now supplies a fail-closed protocol v2 client boundary. The following
+remain production work:
 
 1. Cloudflare authentication, tenant/actor resolution, exact CORS, quotas, and
    secret isolation.
-2. Hyphae batch transaction, durable idempotency records, expected-cursor compare,
-   and signed receipts matching the canonical payload.
-3. A concrete authenticated async `BatchTransport` with body/time limits,
-   cancellation, jittered backoff, and telemetry redaction.
-4. Durable browser outbox and replay state (IndexedDB), including schema migration
-   and crash-safe in-flight batch retention.
-5. Trusted public-key discovery/pinning, rotation, revocation, and receipt
-   verification policy.
-6. End-to-end adversarial tests against the real gateway and Hyphae deployment.
+2. A real Hyphae v2 batch/pull implementation with durable idempotency and
+   canonical receipt, append, and page signatures.
+3. A bounded authenticated async transport with cancellation, jittered backoff,
+   and telemetry redaction.
+4. Durable browser outbox and `ReplayState` persistence with crash recovery and
+   migration.
+5. Production key discovery, pinning, rotation, revocation, and operational
+   recovery.
+6. End-to-end adversarial tests against the deployed gateway and service.
 
-Until those items pass, documentation and UI must describe this as a stable
-client contract with an experimental integration, never as completed production
-sync or verified cross-tenant provenance.
+Until those exist, PliegoRS may claim a verified client contract, not completed
+production synchronization or cross-tenant provenance.
+
+## Decisions
+
+- [ADR-002: Hyphae active data plane](adr/ADR-002-hyphae-active-plane.md)
+- [ADR-004: Hyphae verified sync protocol v2](adr/ADR-004-hyphae-verified-sync-v2.md)

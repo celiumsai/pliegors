@@ -1,6 +1,6 @@
 # Framework readiness review
 
-**Reviewed:** 2026-07-14
+**Reviewed:** 2026-07-15
 **Verdict:** credible pre-release foundation for native static and focused
 Rust/WASM sites; not ready for a public compatibility or trust claim.
 
@@ -13,8 +13,9 @@ Rust/WASM sites; not ready for a public compatibility or trust claim.
 - Rust/WASM clients and plugin API v1 with lazy admission, capability policy,
   reduced motion, Save-Data, cancellation, update/unmount, and LIFO cleanup.
 - Reproducible adaptive media plans for images, video, fonts, and 3D.
-- Hyphae client protocol v1 for idempotent batches, cursor conflicts, receipts,
-  bounded retry, pull, and replay.
+- Hyphae client protocol v2 with idempotent batches, signed append/page
+  attestations, receipt authority, snapshot-consistent pull, event-version
+  admission, and type-gated replay.
 - The official PliegoRS site and neutral references as native framework evidence.
 - Manual five-target GitHub Actions candidate workflow and installer lifecycle.
 
@@ -38,7 +39,9 @@ The full findings and acceptance sequence are in the
 - It integrates native JavaScript libraries through an explicit lifecycle API.
 - It has deterministic build and adaptive-asset foundations with automated
   tests.
-- It has a versioned Hyphae client protocol without a production gateway claim.
+- It has a fail-closed Hyphae protocol v2 client contract without claiming a
+  production gateway, key distribution system, durable browser outbox, or
+  deployed conforming Hyphae service.
 
 ## Claims blocked before R6
 
@@ -51,7 +54,8 @@ The full findings and acceptance sequence are in the
 
 ## Next review
 
-Repeat this review after R0-R4 close with adversarial tests, lifecycle plateau
-evidence, collision cases, exact artifact verification, and rejected replay
-fork/gap/receipt fixtures. Release readiness is then decided against R5-R6,
-not visual completeness.
+Repeat this review after R0-R4 close with committed adversarial evidence,
+lifecycle plateau results, exact artifact verification, and rejected replay
+fork/gap/authority/attestation fixtures. Client-side R2 closure must remain
+separate from production sync readiness. Release readiness is then decided
+against R5-R6, not visual completeness.

@@ -22,6 +22,11 @@ Versioning once a public release exists.
 
 - Explicit capability boundaries, safe HTML defaults, bounded content inputs,
   release provenance, dependency audits, and automatic browser cleanup.
+- Hyphae protocol v2 makes append and page attestations mandatory, verifies
+  every receipt under one logical authority, binds replay to a stream and fixed
+  snapshot, and admits events only through a consuming typestate.
+- The unauthenticated M5 one-event ACK seam is disabled by default behind the
+  `experimental-legacy` feature and cannot enter verified replay.
 
 ## 0.0.1 - Not published
 

@@ -10,20 +10,25 @@
 //! this wire contract; receipt authenticity still requires a trusted verifier
 //! and a production transport.
 //!
-//! [`JournalTransport`] and [`push_pending`] remain as the experimental M5
-//! compatibility seam. New integrations should use [`BatchTransport`],
-//! [`append_with_retry`], [`PullRequest`], and [`apply_pull_page`].
+//! The modern API is fail-closed: untrusted wire values must cross validation,
+//! authority verification, and event-version policy before replay. The old M5
+//! seam is available only with the non-default `experimental-legacy` feature.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 
-use pliego_log::{Event, Log, hex};
+#[cfg(feature = "experimental-legacy")]
+use pliego_log::Log;
+use pliego_log::{Event, hex};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-/// Exact wire protocol accepted by this client contract.
-pub const PROTOCOL_V1: &str = "pliego-hyphae/1";
+/// Exact modern wire protocol accepted by this client contract.
+pub const PROTOCOL_V2: &str = "pliego-hyphae/2";
+const RECEIPT_DOMAIN: &str = "pliego-hyphae/2/receipt";
+const PAGE_DOMAIN: &str = "pliego-hyphae/2/page";
+const APPEND_DOMAIN: &str = "pliego-hyphae/2/append";
 /// Namespace accepted by Hyphae for application-owned journal events.
 pub const APP_KIND_PREFIX: &str = "app_";
 /// Maximum number of events in one append batch.
@@ -37,6 +42,7 @@ pub const MAX_CAUSAL_PARENTS: usize = 16;
 /// Maximum events requested or returned by a pull page.
 pub const MAX_PULL_EVENTS: u16 = 256;
 /// Defensive ceiling for the legacy in-memory acknowledgement vector.
+#[cfg(feature = "experimental-legacy")]
 pub const MAX_LEGACY_ACKS: usize = 1_000_000;
 /// Canonical head hash for a stream that has accepted no events.
 pub const EMPTY_STREAM_HASH: &str =
@@ -76,7 +82,7 @@ impl fmt::Display for ValidationError {
 impl Error for ValidationError {}
 
 fn ensure_protocol(protocol: &str) -> Result<(), ValidationError> {
-    if protocol == PROTOCOL_V1 {
+    if protocol == PROTOCOL_V2 {
         Ok(())
     } else {
         Err(ValidationError::new("protocol", "unsupported version"))
@@ -139,15 +145,32 @@ pub fn validate_stream_id(value: &str) -> Result<(), ValidationError> {
         && value.bytes().all(|byte| {
             byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':' | b'/')
         })
-        && !value.contains("..")
         && !value.starts_with('/')
-        && !value.ends_with('/');
+        && !value.ends_with('/')
+        && value
+            .split('/')
+            .all(|segment| !segment.is_empty() && segment != "." && segment != "..");
     if valid {
         Ok(())
     } else {
         Err(ValidationError::new(
             "stream_id",
             "expected 1..128 safe ASCII characters without traversal segments",
+        ))
+    }
+}
+
+fn validate_authority_id(value: &str) -> Result<(), ValidationError> {
+    let valid = (1..=96).contains(&value.len())
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'));
+    if valid {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "authority_id",
+            "expected a safe ASCII authority token",
         ))
     }
 }
@@ -277,9 +300,14 @@ fn validate_timestamp(value: &str) -> Result<(), ValidationError> {
 fn validate_signature(value: &str) -> Result<(), ValidationError> {
     let core = value.trim_end_matches('=');
     let padding = value.len() - core.len();
+    let padding_is_canonical = match padding {
+        0 => core.len() % 4 != 1,
+        1 => core.len() % 4 == 3 && value.len() % 4 == 0,
+        2 => core.len() % 4 == 2 && value.len() % 4 == 0,
+        _ => false,
+    };
     let valid = (16..=512).contains(&value.len())
-        && padding <= 2
-        && core.len() % 4 != 1
+        && padding_is_canonical
         && core
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'));
@@ -390,7 +418,7 @@ impl EventEnvelope {
         created_at: impl Into<String>,
     ) -> Result<Self, ValidationError> {
         let envelope = Self {
-            protocol: PROTOCOL_V1.to_owned(),
+            protocol: PROTOCOL_V2.to_owned(),
             client_event_id: client_event_id.into(),
             stream_id: stream_id.into(),
             schema_version,
@@ -485,6 +513,58 @@ fn hash_field(hasher: &mut Sha256, value: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
+/// A validated, opaque authority identity returned by the trust boundary.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
+pub struct AuthorityId(String);
+
+impl AuthorityId {
+    /// Construct an authority identity after validating its bounded wire form.
+    pub fn try_new(value: impl Into<String>) -> Result<Self, ValidationError> {
+        let value = value.into();
+        validate_authority_id(&value)?;
+        Ok(Self(value))
+    }
+
+    /// Borrow the canonical authority token.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for AuthorityId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::try_new(value).map_err(serde::de::Error::custom)
+    }
+}
+
+fn hash_bytes(hasher: &mut Sha256, value: &[u8]) -> Result<(), ValidationError> {
+    let length = u32::try_from(value.len())
+        .map_err(|_| ValidationError::new("signature_payload", "field length overflow"))?;
+    hasher.update(length.to_be_bytes());
+    hasher.update(value);
+    Ok(())
+}
+
+fn append_field(target: &mut Vec<u8>, value: &str) -> Result<(), ValidationError> {
+    let length = u32::try_from(value.len())
+        .map_err(|_| ValidationError::new("signature_payload", "field length overflow"))?;
+    target.extend_from_slice(&length.to_be_bytes());
+    target.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+
+fn append_cursor(target: &mut Vec<u8>, cursor: &StreamCursor) -> Result<(), ValidationError> {
+    cursor.validate()?;
+    target.extend_from_slice(&cursor.position.to_be_bytes());
+    append_field(target, &cursor.head_hash)
+}
+
 /// Idempotent unit of append and retry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -495,9 +575,8 @@ pub struct AppendBatch {
     pub batch_id: String,
     /// Stream shared by every envelope in this batch.
     pub stream_id: String,
-    /// Last observed durable cursor; `None` is the genesis precondition.
-    /// Blind appends are intentionally not representable in protocol v1.
-    pub expected_cursor: Option<StreamCursor>,
+    /// Exact durable cursor the batch must extend, including genesis.
+    pub expected_cursor: StreamCursor,
     /// Ordered, contiguous local events.
     pub events: Vec<EventEnvelope>,
 }
@@ -508,9 +587,7 @@ impl AppendBatch {
         ensure_protocol(&self.protocol)?;
         validate_batch_id(&self.batch_id)?;
         validate_stream_id(&self.stream_id)?;
-        if let Some(cursor) = &self.expected_cursor {
-            cursor.validate()?;
-        }
+        self.expected_cursor.validate()?;
         if self.events.is_empty() || self.events.len() > MAX_BATCH_EVENTS {
             return Err(ValidationError::new(
                 "events",
@@ -571,7 +648,7 @@ pub struct Receipt {
     pub stream_id: String,
     /// Canonical hash of the exact accepted [`EventEnvelope`].
     pub envelope_hash: String,
-    /// Sequence on the durable journal.
+    /// One-based sequence on the durable journal.
     pub server_seq: u64,
     /// Hash of the accepted durable entry.
     pub server_hash: String,
@@ -593,59 +670,57 @@ impl Receipt {
         validate_client_event_id(&self.client_event_id)?;
         validate_stream_id(&self.stream_id)?;
         validate_hash(&self.envelope_hash)?;
+        if self.server_seq == 0 {
+            return Err(ValidationError::new("server_seq", "must be one-based"));
+        }
         validate_hash(&self.server_hash)?;
         validate_hash(&self.server_prev_hash)?;
         validate_hash(&self.journal_head)?;
+        if self.server_hash == EMPTY_STREAM_HASH || self.server_hash == self.server_prev_hash {
+            return Err(ValidationError::new(
+                "server_hash",
+                "durable entry hash must advance from a non-entry sentinel",
+            ));
+        }
+        if self.journal_head == EMPTY_STREAM_HASH || self.journal_head == self.server_prev_hash {
+            return Err(ValidationError::new(
+                "journal_head",
+                "durable journal head must include the accepted entry",
+            ));
+        }
         validate_timestamp(&self.committed_at)?;
         validate_key_id(&self.key_id)?;
         validate_signature(&self.signature)
     }
 
-    /// Canonical length-prefixed bytes covered by a receipt signature.
-    ///
-    /// The signature itself is excluded. Every string is encoded as a
-    /// big-endian `u32` byte length followed by UTF-8 bytes; `server_seq` is a
-    /// big-endian `u64`. Call [`Self::validate_shape`] before trusting this
-    /// payload or allocating verifier state.
+    /// Canonical bytes signed for one durable receipt.
     pub fn signing_payload(&self) -> Result<Vec<u8>, ValidationError> {
         self.validate_shape()?;
-        let leading_fields = [
-            PROTOCOL_V1,
+        let mut payload = Vec::new();
+        for field in [
+            RECEIPT_DOMAIN,
+            PROTOCOL_V2,
             self.client_event_id.as_str(),
             self.stream_id.as_str(),
             self.envelope_hash.as_str(),
-        ];
-        let trailing_fields = [
+        ] {
+            append_field(&mut payload, field)?;
+        }
+        payload.extend_from_slice(&self.server_seq.to_be_bytes());
+        for field in [
             self.server_hash.as_str(),
             self.server_prev_hash.as_str(),
             self.journal_head.as_str(),
             self.committed_at.as_str(),
             self.key_id.as_str(),
-        ];
-        let capacity = leading_fields
-            .iter()
-            .chain(&trailing_fields)
-            .map(|field| field.len() + 4)
-            .sum::<usize>()
-            + 8;
-        let mut payload = Vec::with_capacity(capacity);
-        for field in leading_fields {
-            let length = u32::try_from(field.len())
-                .map_err(|_| ValidationError::new("receipt", "field length overflow"))?;
-            payload.extend_from_slice(&length.to_be_bytes());
-            payload.extend_from_slice(field.as_bytes());
-        }
-        payload.extend_from_slice(&self.server_seq.to_be_bytes());
-        for field in trailing_fields {
-            let length = u32::try_from(field.len())
-                .map_err(|_| ValidationError::new("receipt", "field length overflow"))?;
-            payload.extend_from_slice(&length.to_be_bytes());
-            payload.extend_from_slice(field.as_bytes());
+        ] {
+            append_field(&mut payload, field)?;
         }
         Ok(payload)
     }
 
-    /// Lossy compatibility view used by the legacy one-event seam.
+    /// Lossy compatibility view used only by the experimental legacy seam.
+    #[cfg(feature = "experimental-legacy")]
     #[must_use]
     pub fn legacy_ack(&self) -> Ack {
         Ack {
@@ -655,55 +730,206 @@ impl Receipt {
     }
 }
 
-/// Cryptographic boundary for verifying receipts against trusted Hyphae keys.
-/// Implementations should pin or securely rotate keys outside this crate.
-pub trait ReceiptVerifier {
-    /// Verify a detached base64url signature over the canonical payload.
-    fn verify(&self, key_id: &str, signing_payload: &[u8], signature: &str)
-    -> Result<bool, String>;
+/// Kind of signed object presented to the authority verifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignaturePurpose {
+    /// One durable event receipt.
+    Receipt,
+    /// One complete atomic append response.
+    AppendAttestation,
+    /// One bounded pull page, including an empty page.
+    PageAttestation,
 }
 
-/// A receipt failed shape, key lookup, or signature verification.
+/// Typed metadata used for key scope, rotation, and revocation decisions.
+#[derive(Debug, Clone, Copy)]
+pub struct VerificationContext<'a> {
+    purpose: SignaturePurpose,
+    claimed_authority: Option<&'a AuthorityId>,
+    stream_id: &'a str,
+    signed_at: &'a str,
+    key_id: &'a str,
+}
+
+impl<'a> VerificationContext<'a> {
+    /// Signed object class.
+    #[must_use]
+    pub const fn purpose(&self) -> SignaturePurpose {
+        self.purpose
+    }
+
+    /// Authority claimed by the enclosing attestation, when present.
+    #[must_use]
+    pub const fn claimed_authority(&self) -> Option<&'a AuthorityId> {
+        self.claimed_authority
+    }
+
+    /// Authorized stream scope.
+    #[must_use]
+    pub const fn stream_id(&self) -> &'a str {
+        self.stream_id
+    }
+
+    /// Timestamp covered by the signature.
+    #[must_use]
+    pub const fn signed_at(&self) -> &'a str {
+        self.signed_at
+    }
+
+    /// Key identifier covered by the signature.
+    #[must_use]
+    pub const fn key_id(&self) -> &'a str {
+        self.key_id
+    }
+}
+
+/// Fail-closed authority verification failures.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReceiptVerificationError {
-    /// Untrusted receipt shape was invalid.
-    Validation(ValidationError),
-    /// The verifier could not resolve or use the trusted key.
-    Verifier(String),
-    /// Cryptographic verification returned false.
+pub enum VerificationError {
+    /// The key identifier is not trusted.
+    UnknownKey,
+    /// The key was revoked at the signed timestamp.
+    RevokedKey,
+    /// The key or authority is not authorized for this stream.
+    UnauthorizedStream,
+    /// The detached signature does not cover the supplied canonical bytes.
     InvalidSignature,
+    /// The verifier could not make a trustworthy decision.
+    Unavailable(String),
+    /// Different signatures resolved to different authorities.
+    AuthorityMismatch,
 }
 
-impl fmt::Display for ReceiptVerificationError {
+impl fmt::Display for VerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Validation(error) => error.fmt(f),
-            Self::Verifier(message) => write!(f, "receipt verifier failed: {message}"),
-            Self::InvalidSignature => f.write_str("invalid receipt signature"),
+            Self::UnknownKey => f.write_str("unknown signing key"),
+            Self::RevokedKey => f.write_str("signing key was revoked"),
+            Self::UnauthorizedStream => f.write_str("authority is not authorized for stream"),
+            Self::InvalidSignature => f.write_str("invalid detached signature"),
+            Self::Unavailable(message) => write!(f, "authority verifier unavailable: {message}"),
+            Self::AuthorityMismatch => f.write_str("signatures resolve to different authorities"),
         }
     }
 }
 
-impl Error for ReceiptVerificationError {}
+impl Error for VerificationError {}
 
-/// Verify one typed receipt. Shape validation alone never implies durability.
-pub fn verify_receipt<V: ReceiptVerifier>(
-    receipt: &Receipt,
+/// Cryptographic boundary for trusted Hyphae keys and authority policy.
+pub trait ReceiptVerifier {
+    /// Verify canonical bytes and return the stable authority controlling the key.
+    fn verify(
+        &self,
+        context: VerificationContext<'_>,
+        signing_payload: &[u8],
+        signature: &str,
+    ) -> Result<AuthorityId, VerificationError>;
+}
+
+fn verify_as<V: ReceiptVerifier>(
     verifier: &V,
-) -> Result<(), ReceiptVerificationError> {
-    let payload = receipt
-        .signing_payload()
-        .map_err(ReceiptVerificationError::Validation)?;
-    match verifier
-        .verify(&receipt.key_id, &payload, &receipt.signature)
-        .map_err(ReceiptVerificationError::Verifier)?
+    context: VerificationContext<'_>,
+    payload: &[u8],
+    signature: &str,
+) -> Result<AuthorityId, VerificationError> {
+    let claimed = context.claimed_authority.cloned();
+    let authority = verifier.verify(context, payload, signature)?;
+    if claimed
+        .as_ref()
+        .is_some_and(|expected| expected != &authority)
     {
-        true => Ok(()),
-        false => Err(ReceiptVerificationError::InvalidSignature),
+        return Err(VerificationError::AuthorityMismatch);
+    }
+    Ok(authority)
+}
+
+fn accepted_events_hash(events: &[AcceptedEvent]) -> Result<String, ValidationError> {
+    let mut hasher = Sha256::new();
+    hash_field(&mut hasher, "pliego-hyphae/2/accepted-events")?;
+    let count = u64::try_from(events.len())
+        .map_err(|_| ValidationError::new("events", "count overflow"))?;
+    hasher.update(count.to_be_bytes());
+    for accepted in events {
+        hash_field(&mut hasher, &accepted.envelope.wire_hash()?)?;
+        hash_bytes(&mut hasher, &accepted.receipt.signing_payload()?)?;
+        hash_field(&mut hasher, &accepted.receipt.signature)?;
+    }
+    let digest: [u8; 32] = hasher.finalize().into();
+    Ok(hex(&digest))
+}
+
+fn append_events_hash(
+    events: &[EventEnvelope],
+    receipts: &[Receipt],
+) -> Result<String, ValidationError> {
+    if events.len() != receipts.len() {
+        return Err(ValidationError::new("receipts", "cardinality mismatch"));
+    }
+    let paired: Vec<AcceptedEvent> = events
+        .iter()
+        .cloned()
+        .zip(receipts.iter().cloned())
+        .map(|(envelope, receipt)| AcceptedEvent { envelope, receipt })
+        .collect();
+    accepted_events_hash(&paired)
+}
+
+/// Signature over the complete atomic append result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppendAttestation {
+    /// Stable authority owning the signing key.
+    pub authority_id: AuthorityId,
+    /// Authoritative timestamp for the atomic append claim.
+    pub committed_at: String,
+    /// Signing key identifier.
+    pub key_id: String,
+    /// Detached base64url signature.
+    pub signature: String,
+}
+
+impl AppendAttestation {
+    fn validate_shape(&self) -> Result<(), ValidationError> {
+        validate_authority_id(self.authority_id.as_str())?;
+        validate_timestamp(&self.committed_at)?;
+        validate_key_id(&self.key_id)?;
+        validate_signature(&self.signature)
+    }
+
+    /// Canonical bytes binding batch identity, precondition, atomic set, and cursor.
+    pub fn signing_payload(
+        &self,
+        batch: &AppendBatch,
+        response: &AppendResponse,
+    ) -> Result<Vec<u8>, ValidationError> {
+        self.validate_shape()?;
+        batch.validate()?;
+        let mut payload = Vec::new();
+        for field in [
+            APPEND_DOMAIN,
+            PROTOCOL_V2,
+            self.authority_id.as_str(),
+            batch.batch_id.as_str(),
+            batch.stream_id.as_str(),
+        ] {
+            append_field(&mut payload, field)?;
+        }
+        append_cursor(&mut payload, &batch.expected_cursor)?;
+        append_cursor(&mut payload, &response.next_cursor)?;
+        let count = u64::try_from(batch.events.len())
+            .map_err(|_| ValidationError::new("events", "count overflow"))?;
+        payload.extend_from_slice(&count.to_be_bytes());
+        append_field(
+            &mut payload,
+            &append_events_hash(&batch.events, &response.receipts)?,
+        )?;
+        append_field(&mut payload, &self.committed_at)?;
+        append_field(&mut payload, &self.key_id)?;
+        Ok(payload)
     }
 }
 
-/// Response for an accepted or deduplicated append batch.
+/// Raw response for an accepted or deduplicated append batch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AppendResponse {
@@ -717,11 +943,13 @@ pub struct AppendResponse {
     pub receipts: Vec<Receipt>,
     /// Cursor after the complete atomic batch.
     pub next_cursor: StreamCursor,
+    /// Signature over the complete append transaction.
+    pub attestation: AppendAttestation,
 }
 
 impl AppendResponse {
-    /// Validate that this untrusted response corresponds exactly to `batch`.
-    pub fn validate_against(&self, batch: &AppendBatch) -> Result<(), ValidationError> {
+    fn validate_against(&self, batch: &AppendBatch) -> Result<(), ValidationError> {
+        batch.validate()?;
         ensure_protocol(&self.protocol)?;
         if self.batch_id != batch.batch_id {
             return Err(ValidationError::new("batch_id", "response mismatch"));
@@ -736,8 +964,8 @@ impl AppendResponse {
             ));
         }
         self.next_cursor.validate()?;
-        let mut previous: Option<&Receipt> = None;
-        for (event, receipt) in batch.events.iter().zip(&self.receipts) {
+        self.attestation.validate_shape()?;
+        for (index, (event, receipt)) in batch.events.iter().zip(&self.receipts).enumerate() {
             receipt.validate_shape()?;
             if receipt.client_event_id != event.client_event_id
                 || receipt.stream_id != batch.stream_id
@@ -748,82 +976,150 @@ impl AppendResponse {
                     "event identity or stream mismatch",
                 ));
             }
-            if let Some(prior) = previous {
-                if receipt.server_seq <= prior.server_seq
-                    || receipt.server_prev_hash != prior.server_hash
-                {
-                    return Err(ValidationError::new(
-                        "receipts",
-                        "durable order or hash link mismatch",
-                    ));
-                }
-            } else {
-                let expected_head = batch
-                    .expected_cursor
-                    .as_ref()
-                    .map_or(EMPTY_STREAM_HASH, |cursor| cursor.head_hash.as_str());
-                if receipt.server_prev_hash != expected_head {
-                    return Err(ValidationError::new(
-                        "receipts",
-                        "first receipt does not extend expected cursor",
-                    ));
-                }
+            let offset = u64::try_from(index)
+                .map_err(|_| ValidationError::new("receipts", "index overflow"))?;
+            let expected_seq = batch
+                .expected_cursor
+                .position
+                .checked_add(offset)
+                .and_then(|position| position.checked_add(1))
+                .ok_or(ValidationError::new("server_seq", "sequence overflow"))?;
+            if receipt.server_seq != expected_seq {
+                return Err(ValidationError::new(
+                    "server_seq",
+                    "receipt sequence is not contiguous",
+                ));
             }
-            previous = Some(receipt);
+            let expected_prev = if index == 0 {
+                &batch.expected_cursor.head_hash
+            } else {
+                &self.receipts[index - 1].server_hash
+            };
+            if &receipt.server_prev_hash != expected_prev {
+                return Err(ValidationError::new(
+                    "receipts",
+                    "durable hash link mismatch",
+                ));
+            }
         }
         let last = self
             .receipts
             .last()
             .ok_or(ValidationError::new("receipts", "empty response"))?;
-        if self.next_cursor.head_hash != last.journal_head {
-            return Err(ValidationError::new(
-                "next_cursor",
-                "head does not match final receipt",
-            ));
-        }
-        if last.server_hash != last.journal_head {
-            return Err(ValidationError::new(
-                "receipts",
-                "final durable entry is not the journal head",
-            ));
-        }
-        if self
-            .receipts
-            .iter()
-            .any(|receipt| receipt.journal_head != self.next_cursor.head_hash)
-        {
-            return Err(ValidationError::new(
-                "receipts",
-                "atomic batch receipts disagree on journal head",
-            ));
-        }
-        let start_position = batch
-            .expected_cursor
-            .as_ref()
-            .map_or(0, |cursor| cursor.position);
         let appended = u64::try_from(batch.events.len())
             .map_err(|_| ValidationError::new("events", "count overflow"))?;
-        let next_position = start_position
+        let next_position = batch
+            .expected_cursor
+            .position
             .checked_add(appended)
             .ok_or(ValidationError::new("next_cursor", "position overflow"))?;
-        if self.next_cursor.position != next_position {
+        if self.next_cursor.position != next_position
+            || self.next_cursor.head_hash != last.server_hash
+            || last.journal_head != self.next_cursor.head_hash
+            || self
+                .receipts
+                .iter()
+                .any(|receipt| receipt.journal_head != self.next_cursor.head_hash)
+        {
             return Err(ValidationError::new(
                 "next_cursor",
-                "position does not match atomic append",
+                "atomic append cursor or journal head mismatch",
             ));
         }
         Ok(())
     }
+}
 
-    /// Verify every receipt with a trusted external key implementation.
-    pub fn verify_receipts<V: ReceiptVerifier>(
-        &self,
+/// Structurally valid append response; signatures remain untrusted.
+#[derive(Debug, Clone)]
+pub struct ValidatedAppendResponse {
+    batch: AppendBatch,
+    response: AppendResponse,
+}
+
+impl ValidatedAppendResponse {
+    /// Inspect the validated raw response without claiming authenticity.
+    #[must_use]
+    pub fn response(&self) -> &AppendResponse {
+        &self.response
+    }
+
+    /// Verify the append attestation and every receipt under one authority.
+    pub fn verify<V: ReceiptVerifier>(
+        self,
         verifier: &V,
-    ) -> Result<(), ReceiptVerificationError> {
-        for receipt in &self.receipts {
-            verify_receipt(receipt, verifier)?;
+    ) -> Result<VerifiedAppendResponse, SyncError> {
+        let claimed = &self.response.attestation.authority_id;
+        let payload = self
+            .response
+            .attestation
+            .signing_payload(&self.batch, &self.response)
+            .map_err(SyncError::Validation)?;
+        let authority = verify_as(
+            verifier,
+            VerificationContext {
+                purpose: SignaturePurpose::AppendAttestation,
+                claimed_authority: Some(claimed),
+                stream_id: &self.batch.stream_id,
+                signed_at: &self.response.attestation.committed_at,
+                key_id: &self.response.attestation.key_id,
+            },
+            &payload,
+            &self.response.attestation.signature,
+        )
+        .map_err(SyncError::Verification)?;
+        for receipt in &self.response.receipts {
+            let payload = receipt.signing_payload().map_err(SyncError::Validation)?;
+            let receipt_authority = verify_as(
+                verifier,
+                VerificationContext {
+                    purpose: SignaturePurpose::Receipt,
+                    claimed_authority: Some(&authority),
+                    stream_id: &receipt.stream_id,
+                    signed_at: &receipt.committed_at,
+                    key_id: &receipt.key_id,
+                },
+                &payload,
+                &receipt.signature,
+            )
+            .map_err(SyncError::Verification)?;
+            if receipt_authority != authority {
+                return Err(SyncError::Verification(
+                    VerificationError::AuthorityMismatch,
+                ));
+            }
         }
-        Ok(())
+        Ok(VerifiedAppendResponse {
+            response: self.response,
+            authority,
+        })
+    }
+}
+
+/// Cryptographically verified atomic append response.
+#[derive(Debug, Clone)]
+pub struct VerifiedAppendResponse {
+    response: AppendResponse,
+    authority: AuthorityId,
+}
+
+impl VerifiedAppendResponse {
+    /// Authority that signed the complete result and every receipt.
+    #[must_use]
+    pub fn authority(&self) -> &AuthorityId {
+        &self.authority
+    }
+
+    /// Authenticated raw response.
+    #[must_use]
+    pub fn response(&self) -> &AppendResponse {
+        &self.response
+    }
+
+    /// Authenticated next cursor.
+    #[must_use]
+    pub fn next_cursor(&self) -> &StreamCursor {
+        &self.response.next_cursor
     }
 }
 
@@ -836,7 +1132,7 @@ pub enum TransportError {
     /// The stream no longer has the client's expected cursor.
     CursorConflict {
         /// Cursor supplied by the client.
-        expected: Option<StreamCursor>,
+        expected: StreamCursor,
         /// Current cursor disclosed for this authorized stream.
         actual: StreamCursor,
     },
@@ -880,6 +1176,10 @@ pub enum SyncError {
     Validation(ValidationError),
     /// Transport failed or rejected the operation.
     Transport(TransportError),
+    /// A signature, key, scope, or authority decision failed closed.
+    Verification(VerificationError),
+    /// The application does not support this event kind and schema version.
+    EventVersion(EventVersionError),
     /// Every allowed transient attempt failed.
     AttemptsExhausted,
     /// The application reducer rejected an otherwise valid recovered event.
@@ -891,6 +1191,8 @@ impl fmt::Display for SyncError {
         match self {
             Self::Validation(error) => error.fmt(f),
             Self::Transport(error) => error.fmt(f),
+            Self::Verification(error) => error.fmt(f),
+            Self::EventVersion(error) => error.fmt(f),
             Self::AttemptsExhausted => f.write_str("append retry attempts exhausted"),
             Self::Reducer(message) => write!(f, "replay reducer failed: {message}"),
         }
@@ -905,7 +1207,7 @@ pub fn append_with_retry<T: BatchTransport>(
     transport: &mut T,
     batch: &AppendBatch,
     max_attempts: u8,
-) -> Result<AppendResponse, SyncError> {
+) -> Result<ValidatedAppendResponse, SyncError> {
     batch.validate().map_err(SyncError::Validation)?;
     if max_attempts == 0 {
         return Err(SyncError::AttemptsExhausted);
@@ -916,7 +1218,10 @@ pub fn append_with_retry<T: BatchTransport>(
                 response
                     .validate_against(batch)
                     .map_err(SyncError::Validation)?;
-                return Ok(response);
+                return Ok(ValidatedAppendResponse {
+                    batch: batch.clone(),
+                    response,
+                });
             }
             Err(TransportError::Retryable(_)) => {}
             Err(error) => return Err(SyncError::Transport(error)),
@@ -925,16 +1230,40 @@ pub fn append_with_retry<T: BatchTransport>(
     Err(SyncError::AttemptsExhausted)
 }
 
-/// Request for one bounded pull page.
+/// Only whole-stream replay is supported by protocol v2.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PullSelection {
+    /// Return the complete ordered stream within the fixed snapshot.
+    WholeStream,
+}
+
+/// Snapshot policy for one pull cycle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", content = "cursor", rename_all = "snake_case")]
+pub enum SnapshotSelection {
+    /// Ask the authority to fix the latest stream head for this cycle.
+    Latest,
+    /// Continue against an exact snapshot returned by an earlier page.
+    Exact(StreamCursor),
+}
+
+/// Request for one bounded, snapshot-consistent pull page.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PullRequest {
     /// Wire protocol version.
     pub protocol: String,
+    /// UUIDv7 binding all signed values to this request.
+    pub request_id: String,
     /// Authorized application stream.
     pub stream_id: String,
-    /// Cursor after which events are requested.
-    pub after: Option<StreamCursor>,
+    /// Exact cursor after which events are requested, including genesis.
+    pub after: StreamCursor,
+    /// Latest snapshot discovery or an exact fixed snapshot.
+    pub snapshot: SnapshotSelection,
+    /// Explicit replay selection. V2 supports only the whole stream.
+    pub selection: PullSelection,
     /// Bounded page size.
     pub limit: u16,
 }
@@ -943,9 +1272,20 @@ impl PullRequest {
     /// Validate request bounds and identities.
     pub fn validate(&self) -> Result<(), ValidationError> {
         ensure_protocol(&self.protocol)?;
+        validate_uuid_v7("request_id", &self.request_id)?;
         validate_stream_id(&self.stream_id)?;
-        if let Some(cursor) = &self.after {
-            cursor.validate()?;
+        self.after.validate()?;
+        if let SnapshotSelection::Exact(snapshot) = &self.snapshot {
+            snapshot.validate()?;
+            if snapshot.position < self.after.position
+                || (snapshot.position == self.after.position
+                    && snapshot.head_hash != self.after.head_hash)
+            {
+                return Err(ValidationError::new(
+                    "snapshot",
+                    "exact snapshot precedes or forks from request cursor",
+                ));
+            }
         }
         if self.limit == 0 || self.limit > MAX_PULL_EVENTS {
             return Err(ValidationError::new("limit", "must be in 1..=256"));
@@ -954,7 +1294,7 @@ impl PullRequest {
     }
 }
 
-/// One envelope paired with its durable receipt.
+/// One untrusted wire envelope paired with its durable receipt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AcceptedEvent {
@@ -964,7 +1304,72 @@ pub struct AcceptedEvent {
     pub receipt: Receipt,
 }
 
-/// Ordered response page for pull, recovery, and replay.
+/// Signature over a complete pull page, including empty pages and completion.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PageAttestation {
+    /// Stable authority owning the signing key.
+    pub authority_id: AuthorityId,
+    /// Authoritative RFC3339 issuance time.
+    pub issued_at: String,
+    /// Signing key identifier.
+    pub key_id: String,
+    /// Detached base64url signature.
+    pub signature: String,
+}
+
+impl PageAttestation {
+    fn validate_shape(&self) -> Result<(), ValidationError> {
+        validate_authority_id(self.authority_id.as_str())?;
+        validate_timestamp(&self.issued_at)?;
+        validate_key_id(&self.key_id)?;
+        validate_signature(&self.signature)
+    }
+
+    /// Canonical bytes binding the request, fixed snapshot, result, and completion.
+    pub fn signing_payload(
+        &self,
+        request: &PullRequest,
+        page: &PullPage,
+    ) -> Result<Vec<u8>, ValidationError> {
+        self.validate_shape()?;
+        request.validate()?;
+        let mut payload = Vec::new();
+        for field in [
+            PAGE_DOMAIN,
+            PROTOCOL_V2,
+            self.authority_id.as_str(),
+            request.request_id.as_str(),
+            request.stream_id.as_str(),
+        ] {
+            append_field(&mut payload, field)?;
+        }
+        append_cursor(&mut payload, &request.after)?;
+        match &request.snapshot {
+            SnapshotSelection::Latest => append_field(&mut payload, "latest")?,
+            SnapshotSelection::Exact(cursor) => {
+                append_field(&mut payload, "exact")?;
+                append_cursor(&mut payload, cursor)?;
+            }
+        }
+        match request.selection {
+            PullSelection::WholeStream => append_field(&mut payload, "whole_stream")?,
+        }
+        payload.extend_from_slice(&request.limit.to_be_bytes());
+        append_cursor(&mut payload, &page.next_cursor)?;
+        append_cursor(&mut payload, &page.snapshot_cursor)?;
+        payload.push(u8::from(page.complete));
+        let count = u64::try_from(page.events.len())
+            .map_err(|_| ValidationError::new("events", "count overflow"))?;
+        payload.extend_from_slice(&count.to_be_bytes());
+        append_field(&mut payload, &accepted_events_hash(&page.events)?)?;
+        append_field(&mut payload, &self.issued_at)?;
+        append_field(&mut payload, &self.key_id)?;
+        Ok(payload)
+    }
+}
+
+/// Ordered raw response page for pull, recovery, and replay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PullPage {
@@ -976,13 +1381,16 @@ pub struct PullPage {
     pub events: Vec<AcceptedEvent>,
     /// Cursor immediately after this page.
     pub next_cursor: StreamCursor,
-    /// `true` only when the authorized stream has no further records.
+    /// Fixed terminal snapshot for the entire pull cycle.
+    pub snapshot_cursor: StreamCursor,
+    /// Must equal `next_cursor == snapshot_cursor`.
     pub complete: bool,
+    /// Mandatory signature over the entire page, even when `events` is empty.
+    pub attestation: PageAttestation,
 }
 
 impl PullPage {
-    /// Validate an untrusted page against its request.
-    pub fn validate_against(&self, request: &PullRequest) -> Result<(), ValidationError> {
+    fn validate_against(&self, request: &PullRequest) -> Result<(), ValidationError> {
         request.validate()?;
         ensure_protocol(&self.protocol)?;
         if self.stream_id != request.stream_id {
@@ -992,15 +1400,38 @@ impl PullPage {
             return Err(ValidationError::new("events", "pull limit exceeded"));
         }
         self.next_cursor.validate()?;
+        self.snapshot_cursor.validate()?;
+        self.attestation.validate_shape()?;
+        if self.snapshot_cursor.position < request.after.position {
+            return Err(ValidationError::new(
+                "snapshot_cursor",
+                "snapshot regressed",
+            ));
+        }
+        if let SnapshotSelection::Exact(expected) = &request.snapshot {
+            if &self.snapshot_cursor != expected {
+                return Err(ValidationError::new(
+                    "snapshot_cursor",
+                    "response changed fixed snapshot",
+                ));
+            }
+        }
+        if self.next_cursor.position > self.snapshot_cursor.position {
+            return Err(ValidationError::new(
+                "next_cursor",
+                "page advanced beyond fixed snapshot",
+            ));
+        }
+        if self.next_cursor.position == self.snapshot_cursor.position
+            && self.next_cursor.head_hash != self.snapshot_cursor.head_hash
+        {
+            return Err(ValidationError::new(
+                "snapshot_cursor",
+                "same snapshot position has a different durable head",
+            ));
+        }
         let mut ids = BTreeSet::new();
-        let mut previous_hash = Some(
-            request
-                .after
-                .as_ref()
-                .map_or(EMPTY_STREAM_HASH, |cursor| cursor.head_hash.as_str()),
-        );
-        let mut previous_seq = None;
-        for accepted in &self.events {
+        for (index, accepted) in self.events.iter().enumerate() {
             accepted.envelope.validate()?;
             accepted.receipt.validate_shape()?;
             if accepted.envelope.stream_id != self.stream_id
@@ -1019,39 +1450,65 @@ impl PullPage {
                     "duplicate inside pull page",
                 ));
             }
-            if previous_hash.is_some_and(|hash| hash != accepted.receipt.server_prev_hash) {
+            let offset = u64::try_from(index)
+                .map_err(|_| ValidationError::new("events", "index overflow"))?;
+            let expected_seq = request
+                .after
+                .position
+                .checked_add(offset)
+                .and_then(|position| position.checked_add(1))
+                .ok_or(ValidationError::new("server_seq", "sequence overflow"))?;
+            if accepted.receipt.server_seq != expected_seq {
+                return Err(ValidationError::new(
+                    "server_seq",
+                    "pull sequence is not contiguous",
+                ));
+            }
+            let expected_prev = if index == 0 {
+                &request.after.head_hash
+            } else {
+                &self.events[index - 1].receipt.server_hash
+            };
+            if &accepted.receipt.server_prev_hash != expected_prev {
                 return Err(ValidationError::new(
                     "receipts",
                     "pull hash chain is discontinuous",
                 ));
             }
-            if previous_seq.is_some_and(|seq| accepted.receipt.server_seq <= seq) {
-                return Err(ValidationError::new(
-                    "receipts",
-                    "pull sequence is not increasing",
-                ));
-            }
-            previous_hash = Some(&accepted.receipt.server_hash);
-            previous_seq = Some(accepted.receipt.server_seq);
         }
-        if let Some(last) = self.events.last() {
-            if self.next_cursor.head_hash != last.receipt.server_hash {
-                return Err(ValidationError::new(
-                    "next_cursor",
-                    "head does not match final durable entry",
-                ));
-            }
-        }
-        let start = request.after.as_ref().map_or(0, |cursor| cursor.position);
         let count = u64::try_from(self.events.len())
             .map_err(|_| ValidationError::new("events", "count overflow"))?;
-        let expected_position = start
+        let expected_position = request
+            .after
+            .position
             .checked_add(count)
             .ok_or(ValidationError::new("next_cursor", "position overflow"))?;
         if self.next_cursor.position != expected_position {
             return Err(ValidationError::new(
                 "next_cursor",
                 "position does not match returned page",
+            ));
+        }
+        match self.events.last() {
+            Some(last) if self.next_cursor.head_hash != last.receipt.server_hash => {
+                return Err(ValidationError::new(
+                    "next_cursor",
+                    "head does not match final durable entry",
+                ));
+            }
+            None if self.next_cursor != request.after => {
+                return Err(ValidationError::new(
+                    "next_cursor",
+                    "empty page changed request cursor",
+                ));
+            }
+            _ => {}
+        }
+        let derived_complete = self.next_cursor == self.snapshot_cursor;
+        if self.complete != derived_complete {
+            return Err(ValidationError::new(
+                "complete",
+                "must exactly reflect next cursor reaching fixed snapshot",
             ));
         }
         if !self.complete && self.events.is_empty() {
@@ -1064,130 +1521,564 @@ impl PullPage {
     }
 }
 
-/// Persistent replay bookkeeping used to deduplicate overlapping pull pages.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+/// Unsupported event kind/version returned by application policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventVersionError {
+    kind: String,
+    schema_version: u32,
+    reason: String,
+}
+
+impl EventVersionError {
+    /// Build an application policy rejection.
+    #[must_use]
+    pub fn new(kind: impl Into<String>, schema_version: u32, reason: impl Into<String>) -> Self {
+        Self {
+            kind: kind.into(),
+            schema_version,
+            reason: reason.into(),
+        }
+    }
+
+    /// Rejected event kind.
+    #[must_use]
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
+
+    /// Rejected schema version.
+    #[must_use]
+    pub const fn schema_version(&self) -> u32 {
+        self.schema_version
+    }
+}
+
+impl fmt::Display for EventVersionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "unsupported event {}@{}: {}",
+            self.kind, self.schema_version, self.reason
+        )
+    }
+}
+
+impl Error for EventVersionError {}
+
+/// Application-owned fail-closed event schema policy.
+pub trait EventVersionPolicy {
+    /// Accept a known reducer input or reject unknown kind/version pairs.
+    fn validate(&self, kind: &str, schema_version: u32) -> Result<(), EventVersionError>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReplayAnchor {
+    head_hash: String,
+    event_identity: Option<(String, String)>,
+}
+
+const MAX_REPLAY_ANCHORS: usize = MAX_PULL_EVENTS as usize * 4 + 1;
+
+/// Persistent replay bookkeeping bound to exactly one stream and authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReplayState {
-    cursor: Option<StreamCursor>,
-    recent: BTreeMap<String, String>,
+    stream_id: String,
+    authority: Option<AuthorityId>,
+    cursor: StreamCursor,
+    snapshot: Option<StreamCursor>,
+    anchors: BTreeMap<u64, ReplayAnchor>,
 }
 
 impl ReplayState {
-    /// Last validated durable cursor.
-    #[must_use]
-    pub fn cursor(&self) -> Option<&StreamCursor> {
-        self.cursor.as_ref()
+    /// Create state bound to one validated stream at explicit genesis.
+    pub fn new(stream_id: impl Into<String>) -> Result<Self, ValidationError> {
+        let stream_id = stream_id.into();
+        validate_stream_id(&stream_id)?;
+        let cursor = StreamCursor::genesis();
+        let anchors = BTreeMap::from([(
+            0,
+            ReplayAnchor {
+                head_hash: cursor.head_hash.clone(),
+                event_identity: None,
+            },
+        )]);
+        Ok(Self {
+            stream_id,
+            authority: None,
+            cursor,
+            snapshot: None,
+            anchors,
+        })
     }
 
-    /// Number of entries retained in the bounded overlap-deduplication window.
+    /// Bound stream identifier.
+    #[must_use]
+    pub fn stream_id(&self) -> &str {
+        &self.stream_id
+    }
+
+    /// Authority established by the first applied page.
+    #[must_use]
+    pub const fn authority(&self) -> Option<&AuthorityId> {
+        self.authority.as_ref()
+    }
+
+    /// Last authenticated durable cursor.
+    #[must_use]
+    pub const fn cursor(&self) -> &StreamCursor {
+        &self.cursor
+    }
+
+    /// Fixed snapshot currently bound to the replay cycle.
+    #[must_use]
+    pub const fn snapshot(&self) -> Option<&StreamCursor> {
+        self.snapshot.as_ref()
+    }
+
+    /// Number of retained absolute-position anchors.
     #[must_use]
     pub fn dedupe_window_len(&self) -> usize {
-        self.recent.len()
+        self.anchors
+            .values()
+            .filter(|anchor| anchor.event_identity.is_some())
+            .count()
     }
-}
 
-/// Application reducer boundary for recovered accepted events.
-pub trait ReplaySink {
-    /// Atomically apply one bounded page of previously unseen accepted events.
-    /// Returning an error must leave application state unchanged.
-    fn apply_batch(&mut self, events: &[AcceptedEvent]) -> Result<(), String>;
-}
-
-/// Validate and apply a pull page. Repeated event IDs with the same durable hash
-/// are ignored; an ID reused with another hash is rejected as equivocation.
-pub fn apply_pull_page<S: ReplaySink>(
-    state: &mut ReplayState,
-    request: &PullRequest,
-    page: &PullPage,
-    sink: &mut S,
-) -> Result<u64, SyncError> {
-    page.validate_against(request)
-        .map_err(SyncError::Validation)?;
-    let current_position = state.cursor.as_ref().map_or(0, |cursor| cursor.position);
-    let start_position = request.after.as_ref().map_or(0, |cursor| cursor.position);
-    let mut fresh = Vec::new();
-    for (index, accepted) in page.events.iter().enumerate() {
-        let offset = u64::try_from(index)
-            .map_err(|_| SyncError::Validation(ValidationError::new("events", "index overflow")))?;
-        let absolute_position = start_position
-            .checked_add(offset)
-            .and_then(|position| position.checked_add(1))
-            .ok_or_else(|| {
-                SyncError::Validation(ValidationError::new("events", "position overflow"))
-            })?;
-        if absolute_position <= current_position {
-            match state.recent.get(&accepted.envelope.client_event_id) {
-                Some(hash) if hash == &accepted.receipt.server_hash => continue,
-                Some(_) => {
-                    return Err(SyncError::Validation(ValidationError::new(
-                        "client_event_id",
-                        "durable hash changed during replay",
-                    )));
+    fn preflight(&self, request: &PullRequest, page: &PullPage) -> Result<(), ValidationError> {
+        if request.stream_id != self.stream_id || page.stream_id != self.stream_id {
+            return Err(ValidationError::new("stream_id", "replay state mismatch"));
+        }
+        if request.after.position > self.cursor.position {
+            return Err(ValidationError::new(
+                "after",
+                "request skips local replay state",
+            ));
+        }
+        let Some(anchor) = self.anchors.get(&request.after.position) else {
+            return Err(ValidationError::new(
+                "after",
+                "cursor falls outside bounded replay window",
+            ));
+        };
+        if anchor.head_hash != request.after.head_hash {
+            return Err(ValidationError::new(
+                "after",
+                "cursor forks from replay state",
+            ));
+        }
+        if page.snapshot_cursor.position < self.cursor.position {
+            return Err(ValidationError::new(
+                "snapshot_cursor",
+                "snapshot regressed behind replay state",
+            ));
+        }
+        if page.snapshot_cursor.position == self.cursor.position
+            && page.snapshot_cursor.head_hash != self.cursor.head_hash
+        {
+            return Err(ValidationError::new(
+                "snapshot_cursor",
+                "snapshot forks at the current replay position",
+            ));
+        }
+        if let Some(bound) = &self.snapshot {
+            let cycle_active = self.cursor != *bound;
+            match request.snapshot {
+                SnapshotSelection::Exact(_) if page.snapshot_cursor != *bound => {
+                    return Err(ValidationError::new(
+                        "snapshot_cursor",
+                        "exact snapshot differs from replay state",
+                    ));
                 }
-                None => {
-                    return Err(SyncError::Validation(ValidationError::new(
-                        "events",
-                        "stale replay falls outside the bounded dedupe window",
-                    )));
+                SnapshotSelection::Latest if cycle_active && page.snapshot_cursor != *bound => {
+                    return Err(ValidationError::new(
+                        "snapshot_cursor",
+                        "active pull cycle changed snapshot",
+                    ));
                 }
+                _ => {}
             }
         }
-        if state
-            .recent
-            .get(&accepted.envelope.client_event_id)
-            .is_some_and(|hash| hash != &accepted.receipt.server_hash)
-        {
-            return Err(SyncError::Validation(ValidationError::new(
-                "client_event_id",
-                "durable hash changed during replay",
-            )));
-        }
-        if state
-            .recent
-            .contains_key(&accepted.envelope.client_event_id)
-        {
-            return Err(SyncError::Validation(ValidationError::new(
-                "client_event_id",
-                "event identity moved to another stream position",
-            )));
-        }
-        fresh.push(accepted.clone());
+        Ok(())
     }
-    sink.apply_batch(&fresh).map_err(SyncError::Reducer)?;
-    let applied = u64::try_from(fresh.len())
-        .map_err(|_| SyncError::Validation(ValidationError::new("events", "count overflow")))?;
-    match &state.cursor {
-        Some(current) if current.position > page.next_cursor.position => {}
-        Some(current)
-            if current.position == page.next_cursor.position
-                && current.head_hash != page.next_cursor.head_hash =>
+
+    fn prune_anchors(&mut self) {
+        while self.anchors.len() > MAX_REPLAY_ANCHORS {
+            let Some(oldest) = self.anchors.keys().next().copied() else {
+                break;
+            };
+            if oldest == self.cursor.position {
+                break;
+            }
+            self.anchors.remove(&oldest);
+        }
+    }
+}
+
+/// Raw request/page pair. Construction proves no trust property.
+#[derive(Debug, Clone)]
+pub struct UntrustedPullPage {
+    request: PullRequest,
+    page: PullPage,
+}
+
+impl UntrustedPullPage {
+    /// Pair raw wire values before fail-closed validation.
+    #[must_use]
+    pub fn new(request: PullRequest, page: PullPage) -> Self {
+        Self { request, page }
+    }
+
+    /// Validate shape, sequence, snapshot, stream, and current replay anchors.
+    pub fn validate(self, state: &ReplayState) -> Result<ValidatedPullPage, SyncError> {
+        self.page
+            .validate_against(&self.request)
+            .map_err(SyncError::Validation)?;
+        state
+            .preflight(&self.request, &self.page)
+            .map_err(SyncError::Validation)?;
+        Ok(ValidatedPullPage {
+            request: self.request,
+            page: self.page,
+        })
+    }
+}
+
+/// Structurally validated pull page. It is still cryptographically untrusted.
+///
+/// ```compile_fail
+/// use pliego_hyphae::{ReplaySink, ReplayState, ValidatedPullPage};
+/// fn bypass(mut page: ValidatedPullPage, state: &mut ReplayState, sink: &mut impl ReplaySink) {
+///     let _ = page.apply(state, sink);
+/// }
+/// ```
+#[derive(Debug)]
+pub struct ValidatedPullPage {
+    request: PullRequest,
+    page: PullPage,
+}
+
+impl ValidatedPullPage {
+    /// Verify page attestation, every receipt, one authority, and event policy.
+    pub fn verify<V: ReceiptVerifier, P: EventVersionPolicy>(
+        self,
+        verifier: &V,
+        policy: &P,
+    ) -> Result<VerifiedPullPage, SyncError> {
+        let claimed = &self.page.attestation.authority_id;
+        let payload = self
+            .page
+            .attestation
+            .signing_payload(&self.request, &self.page)
+            .map_err(SyncError::Validation)?;
+        let authority = verify_as(
+            verifier,
+            VerificationContext {
+                purpose: SignaturePurpose::PageAttestation,
+                claimed_authority: Some(claimed),
+                stream_id: &self.request.stream_id,
+                signed_at: &self.page.attestation.issued_at,
+                key_id: &self.page.attestation.key_id,
+            },
+            &payload,
+            &self.page.attestation.signature,
+        )
+        .map_err(SyncError::Verification)?;
+        let mut verified_events = Vec::with_capacity(self.page.events.len());
+        for accepted in &self.page.events {
+            let receipt_payload = accepted
+                .receipt
+                .signing_payload()
+                .map_err(SyncError::Validation)?;
+            let receipt_authority = verify_as(
+                verifier,
+                VerificationContext {
+                    purpose: SignaturePurpose::Receipt,
+                    claimed_authority: Some(&authority),
+                    stream_id: &accepted.receipt.stream_id,
+                    signed_at: &accepted.receipt.committed_at,
+                    key_id: &accepted.receipt.key_id,
+                },
+                &receipt_payload,
+                &accepted.receipt.signature,
+            )
+            .map_err(SyncError::Verification)?;
+            if receipt_authority != authority {
+                return Err(SyncError::Verification(
+                    VerificationError::AuthorityMismatch,
+                ));
+            }
+            policy
+                .validate(&accepted.envelope.kind, accepted.envelope.schema_version)
+                .map_err(SyncError::EventVersion)?;
+            verified_events.push(VerifiedAcceptedEvent {
+                envelope: accepted.envelope.clone(),
+                receipt: accepted.receipt.clone(),
+                authority: authority.clone(),
+            });
+        }
+        Ok(VerifiedPullPage {
+            request: self.request,
+            page: self.page,
+            authority,
+            events: verified_events,
+        })
+    }
+}
+
+/// One authenticated event that passed application version policy.
+#[derive(Debug, Clone)]
+pub struct VerifiedAcceptedEvent {
+    envelope: EventEnvelope,
+    receipt: Receipt,
+    authority: AuthorityId,
+}
+
+impl VerifiedAcceptedEvent {
+    /// Authenticated application event.
+    #[must_use]
+    pub const fn envelope(&self) -> &EventEnvelope {
+        &self.envelope
+    }
+
+    /// Authenticated durable receipt.
+    #[must_use]
+    pub const fn receipt(&self) -> &Receipt {
+        &self.receipt
+    }
+
+    /// Authority that authenticated this event and its enclosing page.
+    #[must_use]
+    pub const fn authority(&self) -> &AuthorityId {
+        &self.authority
+    }
+}
+
+/// Application reducer boundary. Raw [`AcceptedEvent`] values cannot enter it.
+///
+/// ```compile_fail
+/// use pliego_hyphae::{AcceptedEvent, ReplaySink};
+/// fn raw_event_cannot_reach_sink(raw: AcceptedEvent, sink: &mut impl ReplaySink) {
+///     let _ = sink.apply_batch(&[raw]);
+/// }
+/// ```
+pub trait ReplaySink {
+    /// Atomically apply previously unseen, authenticated events.
+    /// Returning an error must leave the application reducer unchanged.
+    fn apply_batch(&mut self, events: &[VerifiedAcceptedEvent]) -> Result<(), String>;
+}
+
+/// Fully authenticated pull page. Private fields prevent construction by callers.
+///
+/// ```compile_fail
+/// use pliego_hyphae::{PullPage, ReplaySink, ReplayState};
+/// fn raw_cannot_apply(raw: PullPage, state: &mut ReplayState, sink: &mut impl ReplaySink) {
+///     let _ = raw.apply(state, sink);
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use pliego_hyphae::VerifiedPullPage;
+/// fn cannot_forge() {
+///     let _ = VerifiedPullPage { request: todo!(), page: todo!(), authority: todo!(), events: vec![] };
+/// }
+/// ```
+#[derive(Debug)]
+pub struct VerifiedPullPage {
+    request: PullRequest,
+    page: PullPage,
+    authority: AuthorityId,
+    events: Vec<VerifiedAcceptedEvent>,
+}
+
+impl VerifiedPullPage {
+    /// Apply once. All state, fork, overlap, and authority checks precede the sink.
+    pub fn apply<S: ReplaySink>(
+        self,
+        state: &mut ReplayState,
+        sink: &mut S,
+    ) -> Result<AppliedPullPage, SyncError> {
+        state
+            .preflight(&self.request, &self.page)
+            .map_err(SyncError::Validation)?;
+        if state
+            .authority
+            .as_ref()
+            .is_some_and(|bound| bound != &self.authority)
+        {
+            return Err(SyncError::Verification(
+                VerificationError::AuthorityMismatch,
+            ));
+        }
+
+        let mut candidate = state.clone();
+        candidate.authority = Some(self.authority.clone());
+        candidate.snapshot = Some(self.page.snapshot_cursor.clone());
+        let current_position = state.cursor.position;
+        let mut fresh = Vec::new();
+        for (index, event) in self.events.iter().enumerate() {
+            let offset = u64::try_from(index).map_err(|_| {
+                SyncError::Validation(ValidationError::new("events", "index overflow"))
+            })?;
+            let position = self
+                .request
+                .after
+                .position
+                .checked_add(offset)
+                .and_then(|value| value.checked_add(1))
+                .ok_or_else(|| {
+                    SyncError::Validation(ValidationError::new("events", "position overflow"))
+                })?;
+            if position <= current_position {
+                let Some(anchor) = state.anchors.get(&position) else {
+                    return Err(SyncError::Validation(ValidationError::new(
+                        "events",
+                        "overlap falls outside bounded replay window",
+                    )));
+                };
+                let expected = Some((
+                    event.envelope.client_event_id.clone(),
+                    event.receipt.server_hash.clone(),
+                ));
+                if anchor.head_hash != event.receipt.server_hash
+                    || anchor.event_identity != expected
+                {
+                    return Err(SyncError::Validation(ValidationError::new(
+                        "events",
+                        "overlap changed event identity or durable hash",
+                    )));
+                }
+                continue;
+            }
+            let fresh_offset = u64::try_from(fresh.len()).map_err(|_| {
+                SyncError::Validation(ValidationError::new("events", "count overflow"))
+            })?;
+            let expected_position = current_position
+                .checked_add(fresh_offset)
+                .and_then(|value| value.checked_add(1))
+                .ok_or_else(|| {
+                    SyncError::Validation(ValidationError::new("events", "position overflow"))
+                })?;
+            if position != expected_position {
+                return Err(SyncError::Validation(ValidationError::new(
+                    "events",
+                    "fresh replay contains a position gap",
+                )));
+            }
+            if candidate.anchors.values().any(|anchor| {
+                anchor
+                    .event_identity
+                    .as_ref()
+                    .is_some_and(|(id, _)| id == &event.envelope.client_event_id)
+            }) {
+                return Err(SyncError::Validation(ValidationError::new(
+                    "client_event_id",
+                    "event identity moved to another stream position",
+                )));
+            }
+            candidate.anchors.insert(
+                position,
+                ReplayAnchor {
+                    head_hash: event.receipt.server_hash.clone(),
+                    event_identity: Some((
+                        event.envelope.client_event_id.clone(),
+                        event.receipt.server_hash.clone(),
+                    )),
+                },
+            );
+            fresh.push(event.clone());
+        }
+        if self.page.next_cursor.position > current_position {
+            candidate.cursor = self.page.next_cursor.clone();
+        } else if self.page.next_cursor.position == current_position
+            && self.page.next_cursor.head_hash != state.cursor.head_hash
         {
             return Err(SyncError::Validation(ValidationError::new(
                 "next_cursor",
                 "same position changed durable head",
             )));
         }
-        _ => {
-            state.cursor = Some(page.next_cursor.clone());
-            if !page.events.is_empty() {
-                state.recent = page
-                    .events
-                    .iter()
-                    .map(|accepted| {
-                        (
-                            accepted.envelope.client_event_id.clone(),
-                            accepted.receipt.server_hash.clone(),
-                        )
-                    })
-                    .collect();
-            }
+        candidate.prune_anchors();
+
+        let applied_count = u64::try_from(fresh.len())
+            .map_err(|_| SyncError::Validation(ValidationError::new("events", "count overflow")))?;
+        let applied_cursor = candidate.cursor.clone();
+        let snapshot_cursor = self.page.snapshot_cursor.clone();
+        let complete = applied_cursor == snapshot_cursor;
+        if !fresh.is_empty() {
+            sink.apply_batch(&fresh).map_err(SyncError::Reducer)?;
         }
+        *state = candidate;
+        Ok(AppliedPullPage {
+            applied_count,
+            cursor: applied_cursor,
+            complete,
+            snapshot_cursor,
+            authority: self.authority,
+        })
     }
-    Ok(applied)
+}
+
+/// Consumed result of one authenticated replay application.
+///
+/// ```compile_fail
+/// use pliego_hyphae::{AppliedPullPage, ReplaySink, ReplayState};
+/// fn cannot_apply_twice(page: AppliedPullPage, state: &mut ReplayState, sink: &mut impl ReplaySink) {
+///     let _ = page.apply(state, sink);
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use pliego_hyphae::{ReplaySink, ReplayState, VerifiedPullPage};
+/// fn verified_is_consumed(page: VerifiedPullPage, state: &mut ReplayState, sink: &mut impl ReplaySink) {
+///     let _first = page.apply(state, sink);
+///     let _second = page.apply(state, sink);
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct AppliedPullPage {
+    applied_count: u64,
+    cursor: StreamCursor,
+    snapshot_cursor: StreamCursor,
+    complete: bool,
+    authority: AuthorityId,
+}
+
+impl AppliedPullPage {
+    /// Number of fresh events sent to the reducer.
+    #[must_use]
+    pub const fn applied_count(&self) -> u64 {
+        self.applied_count
+    }
+
+    /// Cursor after this application.
+    #[must_use]
+    pub const fn cursor(&self) -> &StreamCursor {
+        &self.cursor
+    }
+
+    /// Fixed snapshot for continuation requests.
+    #[must_use]
+    pub const fn snapshot_cursor(&self) -> &StreamCursor {
+        &self.snapshot_cursor
+    }
+
+    /// Whether this application reached the fixed snapshot.
+    #[must_use]
+    pub const fn complete(&self) -> bool {
+        self.complete
+    }
+
+    /// Authority established for this stream.
+    #[must_use]
+    pub const fn authority(&self) -> &AuthorityId {
+        &self.authority
+    }
 }
 
 // ───────────────────────── legacy compatibility seam ─────────────────────────
 
 /// A legacy server acknowledgment: where one event landed on a durable chain.
+#[cfg(feature = "experimental-legacy")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ack {
     /// Sequence on the Hyphae journal.
@@ -1196,6 +2087,7 @@ pub struct Ack {
     pub hash: String,
 }
 
+#[cfg(feature = "experimental-legacy")]
 impl Ack {
     /// Validate the acknowledgement's untrusted shape.
     pub fn validate(&self) -> Result<(), ValidationError> {
@@ -1204,12 +2096,14 @@ impl Ack {
 }
 
 /// Tracks which local events have legacy durable acknowledgments.
+#[cfg(feature = "experimental-legacy")]
 #[derive(Debug, Default)]
 pub struct SyncState {
     acks: Vec<Option<Ack>>, // indexed by local seq
     next_to_push: u64,
 }
 
+#[cfg(feature = "experimental-legacy")]
 impl SyncState {
     /// Empty synchronization state.
     #[must_use]
@@ -1277,6 +2171,7 @@ impl SyncState {
 }
 
 /// Legacy one-event journal transport retained for the existing spike.
+#[cfg(feature = "experimental-legacy")]
 pub trait JournalTransport {
     /// Append one event; return where it landed on the durable chain.
     fn append(&mut self, kind: &str, payload: &str) -> Result<Ack, String>;
@@ -1287,6 +2182,7 @@ pub trait JournalTransport {
 /// This function validates the local chain, event kind, payload bound, and
 /// acknowledgement hash. It cannot make a lost acknowledgement idempotent;
 /// use [`append_with_retry`] with [`BatchTransport`] for that guarantee.
+#[cfg(feature = "experimental-legacy")]
 pub fn push_pending<T: JournalTransport>(
     log: &Log,
     sync: &mut SyncState,
@@ -1316,7 +2212,7 @@ pub fn push_pending<T: JournalTransport>(
 
 // ───────────────────────── browser legacy transport ─────────────────────────
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "experimental-legacy"))]
 pub mod fetch {
     //! Legacy `fetch` transport retained for the current browser spike. It is
     //! not the authenticated production batch transport.
@@ -1428,467 +2324,4 @@ pub mod fetch {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use pliego_log::Hash;
-
-    const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
-    const ID_1: &str = "01890f3e-9b4a-7cc0-8a1a-0123456789ab";
-    const ID_2: &str = "01890f3e-9b4a-7cc1-8a1a-0123456789ab";
-    const BATCH_ID: &str = "01890f3e-9b4a-7cc2-8a1a-0123456789ab";
-
-    #[derive(Default)]
-    struct FakeHyphae {
-        journal: Log,
-        appends: u64,
-    }
-
-    impl JournalTransport for FakeHyphae {
-        fn append(&mut self, kind: &str, payload: &str) -> Result<Ack, String> {
-            self.appends += 1;
-            let event = self.journal.append(kind, payload);
-            Ok(Ack {
-                seq: event.seq,
-                hash: hex(&event.hash),
-            })
-        }
-    }
-
-    struct Flaky {
-        inner: FakeHyphae,
-        allow: u64,
-    }
-
-    impl JournalTransport for Flaky {
-        fn append(&mut self, kind: &str, payload: &str) -> Result<Ack, String> {
-            if self.inner.appends >= self.allow {
-                return Err("network down".into());
-            }
-            self.inner.append(kind, payload)
-        }
-    }
-
-    fn client_log(n: u64) -> Log {
-        let mut log = Log::new();
-        for index in 0..n {
-            log.append("task_added", format!("t{index}"));
-        }
-        log
-    }
-
-    fn envelopes() -> Vec<EventEnvelope> {
-        let mut log = Log::new();
-        log.append("task_added", "first");
-        log.append("task_added", "second");
-        [ID_1, ID_2]
-            .into_iter()
-            .zip(log.events())
-            .map(|(id, event)| {
-                EventEnvelope::from_local_event(
-                    event,
-                    id,
-                    "project:alpha",
-                    1,
-                    "2026-07-12T20:00:00Z",
-                )
-                .unwrap()
-            })
-            .collect()
-    }
-
-    fn batch() -> AppendBatch {
-        AppendBatch {
-            protocol: PROTOCOL_V1.to_owned(),
-            batch_id: BATCH_ID.to_owned(),
-            stream_id: "project:alpha".to_owned(),
-            expected_cursor: Some(StreamCursor {
-                position: 0,
-                head_hash: ZERO_HASH.to_owned(),
-            }),
-            events: envelopes(),
-        }
-    }
-
-    fn server_hash(previous: &str, sequence: u64) -> String {
-        let mut bytes: Hash = [0; 32];
-        for (index, byte) in previous.bytes().take(32).enumerate() {
-            bytes[index] = byte ^ (sequence as u8).wrapping_add(1);
-        }
-        hex(&bytes)
-    }
-
-    fn response_for(batch: &AppendBatch) -> AppendResponse {
-        let mut previous = batch
-            .expected_cursor
-            .as_ref()
-            .map_or_else(|| ZERO_HASH.to_owned(), |cursor| cursor.head_hash.clone());
-        let mut receipts = Vec::new();
-        for (index, event) in batch.events.iter().enumerate() {
-            let hash = server_hash(&previous, index as u64);
-            receipts.push(Receipt {
-                client_event_id: event.client_event_id.clone(),
-                stream_id: batch.stream_id.clone(),
-                envelope_hash: event.wire_hash().unwrap(),
-                server_seq: index as u64,
-                server_hash: hash.clone(),
-                server_prev_hash: previous,
-                journal_head: hash.clone(),
-                committed_at: "2026-07-12T20:00:01Z".to_owned(),
-                key_id: "hyphae-test-1".to_owned(),
-                signature: "dGVzdC1zaWduYXR1cmU".to_owned(),
-            });
-            previous = hash;
-        }
-        for receipt in &mut receipts {
-            receipt.journal_head.clone_from(&previous);
-        }
-        AppendResponse {
-            protocol: PROTOCOL_V1.to_owned(),
-            batch_id: batch.batch_id.clone(),
-            stream_id: batch.stream_id.clone(),
-            receipts,
-            next_cursor: StreamCursor {
-                position: batch.events.len() as u64,
-                head_hash: previous,
-            },
-        }
-    }
-
-    #[test]
-    fn rejects_traversal_reserved_kinds_and_malformed_hashes() {
-        assert!(validate_stream_id("../tenant/other").is_err());
-        assert!(validate_stream_id("tenant\nother").is_err());
-        assert!(validate_kind("kv_put").is_err());
-        assert!(validate_kind("app_tombstone-").is_err());
-        assert!(validate_hash(&"A".repeat(64)).is_err());
-        assert!(validate_hash(&"a".repeat(63)).is_err());
-    }
-
-    #[test]
-    fn timestamps_are_validated_as_rfc3339_not_by_shape() {
-        for valid in [
-            "2026-07-12T20:00:00Z",
-            "2016-12-31t23:59:60z",
-            "2026-07-12T20:00:00.123456+05:30",
-        ] {
-            assert!(validate_timestamp(valid).is_ok(), "rejected {valid}");
-        }
-        for invalid in [
-            "2026-02-29T20:00:00Z",
-            "2026-13-12T20:00:00Z",
-            "2026-07-12T24:00:00Z",
-            "2026-07-12T20:60:00Z",
-            "2026-07-12T20:00:61Z",
-            "2024-02-29T23:59:60Z",
-            "2026-07-12T20:00:00.+01:00",
-            "2026-07-12T20:00:00+24:00",
-            "2026-07-12T20:00:00Ztrailing",
-        ] {
-            assert!(validate_timestamp(invalid).is_err(), "accepted {invalid}");
-        }
-    }
-
-    #[test]
-    fn cursors_bind_genesis_position_and_hash() {
-        assert!(StreamCursor::genesis().validate().is_ok());
-        assert!(
-            StreamCursor {
-                position: 0,
-                head_hash: "a".repeat(64),
-            }
-            .validate()
-            .is_err()
-        );
-        assert!(
-            StreamCursor {
-                position: 1,
-                head_hash: EMPTY_STREAM_HASH.to_owned(),
-            }
-            .validate()
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn rejects_unknown_protocol_fields_and_oversized_payloads() {
-        let mut event = envelopes().remove(0);
-        event.protocol = "pliego-hyphae/2".to_owned();
-        assert_eq!(event.validate().unwrap_err().field(), "protocol");
-
-        let json = format!(
-            "{{\"protocol\":\"{PROTOCOL_V1}\",\"stream_id\":\"a\",\"after\":null,\"limit\":1,\"tenant_id\":\"forged\"}}"
-        );
-        assert!(serde_json::from_str::<PullRequest>(&json).is_err());
-
-        event = envelopes().remove(0);
-        event.payload = format!("\"{}\"", "x".repeat(MAX_EVENT_PAYLOAD_BYTES));
-        assert_eq!(event.validate().unwrap_err().field(), "payload");
-    }
-
-    #[test]
-    fn batch_rejects_duplicates_reordering_and_broken_local_links() {
-        let mut duplicate = batch();
-        duplicate.events[1].client_event_id = ID_1.to_owned();
-        assert!(duplicate.validate().is_err());
-
-        let mut reordered = batch();
-        reordered.events.swap(0, 1);
-        assert!(reordered.validate().is_err());
-
-        let mut broken = batch();
-        broken.events[1].local_prev_hash = ZERO_HASH.to_owned();
-        assert!(broken.validate().is_err());
-    }
-
-    #[test]
-    fn response_rejects_id_hash_and_cursor_substitution() {
-        let batch = batch();
-        let mut response = response_for(&batch);
-        response.receipts[0].client_event_id = ID_2.to_owned();
-        assert!(response.validate_against(&batch).is_err());
-
-        response = response_for(&batch);
-        response.receipts[1].server_prev_hash = ZERO_HASH.to_owned();
-        assert!(response.validate_against(&batch).is_err());
-
-        response = response_for(&batch);
-        response.next_cursor.position = 99;
-        assert!(response.validate_against(&batch).is_err());
-
-        let response = response_for(&batch);
-        let mut substituted = batch.clone();
-        substituted.events[0].payload = "\"changed after idempotent commit\"".to_owned();
-        assert!(response.validate_against(&substituted).is_err());
-    }
-
-    #[test]
-    fn absent_append_cursor_is_a_derived_genesis_precondition() {
-        let mut initial = batch();
-        initial.expected_cursor = None;
-        let response = response_for(&initial);
-        response.validate_against(&initial).unwrap();
-
-        let mut substituted = response.clone();
-        substituted.next_cursor.position += 1;
-        assert!(substituted.validate_against(&initial).is_err());
-
-        substituted = response;
-        substituted.receipts[0].server_prev_hash = "a".repeat(64);
-        assert!(substituted.validate_against(&initial).is_err());
-    }
-
-    #[test]
-    fn receipt_verification_covers_every_durable_claim() {
-        struct ExactVerifier(Vec<u8>);
-        impl ReceiptVerifier for ExactVerifier {
-            fn verify(
-                &self,
-                key_id: &str,
-                payload: &[u8],
-                signature: &str,
-            ) -> Result<bool, String> {
-                Ok(key_id == "hyphae-test-1"
-                    && signature == "dGVzdC1zaWduYXR1cmU"
-                    && payload == self.0)
-            }
-        }
-
-        let mut receipt = response_for(&batch()).receipts.remove(0);
-        let verifier = ExactVerifier(receipt.signing_payload().unwrap());
-        verify_receipt(&receipt, &verifier).unwrap();
-        receipt.server_hash = "c".repeat(64);
-        assert_eq!(
-            verify_receipt(&receipt, &verifier),
-            Err(ReceiptVerificationError::InvalidSignature)
-        );
-    }
-
-    #[derive(Default)]
-    struct IdempotentServer {
-        committed: BTreeMap<String, AppendResponse>,
-        durable_appends: usize,
-        lose_first_ack: bool,
-    }
-
-    impl BatchTransport for IdempotentServer {
-        fn append_batch(&mut self, batch: &AppendBatch) -> Result<AppendResponse, TransportError> {
-            if let Some(response) = self.committed.get(&batch.batch_id) {
-                return Ok(response.clone());
-            }
-            let response = response_for(batch);
-            self.durable_appends += batch.events.len();
-            self.committed
-                .insert(batch.batch_id.clone(), response.clone());
-            if self.lose_first_ack {
-                self.lose_first_ack = false;
-                return Err(TransportError::Retryable("ack lost".to_owned()));
-            }
-            Ok(response)
-        }
-    }
-
-    #[test]
-    fn lost_ack_retry_reuses_batch_and_deduplicates_server_append() {
-        let batch = batch();
-        let mut server = IdempotentServer {
-            lose_first_ack: true,
-            ..IdempotentServer::default()
-        };
-        let response = append_with_retry(&mut server, &batch, 2).unwrap();
-        assert_eq!(response.receipts.len(), 2);
-        assert_eq!(
-            server.durable_appends, 2,
-            "retry created no duplicate entries"
-        );
-        assert_eq!(server.committed.len(), 1, "one idempotency record");
-    }
-
-    #[test]
-    fn retry_never_retries_cursor_conflicts() {
-        struct Conflict(u8);
-        impl BatchTransport for Conflict {
-            fn append_batch(
-                &mut self,
-                batch: &AppendBatch,
-            ) -> Result<AppendResponse, TransportError> {
-                self.0 += 1;
-                Err(TransportError::CursorConflict {
-                    expected: batch.expected_cursor.clone(),
-                    actual: StreamCursor {
-                        position: 9,
-                        head_hash: "a".repeat(64),
-                    },
-                })
-            }
-        }
-        let mut server = Conflict(0);
-        assert!(matches!(
-            append_with_retry(&mut server, &batch(), 5),
-            Err(SyncError::Transport(TransportError::CursorConflict { .. }))
-        ));
-        assert_eq!(server.0, 1);
-    }
-
-    #[derive(Default)]
-    struct CountingSink(Vec<String>);
-    impl ReplaySink for CountingSink {
-        fn apply_batch(&mut self, events: &[AcceptedEvent]) -> Result<(), String> {
-            self.0.extend(
-                events
-                    .iter()
-                    .map(|accepted| accepted.envelope.client_event_id.clone()),
-            );
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn pull_page_validates_chain_and_replay_deduplicates_overlap() {
-        let batch = batch();
-        let response = response_for(&batch);
-        let page = PullPage {
-            protocol: PROTOCOL_V1.to_owned(),
-            stream_id: batch.stream_id.clone(),
-            events: batch
-                .events
-                .iter()
-                .cloned()
-                .zip(response.receipts.iter().cloned())
-                .map(|(envelope, receipt)| AcceptedEvent { envelope, receipt })
-                .collect(),
-            next_cursor: response.next_cursor.clone(),
-            complete: true,
-        };
-        let request = PullRequest {
-            protocol: PROTOCOL_V1.to_owned(),
-            stream_id: batch.stream_id.clone(),
-            after: batch.expected_cursor.clone(),
-            limit: 10,
-        };
-        let mut state = ReplayState::default();
-        let mut sink = CountingSink::default();
-        assert_eq!(
-            apply_pull_page(&mut state, &request, &page, &mut sink).unwrap(),
-            2
-        );
-        assert_eq!(state.dedupe_window_len(), 2);
-
-        // The same validated recovery page is harmless when a caller resumes
-        // from the same persisted request after losing its local completion ACK.
-        assert_eq!(
-            apply_pull_page(&mut state, &request, &page, &mut sink).unwrap(),
-            0
-        );
-        assert_eq!(sink.0.len(), 2);
-    }
-
-    #[test]
-    fn pull_rejects_discontinuous_and_non_advancing_pages() {
-        let batch = batch();
-        let response = response_for(&batch);
-        let request = PullRequest {
-            protocol: PROTOCOL_V1.to_owned(),
-            stream_id: batch.stream_id.clone(),
-            after: batch.expected_cursor.clone(),
-            limit: 10,
-        };
-        let mut page = PullPage {
-            protocol: PROTOCOL_V1.to_owned(),
-            stream_id: batch.stream_id.clone(),
-            events: vec![AcceptedEvent {
-                envelope: batch.events[0].clone(),
-                receipt: response.receipts[0].clone(),
-            }],
-            next_cursor: StreamCursor {
-                position: 1,
-                head_hash: response.receipts[0].journal_head.clone(),
-            },
-            complete: false,
-        };
-        page.events[0].receipt.server_prev_hash = "b".repeat(64);
-        assert!(page.validate_against(&request).is_err());
-
-        page.events.clear();
-        page.next_cursor = request.after.clone().unwrap();
-        assert!(page.validate_against(&request).is_err());
-    }
-
-    #[test]
-    fn legacy_gate_push_and_retry_remain_compatible() {
-        let log = client_log(6);
-        let mut sync = SyncState::new();
-        let mut flaky = Flaky {
-            inner: FakeHyphae::default(),
-            allow: 2,
-        };
-        assert!(push_pending(&log, &mut sync, &mut flaky).is_err());
-        assert_eq!(sync.next_to_push(), 2);
-        flaky.allow = u64::MAX;
-        assert_eq!(push_pending(&log, &mut sync, &mut flaky).unwrap(), 4);
-        assert_eq!(sync.confirmed(), 6);
-        assert_eq!(flaky.inner.appends, 6);
-    }
-
-    #[test]
-    fn legacy_ack_guard_rejects_gaps_conflicts_and_memory_abuse() {
-        let valid = Ack {
-            seq: 0,
-            hash: "a".repeat(64),
-        };
-        let mut state = SyncState::new();
-        assert!(state.try_confirm(1, valid.clone()).is_err());
-        state.try_confirm(0, valid.clone()).unwrap();
-        assert!(state.try_confirm(0, valid).is_ok());
-        assert!(
-            state
-                .try_confirm(
-                    MAX_LEGACY_ACKS as u64,
-                    Ack {
-                        seq: 1,
-                        hash: "b".repeat(64),
-                    }
-                )
-                .is_err()
-        );
-    }
-}
+mod r2_tests;

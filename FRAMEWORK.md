@@ -114,10 +114,14 @@ Projects should expose only the mode they need:
 1. deterministic static output;
 2. local event history and replay;
 3. a durable outbox;
-4. verified synchronization with Hyphae.
+4. verified synchronization through the Hyphae protocol v2 client contract.
 
 Static projects do not require Hyphae. Projects that enable sync must define
-authority, cursor, receipt, event-version, conflict, and unknown-version policy.
+an authenticated transport, authority and key policy, stream-bound replay
+state, reducer transaction policy, and explicit event-version admission.
+Protocol v2 requires append/page attestations and per-event receipts before an
+event can reach a reducer. This client guarantee is not a deployed gateway or
+Hyphae durability claim.
 
 ## Official starters
 
@@ -127,7 +131,8 @@ either from a local checkout or one exact canonical Git revision.
 
 ## Current limits
 
-Streaming SSR, server functions, authenticated Hyphae infrastructure,
+Streaming SSR, server functions, authenticated Hyphae infrastructure, durable
+outbox/replay persistence, production key distribution,
 selective build invalidation, deployment automation, and public package
 distribution are not stable surfaces. The R0-R7 gates in
 [`docs/28-hardening-roadmap.md`](docs/28-hardening-roadmap.md) take precedence

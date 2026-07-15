@@ -99,6 +99,21 @@ The accepted target is the contract in `docs/01-hyphae-protocol.md`:
 - durable signed receipts and browser verification;
 - versioned shared Rust reducers where reuse is valid.
 
+### Amendment: verified sync protocol v2 (2026-07-15)
+
+The client-side target above is now represented by protocol
+`pliego-hyphae/2`. V2 adds mandatory signed append and page attestations,
+per-event receipt verification, a fixed snapshot cursor, stable logical
+authority, explicit event-version admission, and the consuming
+`UntrustedPullPage -> ValidatedPullPage -> VerifiedPullPage -> AppliedPullPage`
+path. A raw or merely shape-valid page cannot enter a reducer.
+
+This amendment closes the client contract, not the production topology. The
+Cloudflare gateway, tenant/key operations, durable browser outbox and replay
+state, and a conforming deployed Hyphae v2 service remain pending. The exact
+decision and downgrade boundary are recorded in
+[ADR-004](ADR-004-hyphae-verified-sync-v2.md).
+
 "One machine" means shared event identity, schema, reducer semantics, and
 verifiable lineage. It does not mean one physical store or trust boundary.
 
