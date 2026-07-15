@@ -567,6 +567,9 @@ version = "0.0.1"
 dependencies = [
  "pliego-log",
  "pliego-reactive",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -598,6 +601,8 @@ dependencies = [
 name = "pliego-log"
 version = "0.0.1"
 dependencies = [
+ "serde",
+ "serde_json",
  "sha2",
 ]
 

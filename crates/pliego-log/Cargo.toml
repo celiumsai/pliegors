@@ -11,4 +11,6 @@ description = "The append-only, hash-chained event log PliegoRS folds into UI. W
 publish.workspace = true
 
 [dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
