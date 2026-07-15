@@ -38,6 +38,11 @@ P0-01 and P0-02 are closed by the committed
 `ff60575f8c0f16164ecfc1754eac165ae776d33a`. The historical risks remain above
 so later changes can be checked against the original failure modes.
 
+P0-03 and P0-04 are closed by the committed
+[R1 artifact trust evidence](evidence/r1-artifact-trust.md) and implementation
+commit `12ec7cead21003c6dee8d4a85b873adda3cf2779`. Their historical risks likewise
+remain above as regression targets.
+
 ## P1 and P2 findings
 
 - Validate element and attribute names at DOM construction boundaries.
@@ -76,6 +81,7 @@ Status: complete. See [R0 reactive safety evidence](evidence/r0-reactive-safety.
 
 Close normalized-path collisions, strengthen the content-addressed ledger, and
 lock the build/toolchain identity.
+Status: complete. See [R1 artifact trust evidence](evidence/r1-artifact-trust.md).
 
 ### R2 - Verified sync
 

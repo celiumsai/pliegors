@@ -1,9 +1,8 @@
 # R1 Artifact Trust Evidence
 
-**Status:** implementation documented; final acceptance commands and resulting
-commit are not recorded yet. This file must not be used to mark R1 complete
-until every gate in [Verification record](#verification-record) has a recorded
-result against the same tree.
+**Status:** complete. The implementation and adversarial acceptance matrix are
+recorded below against implementation commit
+`12ec7cead21003c6dee8d4a85b873adda3cf2779`.
 
 ## Security objective and threat model
 
@@ -317,26 +316,35 @@ deliberately before rebuilding. There is no automatic ledger migration.
 
 ## Verification record
 
-The commands below are the R1 acceptance record template. Results must be added
-only after they run against the final R1 tree.
+The Rust matrix ran from a fresh isolated target directory on Debian GNU/Linux
+13.5 (trixie) under WSL2 kernel `6.18.33.1-microsoft-standard-WSL2`. The starter
+matrix used separate CLI and project target directories and built every
+official starter twice before comparing the complete ledger bytes.
 
 | Command | Result |
 | --- | --- |
-| `cargo fmt --check` | NOT RECORDED |
-| `cargo clippy -p pliego-artifact -p pliego-ssg -p pliego-cli --all-targets --locked -- -D warnings` | NOT RECORDED |
-| `cargo test -p pliego-artifact -p pliego-ssg -p pliego-cli --locked` | NOT RECORDED |
-| `cargo clippy --workspace --all-targets --locked -- -D warnings` | NOT RECORDED |
-| `cargo test --workspace --all-targets --locked` | NOT RECORDED |
-| `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked` | NOT RECORDED |
-| `cargo clippy --target wasm32-unknown-unknown --locked -p pliegors-site-client -p spike -- -D warnings` | NOT RECORDED |
-| `node scripts/check-starter-builds.mjs target/ci-starter-minimal target/ci-starter-editorial target/ci-starter-cinematic` | NOT RECORDED |
-| `npm run check:docs` | NOT RECORDED |
-| `git diff --check` | NOT RECORDED |
+| `cargo fmt --all -- --check` | PASS in 1.986 s. |
+| `cargo clippy -p pliego-artifact -p pliego-ssg -p pliego-cli --all-targets --locked -- -D warnings` | PASS in 11.272 s. |
+| `cargo test -p pliego-artifact -p pliego-ssg -p pliego-cli --all-targets --locked` | PASS in 32.825 s: 113 top-level tests, zero failed or ignored; the artifact child self-test also passed. |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | PASS in 20.132 s. |
+| `cargo test --workspace --all-targets --locked` | PASS in 36.788 s: 267 top-level tests, zero failed or ignored; the artifact child self-test also passed. |
+| `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked` | PASS in 14.364 s; 20 crate documentation indexes generated. |
+| `cargo clippy -p pliegors-site-client -p spike --target wasm32-unknown-unknown --locked -- -D warnings` | PASS in 25.347 s. |
+| `node scripts/check-starter-builds.mjs target/ci-starter-minimal target/ci-starter-editorial target/ci-starter-cinematic` | PASS after two byte-identical builds each: minimal 2 routes/5 files/7,732 bytes; editorial 2/14/1,268,273; cinematic 2/12/406,039. |
+| `npm run check:docs` | PASS: 40 documentation files checked. |
+| `npm run check:distribution` | PASS: 15 source-only crates at `0.0.1`, 5 private release candidates, manual draft-release policy. |
+| `git diff --check` | PASS; only informational Git line-ending notices were emitted on Windows. |
 
 - Base commit: `0bdbc96f39ac5623c8576f02a9bbf7dd0e982c27`
-- Resulting implementation commit: NOT RECORDED
-- Rust/Cargo/Node versions: NOT RECORDED
-- Targets checked: NOT RECORDED
+- Resulting implementation commit: `12ec7cead21003c6dee8d4a85b873adda3cf2779`
+- Tool versions: `rustc 1.85.0 (4d91de4e4)`, `cargo 1.85.0
+  (d73d2caf9)`, Node `v20.19.2` in WSL and `v24.16.0` on Windows.
+- Targets checked: `x86_64-unknown-linux-gnu` and
+  `wasm32-unknown-unknown`; focal Windows suites also passed with 25 artifact,
+  28 SSG, 43 CLI unit, and 14 CLI integration tests.
+- Adversarial review: green, with no remaining reproducible P1 or P2 finding.
+  The limits of unsigned receipts, unbounded project-input hashing, hostile
+  mutable filesystems, and crash consistency remain explicitly listed below.
 
 ## Known residual risks
 

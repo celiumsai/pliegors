@@ -1,6 +1,6 @@
 # PliegoRS execution backlog
 
-**Updated:** 2026-07-14
+**Updated:** 2026-07-15
 **Objective:** reach a verified release candidate by closing trust and lifecycle
 gates before adding broad framework surface.
 
@@ -14,8 +14,8 @@ candidate.
 | Order | Gate | Status | Acceptance evidence |
 | --- | --- | --- | --- |
 | 1 | R0 Reactive safety | Complete | [Committed R0 evidence](evidence/r0-reactive-safety.md) covers ownership reclamation, unwind safety, deterministic nested updates, scheduler bounds, and arena plateau. |
-| 2 | R1 Artifact trust | Pending | Output paths are collision-safe; the ledger binds every byte, toolchain input, and source identity. |
-| 3 | R2 Verified sync | Pending | Hyphae replay rejects gaps, forks, invalid receipts, unknown authority, and incompatible event versions. |
+| 2 | R1 Artifact trust | Complete | [Committed R1 evidence](evidence/r1-artifact-trust.md) covers the portable namespace, exact output receipts, build inputs, capability-based publication, deterministic starters, and adversarial verification. |
+| 3 | R2 Verified sync | Active | Hyphae replay rejects gaps, forks, invalid receipts, unknown authority, and incompatible event versions. |
 | 4 | R3 Snapshot and schema contract | Pending | Snapshot identity binds schema, reducer, history head, and canonical encoding; upcasters are explicit. |
 | 5 | R4 DOM lifecycle | Pending | Mounted scopes own listeners and nodes; keyed reconciliation is precise; 10,000 mount/dispose cycles plateau. |
 | 6 | R5 Golden developer experience | Pending | A starter reaches its first replayable app with generated events, projections, diagnostics, and timeline tests. |
