@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "Native Content Ledger: {} typed entries / {route_count} routes / {} files -> {}",
         catalog.total_entries(),
-        report.files.len(),
+        report.receipt.outputs.files.len(),
         output.display()
     );
     Ok(())

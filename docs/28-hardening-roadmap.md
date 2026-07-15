@@ -30,7 +30,7 @@ objects, documents, or provenance are required.
 | P0-01 | Reactive child cleanup can be lost and arena storage can retain unreachable nodes. | Ownership-tree tests reclaim children and memory plateaus after 10,000 create/dispose cycles. |
 | P0-02 | A panic or nested update can poison scheduler state or produce reentrant execution. | Panic recovery restores scheduler invariants; update order is deterministic and covered by adversarial tests. |
 | P0-03 | Distinct routes can collide after output-path normalization. | Route registration rejects every normalized collision before staging or replacing output. |
-| P0-04 | The build ledger can be shallow or forged. | The final ledger binds all emitted bytes, source identities, toolchain pins, configuration, and previous ownership evidence. |
+| P0-04 | The build ledger can be shallow or internally inconsistent. | The final ledger binds all emitted bytes, source identities, toolchain pins, configuration, and verified previous ownership evidence without claiming signature-based authenticity. |
 | P0-05 | Hyphae replay can accept data without complete cryptographic and type verification. | Replay is type-gated and rejects invalid signatures, receipts, gaps, forks, authorities, and unsupported event versions. |
 
 P0-01 and P0-02 are closed by the committed

@@ -13,7 +13,7 @@ publish.workspace = true
 [dependencies]
 cap-fs-ext = "=4.0.2"
 cap-std = "=4.0.2"
+fs2 = "0.4"
+pliego-artifact = { workspace = true }
 pliego-dom = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { workspace = true }

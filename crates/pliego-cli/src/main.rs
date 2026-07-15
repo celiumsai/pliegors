@@ -3,6 +3,7 @@
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr};
@@ -14,6 +15,11 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 use tiny_http::{Header, Method, Response, Server, StatusCode};
 
+use pliego_artifact::{
+    BUILD_CONTEXT_ENV, BuildContext, BuildInvocation, FrameworkEvidence, InputMaterialSpec,
+    Ownership, PortablePath, ToolchainEvidence, capture_build_context_with_materials,
+    verify_build_context_with_materials, verify_build_report, write_build_invocation,
+};
 use pliego_starters as templates;
 
 const PROJECT_FILE: &str = "pliego.toml";
@@ -24,23 +30,28 @@ const RELOAD_QUEUE: usize = 32;
 const MAX_REQUEST_TARGET_BYTES: usize = 4096;
 const MAX_CAPTURED_DIAGNOSTIC_BYTES: usize = 256 * 1024;
 const RELOAD_PATH: &str = "/_pliego/reload";
+static BUILD_CONTEXT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Debug, Deserialize)]
+#[cfg(test)]
+mod r1_material_tests;
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct ProjectManifest {
     project: Project,
     client: Option<Client>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct Project {
+    id: String,
     name: String,
     site_package: String,
     output: PathBuf,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct Client {
     package: String,
@@ -51,6 +62,60 @@ struct Client {
 struct Context {
     root: PathBuf,
     manifest: ProjectManifest,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct CargoInputSelection {
+    project_configuration: Vec<String>,
+    materials: Vec<InputMaterialSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoMetadata {
+    packages: Vec<CargoPackage>,
+    workspace_root: PathBuf,
+    target_directory: PathBuf,
+    resolve: Option<CargoResolve>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoPackage {
+    name: String,
+    version: String,
+    id: String,
+    source: Option<String>,
+    manifest_path: PathBuf,
+    targets: Vec<CargoTarget>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoTarget {
+    kind: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoResolve {
+    nodes: Vec<CargoResolveNode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoResolveNode {
+    id: String,
+    dependencies: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoLock {
+    #[serde(default)]
+    package: Vec<CargoLockPackage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoLockPackage {
+    name: String,
+    version: String,
+    source: Option<String>,
+    checksum: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -305,24 +370,22 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
         "dev" => {
             let options = parse_server_options(arguments.collect(), 4400)
                 .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
+            validate_reproducible_command_context(&context)
+                .map_err(|error| CliFailure::new(FailureKind::Check, error))?;
             dev(&context, options).map_err(DevFailure::into_cli_failure)
         }
         "preview" => {
             let options = parse_server_options(arguments.collect(), 4400)
                 .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
             let output = context.root.join(&context.manifest.project.output);
-            read_build_files(&output.join("pliego.build.json"))
+            verify_project_build(&context, &output)
                 .map_err(|error| CliFailure::new(FailureKind::Artifact, error))?;
             serve(output, options, "preview")
                 .map_err(|error| CliFailure::new(FailureKind::Server, error))
         }
-        "inspect" => inspect(
-            &context
-                .root
-                .join(&context.manifest.project.output)
-                .join("pliego.build.json"),
-        )
-        .map_err(|error| CliFailure::new(FailureKind::Artifact, error)),
+        "inspect" => {
+            inspect(&context).map_err(|error| CliFailure::new(FailureKind::Artifact, error))
+        }
         _ => unreachable!("known commands were validated before project discovery"),
     }
 }
@@ -887,15 +950,22 @@ fn load_context() -> Result<Context, String> {
     loop {
         let manifest_path = current.join(PROJECT_FILE);
         if manifest_path.is_file() {
+            let root = canonical_unlinked_project_root(&current)?;
+            let manifest_path = root.join(PROJECT_FILE);
+            let manifest_metadata = fs::symlink_metadata(&manifest_path)
+                .map_err(|error| format!("cannot inspect {}: {error}", manifest_path.display()))?;
+            if link_like(&manifest_metadata) || !manifest_metadata.is_file() {
+                return Err(format!(
+                    "{PROJECT_FILE} must be a regular, non-linked file: {}",
+                    manifest_path.display()
+                ));
+            }
             let source = fs::read_to_string(&manifest_path)
                 .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
             let manifest: ProjectManifest = toml::from_str(&source)
                 .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
             validate_manifest(&manifest)?;
-            return Ok(Context {
-                root: current,
-                manifest,
-            });
+            return Ok(Context { root, manifest });
         }
         if !current.pop() {
             return Err(format!(
@@ -905,12 +975,145 @@ fn load_context() -> Result<Context, String> {
     }
 }
 
+fn canonical_unlinked_project_root(root: &Path) -> Result<PathBuf, String> {
+    canonical_unlinked_directory(root, "project root", false)
+}
+
+fn canonical_unlinked_directory(
+    path: &Path,
+    label: &str,
+    allow_missing: bool,
+) -> Result<PathBuf, String> {
+    if !path.is_absolute() {
+        return Err(format!("{label} must be absolute: {}", path.display()));
+    }
+    let mut current = PathBuf::new();
+    let mut missing_base = None;
+    let mut missing_tail = PathBuf::new();
+    for component in path.components() {
+        if !matches!(
+            component,
+            std::path::Component::Prefix(_)
+                | std::path::Component::RootDir
+                | std::path::Component::Normal(_)
+        ) {
+            return Err(format!(
+                "{label} contains a non-normal component: {}",
+                path.display()
+            ));
+        }
+        if missing_base.is_some() {
+            if let std::path::Component::Normal(component) = component {
+                missing_tail.push(component);
+            }
+            continue;
+        }
+        current.push(component.as_os_str());
+        if matches!(
+            component,
+            std::path::Component::Prefix(_) | std::path::Component::RootDir
+        ) {
+            continue;
+        }
+        let metadata = match fs::symlink_metadata(&current) {
+            Ok(metadata) => metadata,
+            Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {
+                let missing = current
+                    .file_name()
+                    .ok_or_else(|| format!("cannot resolve missing {label}"))?
+                    .to_owned();
+                current.pop();
+                missing_base = Some(current.canonicalize().map_err(|error| {
+                    format!(
+                        "cannot canonicalize existing {label} ancestor {}: {error}",
+                        current.display()
+                    )
+                })?);
+                missing_tail.push(missing);
+                continue;
+            }
+            Err(error) => {
+                return Err(format!(
+                    "cannot inspect {label} {}: {error}",
+                    current.display()
+                ));
+            }
+        };
+        if link_like(&metadata) {
+            return Err(format!(
+                "{label} cannot traverse a symbolic link or junction: {}",
+                current.display()
+            ));
+        }
+        if !metadata.is_dir() {
+            return Err(format!(
+                "{label} ancestor is not a directory: {}",
+                current.display()
+            ));
+        }
+    }
+    if let Some(base) = missing_base {
+        return Ok(base.join(missing_tail));
+    }
+    path.canonicalize()
+        .map_err(|error| format!("cannot canonicalize {label} {}: {error}", path.display()))
+}
+
+fn validate_loaded_context(context: &Context) -> Result<(), String> {
+    let canonical = canonical_unlinked_project_root(&context.root)?;
+    if canonical != context.root {
+        return Err(format!(
+            "project root is not canonical: expected {}, got {}",
+            canonical.display(),
+            context.root.display()
+        ));
+    }
+    let manifest_path = context.root.join(PROJECT_FILE);
+    let metadata = fs::symlink_metadata(&manifest_path)
+        .map_err(|error| format!("cannot inspect {}: {error}", manifest_path.display()))?;
+    if link_like(&metadata) || !metadata.is_file() {
+        return Err(format!(
+            "{PROJECT_FILE} must remain a regular, non-linked file: {}",
+            manifest_path.display()
+        ));
+    }
+    let source = fs::read_to_string(&manifest_path)
+        .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
+    let current: ProjectManifest =
+        toml::from_str(&source).map_err(|error| format!("{}: {error}", manifest_path.display()))?;
+    validate_manifest(&current)?;
+    if current != context.manifest {
+        return Err(format!(
+            "{PROJECT_FILE} changed after project discovery; restart the command so its paths and ownership are reloaded"
+        ));
+    }
+    Ok(())
+}
+
 fn validate_manifest(manifest: &ProjectManifest) -> Result<(), String> {
     let project = &manifest.project;
     if project.name.trim().is_empty() || project.site_package.trim().is_empty() {
         return Err("project name and site_package cannot be empty".to_owned());
     }
-    validate_generated_path(&project.output, "project.output")?;
+    if project.id.len() > 64
+        || !project
+            .id
+            .starts_with(|character: char| character.is_ascii_lowercase())
+        || !project.id.chars().all(|character| {
+            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-'
+        })
+    {
+        return Err(
+            "project.id must start with a lowercase ASCII letter and contain at most 64 lowercase letters, digits, or hyphens"
+                .to_owned(),
+        );
+    }
+    let output = validate_generated_path(&project.output, "project.output")?;
+    let reserved = PortablePath::parse("target/.pliego")
+        .map_err(|error| format!("invalid reserved generated path: {error}"))?;
+    if generated_paths_overlap(&output, &reserved) {
+        return Err("project.output cannot overlap reserved target/.pliego".to_owned());
+    }
     if let Some(client) = &manifest.client {
         if client.package.trim().is_empty() || client.wasm_name.trim().is_empty() {
             return Err("client package and wasm_name cannot be empty".to_owned());
@@ -922,9 +1125,31 @@ fn validate_manifest(manifest: &ProjectManifest) -> Result<(), String> {
         {
             return Err("client.wasm_name must be a Rust artifact identifier".to_owned());
         }
-        validate_generated_path(&client.bindgen_output, "client.bindgen_output")?;
+        let bindgen_output =
+            validate_generated_path(&client.bindgen_output, "client.bindgen_output")?;
+        if generated_paths_overlap(&bindgen_output, &reserved) {
+            return Err("client.bindgen_output cannot overlap reserved target/.pliego".to_owned());
+        }
+        if generated_paths_overlap(&output, &bindgen_output) {
+            return Err(
+                "project.output and client.bindgen_output must be disjoint generated paths"
+                    .to_owned(),
+            );
+        }
     }
     Ok(())
+}
+
+fn generated_paths_overlap(left: &PortablePath, right: &PortablePath) -> bool {
+    portable_path_prefix(left.collision_key(), right.collision_key())
+        || portable_path_prefix(right.collision_key(), left.collision_key())
+}
+
+fn portable_path_prefix(prefix: &str, path: &str) -> bool {
+    path == prefix
+        || path
+            .strip_prefix(prefix)
+            .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
 fn validate_relative_path(path: &Path, field: &str) -> Result<(), String> {
@@ -938,22 +1163,160 @@ fn validate_relative_path(path: &Path, field: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_generated_path(path: &Path, field: &str) -> Result<(), String> {
+fn validate_generated_path(path: &Path, field: &str) -> Result<PortablePath, String> {
     validate_relative_path(path, field)?;
-    let mut components = path.components();
-    let first = components
-        .next()
-        .and_then(|component| component.as_os_str().to_str());
-    if first != Some("target") || components.next().is_none() {
+    let value = path
+        .to_str()
+        .ok_or_else(|| format!("{field} must be valid UTF-8"))?;
+    let portable = PortablePath::parse(value)
+        .map_err(|error| format!("{field} must be a portable generated path: {error}"))?;
+    if portable.as_str() != value {
+        return Err(format!("{field} must use canonical NFC spelling"));
+    }
+    let mut components = portable.as_str().split('/');
+    if components.next() != Some("target") || components.next().is_none() {
         return Err(format!(
             "{field} must be a generated path below target/, for example target/site"
         ));
     }
+    Ok(portable)
+}
+
+fn validate_reproducible_build_environment() -> Result<(), String> {
+    let mut forbidden = std::env::vars_os()
+        .filter_map(|(name, _)| {
+            forbidden_build_environment_name(&name).then(|| name.to_string_lossy().into_owned())
+        })
+        .collect::<Vec<_>>();
+    forbidden.sort();
+    forbidden.dedup();
+    if forbidden.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "reproducible PliegoRS commands reject build overrides from the environment: {}; move intentional settings into committed .cargo/config.toml",
+        forbidden.join(", ")
+    ))
+}
+
+fn forbidden_build_environment_name(name: &OsStr) -> bool {
+    let Some(name) = name.to_str() else {
+        return false;
+    };
+    let name = name.to_ascii_uppercase();
+    matches!(
+        name.as_str(),
+        "RUSTC"
+            | "RUSTC_WRAPPER"
+            | "RUSTC_WORKSPACE_WRAPPER"
+            | "RUSTC_BOOTSTRAP"
+            | "RUSTFLAGS"
+            | "CARGO_ENCODED_RUSTFLAGS"
+            | "CARGO_INCREMENTAL"
+    ) || name.starts_with("CARGO_BUILD_")
+        || name.starts_with("CARGO_PROFILE_")
+        || (name.starts_with("CARGO_TARGET_") && name != "CARGO_TARGET_DIR")
+}
+
+fn validate_generated_write_paths(context: &Context) -> Result<(), String> {
+    let paths = std::iter::once(("build context", Path::new("target/.pliego")))
+        .chain(std::iter::once((
+            "project.output",
+            context.manifest.project.output.as_path(),
+        )))
+        .chain(
+            context
+                .manifest
+                .client
+                .iter()
+                .map(|client| ("client.bindgen_output", client.bindgen_output.as_path())),
+        );
+    for (field, path) in paths {
+        validate_generated_path(path, field)?;
+        validate_existing_generated_ancestors(&context.root, path, field)?;
+    }
     Ok(())
 }
 
+fn validate_existing_generated_ancestors(
+    project_root: &Path,
+    relative: &Path,
+    field: &str,
+) -> Result<(), String> {
+    if !project_root.is_absolute() {
+        return Err(format!(
+            "project root must be absolute before validating {field}"
+        ));
+    }
+    let root_metadata = fs::symlink_metadata(project_root).map_err(|error| {
+        format!(
+            "cannot inspect project root {} before writing {field}: {error}",
+            project_root.display()
+        )
+    })?;
+    if link_like(&root_metadata) || !root_metadata.is_dir() {
+        return Err(format!(
+            "refusing to write {field} through linked or non-directory project root {}",
+            project_root.display()
+        ));
+    }
+
+    let mut current = project_root.to_owned();
+    for component in relative.components() {
+        let std::path::Component::Normal(component) = component else {
+            return Err(format!("{field} must remain project-relative"));
+        };
+        current.push(component);
+        let metadata = match fs::symlink_metadata(&current) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error) => {
+                return Err(format!(
+                    "cannot inspect generated path ancestor {} for {field}: {error}",
+                    current.display()
+                ));
+            }
+        };
+        if link_like(&metadata) {
+            return Err(format!(
+                "refusing to write {field} through symbolic link or junction {}",
+                current.display()
+            ));
+        }
+        if !metadata.is_dir() {
+            return Err(format!(
+                "generated path ancestor {} for {field} is not a directory",
+                current.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn link_like(metadata: &fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+fn validate_reproducible_command_context(context: &Context) -> Result<(), String> {
+    validate_reproducible_build_environment()?;
+    validate_loaded_context(context)?;
+    validate_generated_write_paths(context)
+}
+
 fn check(context: &Context) -> Result<(), String> {
-    let metadata = cargo_metadata(&context.root)?;
+    validate_reproducible_command_context(context)?;
+    let metadata = prepare_cargo_metadata(&context.root)?;
+    validate_cargo_target_directory(context, &metadata)?;
     require_package(&metadata, &context.manifest.project.site_package, "bin")?;
     println!(
         "PLIEGO check: site package `{}`",
@@ -962,8 +1325,8 @@ fn check(context: &Context) -> Result<(), String> {
 
     if let Some(client) = &context.manifest.client {
         require_package(&metadata, &client.package, "cdylib")?;
-        require_command("wasm-bindgen", &["--version"])?;
-        let targets = command_output("rustup", &["target", "list", "--installed"])?;
+        require_command(&context.root, "wasm-bindgen", &["--version"])?;
+        let targets = command_output(&context.root, "rustup", &["target", "list", "--installed"])?;
         if !targets
             .lines()
             .any(|target| target == "wasm32-unknown-unknown")
@@ -977,6 +1340,9 @@ fn check(context: &Context) -> Result<(), String> {
         println!("PLIEGO check: wasm32 target and wasm-bindgen");
     }
 
+    let (build_context, material_specs) = capture_project_build_context(context, &metadata)?;
+    revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
+
     println!(
         "PLIEGO check: {} is valid",
         context.root.join(PROJECT_FILE).display()
@@ -984,24 +1350,18 @@ fn check(context: &Context) -> Result<(), String> {
     Ok(())
 }
 
-fn require_package(
-    metadata: &serde_json::Value,
-    name: &str,
-    target_kind: &str,
-) -> Result<(), String> {
-    let package = metadata["packages"]
-        .as_array()
-        .and_then(|packages| packages.iter().find(|package| package["name"] == name))
+fn require_package(metadata: &CargoMetadata, name: &str, target_kind: &str) -> Result<(), String> {
+    let package = metadata
+        .packages
+        .iter()
+        .find(|package| package.name == name)
         .ok_or_else(|| {
             format!("Cargo package `{name}` declared in {PROJECT_FILE} was not found")
         })?;
-    let has_target = package["targets"].as_array().is_some_and(|targets| {
-        targets.iter().any(|target| {
-            target["kind"]
-                .as_array()
-                .is_some_and(|kinds| kinds.iter().any(|kind| kind == target_kind))
-        })
-    });
+    let has_target = package
+        .targets
+        .iter()
+        .any(|target| target.kind.iter().any(|kind| kind == target_kind));
     if has_target {
         Ok(())
     } else {
@@ -1011,15 +1371,17 @@ fn require_package(
     }
 }
 
-fn require_command(program: &str, arguments: &[&str]) -> Result<(), String> {
-    command_output(program, arguments)
+fn require_command(directory: &Path, program: &str, arguments: &[&str]) -> Result<(), String> {
+    command_output(directory, program, arguments)
         .map(|_| ())
         .map_err(|error| format!("required tool `{program}` is unavailable or failed: {error}"))
 }
 
-fn command_output(program: &str, arguments: &[&str]) -> Result<String, String> {
+fn command_output(directory: &Path, program: &str, arguments: &[&str]) -> Result<String, String> {
+    let directory = command_working_directory(directory)?;
     let output = Command::new(program)
         .args(arguments)
+        .current_dir(&directory)
         .output()
         .map_err(|error| error.to_string())?;
     if output.status.success() {
@@ -1033,14 +1395,44 @@ fn command_output(program: &str, arguments: &[&str]) -> Result<String, String> {
     }
 }
 
+fn command_working_directory(directory: &Path) -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    {
+        let value = directory.to_str().ok_or_else(|| {
+            format!(
+                "command working directory is not valid UTF-8: {}",
+                directory.display()
+            )
+        })?;
+        if let Some(unc) = value.strip_prefix(r"\\?\UNC\") {
+            return Ok(PathBuf::from(format!(r"\\{unc}")));
+        }
+        if let Some(local) = value.strip_prefix(r"\\?\") {
+            return Ok(PathBuf::from(local));
+        }
+    }
+    Ok(directory.to_owned())
+}
+
 fn build(context: &Context) -> Result<(), String> {
+    validate_reproducible_command_context(context)?;
+    // Resolve the effective workspace and materialize Cargo.lock before the
+    // receipt snapshot so first-use builds cannot create an unrecorded input.
+    let metadata = prepare_cargo_metadata(&context.root)?;
+    let cargo_target = validate_cargo_target_directory(context, &metadata)?;
+    let (build_context, material_specs) = capture_project_build_context(context, &metadata)?;
+    revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
+    let context_path = write_project_build_context(context, &build_context, &material_specs)?;
+    let _context_cleanup = FileCleanup::new(context_path.clone());
+
     if let Some(client) = &context.manifest.client {
-        let cargo_target = cargo_target_directory(&cargo_metadata(&context.root)?)?;
+        revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
         execute(
             &context.root,
             "cargo",
             &[
                 "build",
+                "--locked",
                 "-p",
                 &client.package,
                 "--target",
@@ -1048,14 +1440,15 @@ fn build(context: &Context) -> Result<(), String> {
                 "--release",
             ],
         )?;
-        let bindgen_output = context.root.join(&client.bindgen_output);
-        fs::create_dir_all(&bindgen_output).map_err(|error| error.to_string())?;
+        revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
+        create_generated_directory(context, &client.bindgen_output, "client.bindgen_output")?;
         let wasm_input = path_argument(
             &cargo_target
                 .join("wasm32-unknown-unknown/release")
                 .join(format!("{}.wasm", client.wasm_name)),
         )?;
         let bindgen_output = path_argument(&client.bindgen_output)?;
+        revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
         execute(
             &context.root,
             "wasm-bindgen",
@@ -1070,37 +1463,300 @@ fn build(context: &Context) -> Result<(), String> {
                 "--no-typescript",
             ],
         )?;
+        revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
     }
 
     let output = path_argument(&context.manifest.project.output)?;
-    execute(
+    revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
+    execute_with_environment(
         &context.root,
         "cargo",
         &[
             "run",
+            "--locked",
             "-p",
             &context.manifest.project.site_package,
             "--",
             &output,
         ],
+        Some((BUILD_CONTEXT_ENV, &context_path)),
     )?;
-    let ledger = context
-        .root
-        .join(&context.manifest.project.output)
-        .join("pliego.build.json");
-    read_build_files(&ledger)?;
+    revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
+    let output_root = context.root.join(&context.manifest.project.output);
+    let verified = verify_build_report(&output_root).map_err(|error| error.to_string())?;
+    if verified.report.receipt.context != build_context {
+        return Err("site emitted a receipt for a different build context".to_owned());
+    }
     println!(
-        "PLIEGO build: {} -> {}",
+        "PLIEGO build: {} -> {} [{}]",
         context.manifest.project.name,
-        context.manifest.project.output.display()
+        context.manifest.project.output.display(),
+        &verified.report.receipt_sha256[..12]
     );
     Ok(())
 }
 
-fn cargo_metadata(root: &Path) -> Result<serde_json::Value, String> {
-    let output = Command::new("cargo")
-        .args(["metadata", "--format-version=1", "--no-deps"])
-        .current_dir(root)
+fn revalidate_build_inputs(
+    context: &Context,
+    metadata: &CargoMetadata,
+    expected: &BuildContext,
+    material_specs: &[InputMaterialSpec],
+) -> Result<(), String> {
+    validate_reproducible_command_context(context)?;
+    validate_cargo_target_directory(context, metadata)?;
+    let current = cargo_input_selection(context, metadata)?;
+    let expected_configuration = expected
+        .configuration
+        .iter()
+        .map(|file| file.path.clone())
+        .collect::<Vec<_>>();
+    if current.project_configuration != expected_configuration
+        || current.materials != material_specs
+    {
+        return Err(
+            "Cargo input topology changed after provenance capture; retry from a stable filesystem"
+                .to_owned(),
+        );
+    }
+    verify_build_context_with_materials(&context.root, material_specs, expected)
+        .map_err(|error| format!("build inputs changed during compilation: {error}"))?;
+    let framework_package = resolved_framework_package(context, metadata)?;
+    let current_framework =
+        resolved_framework_evidence(metadata, framework_package, Some(expected))?;
+    if current_framework != expected.framework {
+        return Err("resolved pliego-ssg provenance changed during the build".to_owned());
+    }
+    Ok(())
+}
+
+fn create_generated_directory(
+    context: &Context,
+    relative: &Path,
+    field: &str,
+) -> Result<(), String> {
+    validate_generated_path(relative, field)?;
+    validate_existing_generated_ancestors(&context.root, relative, field)?;
+    let directory = context.root.join(relative);
+    fs::create_dir_all(&directory)
+        .map_err(|error| format!("cannot create {field} {}: {error}", directory.display()))?;
+    validate_existing_generated_ancestors(&context.root, relative, field)
+}
+
+fn capture_project_build_context(
+    context: &Context,
+    metadata: &CargoMetadata,
+) -> Result<(BuildContext, Vec<InputMaterialSpec>), String> {
+    let selection = cargo_input_selection(context, metadata)?;
+    let excluded = vec![path_argument(&context.manifest.project.output)?];
+    let framework_package = resolved_framework_package(context, metadata)?;
+    let preliminary_framework = resolved_framework_evidence(metadata, framework_package, None)?;
+    let mut build_context = capture_build_context_with_materials(
+        &context.root,
+        Ownership {
+            project_id: context.manifest.project.id.clone(),
+            site_package: context.manifest.project.site_package.clone(),
+        },
+        preliminary_framework,
+        &selection.project_configuration,
+        &excluded,
+        &selection.materials,
+    )
+    .map_err(|error| error.to_string())?;
+    build_context.framework =
+        resolved_framework_evidence(metadata, framework_package, Some(&build_context))?;
+    if context.manifest.client.is_some() {
+        build_context.toolchain.push(ToolchainEvidence {
+            name: "wasm-bindgen".to_owned(),
+            version: command_output(&context.root, "wasm-bindgen", &["--version"])
+                .map_err(|error| format!("cannot capture wasm-bindgen provenance: {error}"))?,
+        });
+        build_context
+            .toolchain
+            .sort_by(|left, right| left.name.cmp(&right.name));
+    }
+    Ok((build_context, selection.materials))
+}
+
+fn resolved_framework_package<'a>(
+    context: &Context,
+    metadata: &'a CargoMetadata,
+) -> Result<&'a CargoPackage, String> {
+    let reachable = reachable_package_ids(context, metadata)?;
+    let packages = metadata
+        .packages
+        .iter()
+        .filter(|package| package.name == "pliego-ssg" && reachable.contains(&package.id))
+        .collect::<Vec<_>>();
+    match packages.as_slice() {
+        [package] => Ok(*package),
+        [] => Err(
+            "the resolved site dependency graph does not contain pliego-ssg; framework provenance cannot be established"
+                .to_owned(),
+        ),
+        _ => Err(
+            "the resolved site dependency graph contains multiple pliego-ssg packages; framework provenance is ambiguous"
+                .to_owned(),
+        ),
+    }
+}
+
+fn resolved_framework_evidence(
+    metadata: &CargoMetadata,
+    package: &CargoPackage,
+    captured: Option<&BuildContext>,
+) -> Result<FrameworkEvidence, String> {
+    let workspace_root =
+        canonical_unlinked_directory(&metadata.workspace_root, "Cargo workspace root", false)?;
+    let lock_path = workspace_root.join("Cargo.lock");
+    let lock_source = fs::read_to_string(&lock_path).map_err(|error| {
+        format!(
+            "cannot read resolved Cargo lock {}: {error}",
+            lock_path.display()
+        )
+    })?;
+    let lock: CargoLock = toml::from_str(&lock_source).map_err(|error| {
+        format!(
+            "invalid resolved Cargo lock {}: {error}",
+            lock_path.display()
+        )
+    })?;
+    let locked = lock
+        .package
+        .iter()
+        .filter(|locked| {
+            locked.name == package.name
+                && locked.version == package.version
+                && locked.source == package.source
+        })
+        .collect::<Vec<_>>();
+    let locked = match locked.as_slice() {
+        [locked] => *locked,
+        [] => {
+            return Err(format!(
+                "resolved pliego-ssg {} from Cargo metadata is absent from {}",
+                package.version,
+                lock_path.display()
+            ));
+        }
+        _ => {
+            return Err(format!(
+                "resolved pliego-ssg {} is ambiguous in {}",
+                package.version,
+                lock_path.display()
+            ));
+        }
+    };
+
+    let source_revision = match package.source.as_deref() {
+        Some(source) if source.starts_with("git+") => {
+            let revision = source
+                .rsplit_once('#')
+                .map(|(_, revision)| revision)
+                .filter(|revision| {
+                    revision.len() == 40 && revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+                })
+                .ok_or_else(|| {
+                    format!(
+                        "resolved pliego-ssg Git source does not contain a full commit: {source}"
+                    )
+                })?;
+            revision.to_ascii_lowercase()
+        }
+        Some(source) if source.starts_with("registry+") || source.starts_with("sparse+") => {
+            let checksum = locked.checksum.as_deref().filter(|checksum| {
+                checksum.len() == 64
+                    && checksum
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+            });
+            format!(
+                "sha256:{}",
+                checksum.ok_or_else(|| {
+                    "resolved registry pliego-ssg is missing a valid Cargo.lock checksum".to_owned()
+                })?
+            )
+        }
+        Some(source) => {
+            return Err(format!(
+                "unsupported resolved source for pliego-ssg provenance: {source}"
+            ));
+        }
+        None => {
+            let Some(captured) = captured else {
+                return Ok(FrameworkEvidence {
+                    version: package.version.clone(),
+                    source_revision: "pending-local-package-content".to_owned(),
+                });
+            };
+            let material_id = cargo_path_material_id(package);
+            let material = captured
+                .materials
+                .iter()
+                .find(|material| material.id == material_id)
+                .ok_or_else(|| {
+                    format!(
+                        "resolved local pliego-ssg has no captured input material {material_id:?}"
+                    )
+                })?;
+            format!("sha256:{}", material.sha256)
+        }
+    };
+    Ok(FrameworkEvidence {
+        version: package.version.clone(),
+        source_revision,
+    })
+}
+
+fn cargo_path_material_id(package: &CargoPackage) -> String {
+    format!("cargo-path/{}@{}", package.name, package.version)
+}
+
+fn write_project_build_context(
+    context: &Context,
+    build_context: &BuildContext,
+    material_specs: &[InputMaterialSpec],
+) -> Result<PathBuf, String> {
+    let relative_directory = Path::new("target/.pliego");
+    create_generated_directory(context, relative_directory, "build context")?;
+    let directory = context.root.join(relative_directory);
+    let path = directory.join(format!(
+        "build-context-{}-{}-{}.json",
+        std::process::id(),
+        BUILD_CONTEXT_SEQUENCE.fetch_add(1, Ordering::Relaxed),
+        SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    let invocation = BuildInvocation {
+        context: build_context.clone(),
+        project_root: context.root.clone(),
+        output_path: path_argument(&context.manifest.project.output)?,
+        material_specs: material_specs.to_vec(),
+    };
+    write_build_invocation(&path, &invocation).map_err(|error| error.to_string())?;
+    validate_existing_generated_ancestors(&context.root, relative_directory, "build context")?;
+    Ok(path)
+}
+
+fn cargo_metadata(root: &Path) -> Result<CargoMetadata, String> {
+    cargo_metadata_with_lock_mode(root, true)
+}
+
+fn prepare_cargo_metadata(root: &Path) -> Result<CargoMetadata, String> {
+    cargo_metadata_with_lock_mode(root, false)?;
+    cargo_metadata(root)
+}
+
+fn cargo_metadata_with_lock_mode(root: &Path, locked: bool) -> Result<CargoMetadata, String> {
+    let mut command = Command::new("cargo");
+    command.args(["metadata", "--format-version=1"]);
+    if locked {
+        command.arg("--locked");
+    }
+    let directory = command_working_directory(root)?;
+    let output = command
+        .current_dir(&directory)
         .output()
         .map_err(|error| format!("cannot run cargo metadata: {error}"))?;
     if !output.status.success() {
@@ -1114,11 +1770,676 @@ fn cargo_metadata(root: &Path) -> Result<serde_json::Value, String> {
         .map_err(|error| format!("invalid cargo metadata: {error}"))
 }
 
-fn cargo_target_directory(metadata: &serde_json::Value) -> Result<PathBuf, String> {
-    metadata["target_directory"]
-        .as_str()
-        .map(PathBuf::from)
-        .ok_or_else(|| "cargo metadata omitted target_directory".to_owned())
+fn validate_cargo_target_directory(
+    context: &Context,
+    metadata: &CargoMetadata,
+) -> Result<PathBuf, String> {
+    if !metadata.target_directory.is_absolute() {
+        return Err(format!(
+            "Cargo metadata target_directory must be absolute: {}",
+            metadata.target_directory.display()
+        ));
+    }
+    portable_absolute_path_tail(&metadata.target_directory, "Cargo target directory")?;
+
+    let raw_target = command_working_directory(&metadata.target_directory)?;
+    let command_root = command_working_directory(&context.root)?;
+    let raw_project_relative = raw_target
+        .strip_prefix(&command_root)
+        .ok()
+        .map(|relative| portable_relative_path(relative, "Cargo target directory"))
+        .transpose()?;
+    let canonical_target =
+        canonical_unlinked_directory(&raw_target, "Cargo target directory", true)?;
+    let canonical_project_relative = canonical_target
+        .strip_prefix(&context.root)
+        .ok()
+        .map(|relative| portable_relative_path(relative, "Cargo target directory"))
+        .transpose()?;
+    let project_relative = raw_project_relative
+        .as_ref()
+        .or(canonical_project_relative.as_ref());
+
+    let state = PortablePath::parse("target/.pliego")
+        .map_err(|error| format!("invalid reserved generated path: {error}"))?;
+    let output = validate_generated_path(&context.manifest.project.output, "project.output")?;
+    let mut generated = vec![("build context", state), ("project.output", output)];
+    if let Some(client) = &context.manifest.client {
+        generated.push((
+            "client.bindgen_output",
+            validate_generated_path(&client.bindgen_output, "client.bindgen_output")?,
+        ));
+    }
+
+    let normal_layout = project_relative.is_some_and(|path| path.as_str() == "target");
+    if normal_layout {
+        let expected = canonical_unlinked_directory(
+            &context.root.join("target"),
+            "default Cargo target directory",
+            true,
+        )?;
+        if canonical_target != expected {
+            return Err(format!(
+                "Cargo target directory aliases the default target/ path: {}",
+                metadata.target_directory.display()
+            ));
+        }
+        let cargo_children = cargo_owned_target_children(context)?;
+        for (label, path) in &generated {
+            validate_generated_path_outside_cargo_layout(path, label, &cargo_children)?;
+        }
+        return Ok(canonical_target);
+    }
+
+    for (label, path) in &generated {
+        if project_relative.is_some_and(|target| generated_paths_overlap(target, path)) {
+            return Err(format!(
+                "Cargo target directory {} overlaps {label} {}; choose disjoint directories",
+                metadata.target_directory.display(),
+                path.as_str()
+            ));
+        }
+        let generated_root =
+            canonical_unlinked_directory(&context.root.join(path.as_str()), label, true)?;
+        if absolute_paths_overlap(&canonical_target, &generated_root) {
+            return Err(format!(
+                "Cargo target directory {} overlaps {label} {}; choose disjoint directories",
+                metadata.target_directory.display(),
+                path.as_str()
+            ));
+        }
+    }
+    Ok(canonical_target)
+}
+
+fn portable_relative_path(path: &Path, label: &str) -> Result<PortablePath, String> {
+    let value = portable_path_components(path, label)?;
+    let portable = PortablePath::parse(&value)
+        .map_err(|error| format!("{label} must be portable: {error}"))?;
+    if portable.as_str() != value {
+        return Err(format!("{label} must use canonical NFC spelling"));
+    }
+    Ok(portable)
+}
+
+fn portable_absolute_path_tail(path: &Path, label: &str) -> Result<PortablePath, String> {
+    portable_relative_path(path, label)
+}
+
+fn portable_path_components(path: &Path, label: &str) -> Result<String, String> {
+    let mut components = Vec::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::Prefix(_) | std::path::Component::RootDir => {}
+            std::path::Component::Normal(component) => components.push(
+                component
+                    .to_str()
+                    .ok_or_else(|| format!("{label} must be valid UTF-8"))?,
+            ),
+            _ => {
+                return Err(format!(
+                    "{label} contains a non-normal component: {}",
+                    path.display()
+                ));
+            }
+        }
+    }
+    if components.is_empty() {
+        return Err(format!("{label} cannot be a filesystem root"));
+    }
+    Ok(components.join("/"))
+}
+
+fn validate_generated_path_outside_cargo_layout(
+    path: &PortablePath,
+    label: &str,
+    cargo_children: &BTreeSet<String>,
+) -> Result<(), String> {
+    let child = path
+        .collision_key()
+        .split('/')
+        .nth(1)
+        .ok_or_else(|| format!("{label} must be below target/"))?;
+    if cargo_children.contains(child) || looks_like_rust_target_triple(child) {
+        return Err(format!(
+            "{label} {} overlaps Cargo-owned target layout {child:?}",
+            path.as_str()
+        ));
+    }
+    Ok(())
+}
+
+fn cargo_owned_target_children(context: &Context) -> Result<BTreeSet<String>, String> {
+    let mut children = [
+        "debug",
+        "release",
+        "doc",
+        "package",
+        "tmp",
+        ".rustc_info.json",
+        "cachedir.tag",
+        "wasm32-unknown-unknown",
+    ]
+    .into_iter()
+    .map(ToOwned::to_owned)
+    .collect::<BTreeSet<_>>();
+
+    let built_in = command_output(&context.root, "rustc", &["--print", "target-list"])
+        .map_err(|error| format!("cannot enumerate Rust target layouts: {error}"))?;
+    for target in built_in.lines().filter(|target| !target.is_empty()) {
+        children.insert(cargo_target_output_child(target)?);
+    }
+    for target in configured_cargo_build_targets(context)? {
+        children.insert(cargo_target_output_child(&target)?);
+    }
+    Ok(children)
+}
+
+fn configured_cargo_build_targets(context: &Context) -> Result<Vec<String>, String> {
+    let cargo_home = cargo_home_directory()?;
+    let mut files = Vec::new();
+    let mut ancestor = Some(context.root.as_path());
+    while let Some(root) = ancestor {
+        for relative in [".cargo/config.toml", ".cargo/config"] {
+            if existing_regular_file_beneath(
+                root,
+                Path::new(relative),
+                "effective Cargo configuration",
+            )?
+            .is_some()
+            {
+                files.push(root.join(relative));
+            }
+        }
+        ancestor = root.parent();
+    }
+    for relative in ["config.toml", "config"] {
+        if existing_regular_file_beneath(
+            &cargo_home,
+            Path::new(relative),
+            "Cargo home configuration",
+        )?
+        .is_some()
+        {
+            files.push(cargo_home.join(relative));
+        }
+    }
+
+    let mut targets = Vec::new();
+    for path in files {
+        let source = fs::read_to_string(&path)
+            .map_err(|error| format!("cannot read Cargo config {}: {error}", path.display()))?;
+        let value: toml::Value = toml::from_str(&source)
+            .map_err(|error| format!("invalid Cargo config {}: {error}", path.display()))?;
+        let Some(target) = value
+            .get("build")
+            .and_then(toml::Value::as_table)
+            .and_then(|build| build.get("target"))
+        else {
+            continue;
+        };
+        match target {
+            toml::Value::String(target) => targets.push(target.clone()),
+            toml::Value::Array(values) => {
+                for target in values {
+                    targets.push(
+                        target
+                            .as_str()
+                            .ok_or_else(|| {
+                                format!(
+                                    "Cargo build.target in {} must contain only strings",
+                                    path.display()
+                                )
+                            })?
+                            .to_owned(),
+                    );
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "Cargo build.target in {} must be a string or string array",
+                    path.display()
+                ));
+            }
+        }
+    }
+    Ok(targets)
+}
+
+fn cargo_target_output_child(target: &str) -> Result<String, String> {
+    let name = target
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| format!("invalid Cargo build target {target:?}"))?;
+    let name = name.strip_suffix(".json").unwrap_or(name);
+    let portable = PortablePath::parse(name)
+        .map_err(|error| format!("Cargo build target {target:?} is not portable: {error}"))?;
+    if portable.as_str() != name || name.contains('/') {
+        return Err(format!(
+            "Cargo build target {target:?} does not have a canonical portable output name"
+        ));
+    }
+    Ok(portable.collision_key().to_owned())
+}
+
+fn looks_like_rust_target_triple(name: &str) -> bool {
+    if name.split('-').count() < 3 {
+        return false;
+    }
+    let architecture = name.split('-').next().unwrap_or_default();
+    matches!(
+        architecture,
+        "aarch64"
+            | "arm"
+            | "avr"
+            | "bpfeb"
+            | "bpfel"
+            | "hexagon"
+            | "i586"
+            | "i686"
+            | "m68k"
+            | "nvptx64"
+            | "s390x"
+            | "x86_64"
+    ) || [
+        "armv",
+        "csky",
+        "loongarch",
+        "mips",
+        "powerpc",
+        "riscv",
+        "sparc",
+        "thumbv",
+        "wasm",
+    ]
+    .iter()
+    .any(|prefix| architecture.starts_with(prefix))
+}
+
+fn absolute_paths_overlap(left: &Path, right: &Path) -> bool {
+    left.starts_with(right) || right.starts_with(left)
+}
+
+#[cfg(test)]
+fn cargo_input_materials(
+    context: &Context,
+    metadata: &CargoMetadata,
+) -> Result<Vec<InputMaterialSpec>, String> {
+    Ok(cargo_input_selection(context, metadata)?.materials)
+}
+
+fn cargo_input_selection(
+    context: &Context,
+    metadata: &CargoMetadata,
+) -> Result<CargoInputSelection, String> {
+    let cargo_home = cargo_home_directory()?;
+    cargo_input_selection_with_home(context, metadata, &cargo_home)
+}
+
+fn cargo_input_selection_with_home(
+    context: &Context,
+    metadata: &CargoMetadata,
+    cargo_home: &Path,
+) -> Result<CargoInputSelection, String> {
+    let project_root = canonical_unlinked_project_root(&context.root)?;
+    if project_root != context.root {
+        return Err("project root changed after canonical discovery".to_owned());
+    }
+    let workspace_root =
+        canonical_unlinked_directory(&metadata.workspace_root, "Cargo workspace root", false)?;
+    let cargo_home = canonical_unlinked_directory(cargo_home, "Cargo home", true)?;
+    if cargo_home.starts_with(&project_root) || project_root.starts_with(&cargo_home) {
+        return Err(format!(
+            "Cargo home {} cannot overlap project root {}",
+            cargo_home.display(),
+            project_root.display()
+        ));
+    }
+
+    let mut project_configuration = Vec::new();
+    for path in [PROJECT_FILE, "Cargo.toml", "Cargo.lock"] {
+        if existing_regular_file_beneath(&project_root, Path::new(path), "project configuration")?
+            .is_some()
+        {
+            project_configuration.push(path.to_owned());
+        }
+    }
+    let mut materials = Vec::new();
+
+    let lockfile = workspace_root.join("Cargo.lock");
+    if existing_regular_file_beneath(
+        &workspace_root,
+        Path::new("Cargo.lock"),
+        "Cargo workspace lockfile",
+    )?
+    .is_none()
+    {
+        return Err(format!(
+            "Cargo did not materialize the effective workspace lockfile at {}",
+            lockfile.display()
+        ));
+    }
+    materials.push(
+        InputMaterialSpec::files(
+            "cargo-lock",
+            "cargo-lock",
+            &workspace_root,
+            vec!["Cargo.lock".to_owned()],
+        )
+        .map_err(|error| error.to_string())?,
+    );
+    if existing_regular_file_beneath(
+        &workspace_root,
+        Path::new("Cargo.toml"),
+        "Cargo workspace manifest",
+    )?
+    .is_none()
+    {
+        return Err(format!(
+            "Cargo workspace manifest is missing at {}",
+            workspace_root.join("Cargo.toml").display()
+        ));
+    }
+    materials.push(
+        InputMaterialSpec::files(
+            "cargo-workspace-config",
+            "cargo-workspace-config",
+            &workspace_root,
+            vec!["Cargo.toml".to_owned()],
+        )
+        .map_err(|error| error.to_string())?,
+    );
+
+    let (mut local_configuration, mut external_configuration) =
+        effective_configuration_materials(&project_root, &cargo_home)?;
+    project_configuration.append(&mut local_configuration);
+    materials.append(&mut external_configuration);
+
+    let reachable = reachable_package_ids(context, metadata)?;
+    for package in &metadata.packages {
+        if !reachable.contains(&package.id) || package.source.is_some() {
+            continue;
+        }
+        let package_root = package.manifest_path.parent().ok_or_else(|| {
+            format!(
+                "cargo metadata package {:?} has no manifest root",
+                package.name
+            )
+        })?;
+        let package_root = canonical_unlinked_directory(
+            package_root,
+            &format!("path package {:?}", package.name),
+            false,
+        )?;
+        let inside_project = package_root.starts_with(&project_root);
+        if inside_project && package.name != "pliego-ssg" {
+            continue;
+        }
+        if (!inside_project && project_root.starts_with(&package_root))
+            || materials.iter().any(|material| {
+                material.included_paths.is_empty()
+                    && (package_root.starts_with(&material.root)
+                        || material.root.starts_with(&package_root))
+            })
+        {
+            return Err(format!(
+                "local package root {} overlaps another build input root",
+                package_root.display()
+            ));
+        }
+        materials.push(
+            InputMaterialSpec::tree(
+                cargo_path_material_id(package),
+                "cargo-path-package",
+                package_root,
+                Vec::new(),
+            )
+            .map_err(|error| error.to_string())?,
+        );
+    }
+    project_configuration.sort();
+    project_configuration.dedup();
+    materials.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(CargoInputSelection {
+        project_configuration,
+        materials,
+    })
+}
+
+fn cargo_home_directory() -> Result<PathBuf, String> {
+    if let Some(value) = std::env::var_os("CARGO_HOME") {
+        if value.is_empty() {
+            return Err("CARGO_HOME cannot be empty for a verified build".to_owned());
+        }
+        let path = PathBuf::from(value);
+        if !path.is_absolute() {
+            return Err(format!(
+                "CARGO_HOME must be absolute for a verified build: {}",
+                path.display()
+            ));
+        }
+        return canonical_unlinked_directory(&path, "Cargo home", true);
+    }
+
+    #[cfg(windows)]
+    let home = std::env::var_os("USERPROFILE").or_else(|| {
+        let drive = std::env::var_os("HOMEDRIVE")?;
+        let path = std::env::var_os("HOMEPATH")?;
+        let mut home = PathBuf::from(drive);
+        home.push(path);
+        Some(home.into_os_string())
+    });
+    #[cfg(not(windows))]
+    let home = std::env::var_os("HOME");
+
+    let home = home.ok_or_else(|| {
+        "cannot resolve Cargo home; set CARGO_HOME to an absolute, non-linked directory".to_owned()
+    })?;
+    canonical_unlinked_directory(&PathBuf::from(home).join(".cargo"), "Cargo home", true)
+}
+
+fn effective_configuration_materials(
+    project_root: &Path,
+    cargo_home: &Path,
+) -> Result<(Vec<String>, Vec<InputMaterialSpec>), String> {
+    const ANCESTOR_FILES: [&str; 4] = [
+        ".cargo/config.toml",
+        ".cargo/config",
+        "rust-toolchain.toml",
+        "rust-toolchain",
+    ];
+    const CARGO_HOME_FILES: [&str; 2] = ["config.toml", "config"];
+
+    let mut project_configuration = Vec::new();
+    let mut materials = Vec::new();
+    let mut selected_absolute = BTreeSet::new();
+    let mut ancestor = Some(project_root);
+    let mut selected_ancestor = 0usize;
+    while let Some(root) = ancestor {
+        let mut selected = Vec::new();
+        for relative in ANCESTOR_FILES {
+            if existing_regular_file_beneath(
+                root,
+                Path::new(relative),
+                "effective Cargo or Rust toolchain configuration",
+            )?
+            .is_some()
+            {
+                let absolute = root.join(relative);
+                let cargo_home_equivalent = match relative {
+                    ".cargo/config.toml" => Some(cargo_home.join("config.toml")),
+                    ".cargo/config" => Some(cargo_home.join("config")),
+                    _ => None,
+                };
+                if cargo_home_equivalent.as_ref() == Some(&absolute) {
+                    continue;
+                }
+                selected_absolute.insert(absolute);
+                if root == project_root {
+                    project_configuration.push(relative.to_owned());
+                } else {
+                    selected.push(relative.to_owned());
+                }
+            }
+        }
+        if !selected.is_empty() {
+            materials.push(
+                InputMaterialSpec::files(
+                    format!("cargo-config/ancestor-{selected_ancestor:03}"),
+                    "cargo-ancestor-config",
+                    root,
+                    selected,
+                )
+                .map_err(|error| error.to_string())?,
+            );
+            selected_ancestor = selected_ancestor
+                .checked_add(1)
+                .ok_or_else(|| "Cargo configuration ancestor count overflowed".to_owned())?;
+        }
+        ancestor = root.parent();
+    }
+
+    let mut cargo_home_files = Vec::new();
+    for relative in CARGO_HOME_FILES {
+        if existing_regular_file_beneath(
+            cargo_home,
+            Path::new(relative),
+            "Cargo home configuration",
+        )?
+        .is_some()
+        {
+            let absolute = cargo_home.join(relative);
+            if !selected_absolute.contains(&absolute) {
+                cargo_home_files.push(relative.to_owned());
+            }
+        }
+    }
+    if !cargo_home_files.is_empty() {
+        materials.push(
+            InputMaterialSpec::files(
+                "cargo-config/home",
+                "cargo-home-config",
+                cargo_home,
+                cargo_home_files,
+            )
+            .map_err(|error| error.to_string())?,
+        );
+    }
+    Ok((project_configuration, materials))
+}
+
+fn existing_regular_file_beneath(
+    root: &Path,
+    relative: &Path,
+    label: &str,
+) -> Result<Option<()>, String> {
+    if !relative
+        .components()
+        .all(|component| matches!(component, std::path::Component::Normal(_)))
+    {
+        return Err(format!("{label} path must be relative and normal"));
+    }
+    let mut current = root.to_owned();
+    let components = relative.components().collect::<Vec<_>>();
+    for (index, component) in components.iter().enumerate() {
+        current.push(component.as_os_str());
+        let metadata = match fs::symlink_metadata(&current) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => {
+                return Err(format!(
+                    "cannot inspect {label} {}: {error}",
+                    current.display()
+                ));
+            }
+        };
+        if link_like(&metadata) {
+            return Err(format!(
+                "{label} cannot traverse a symbolic link or junction: {}",
+                current.display()
+            ));
+        }
+        let final_component = index + 1 == components.len();
+        if final_component {
+            if !metadata.is_file() {
+                return Err(format!(
+                    "{label} is not a regular file: {}",
+                    current.display()
+                ));
+            }
+        } else if !metadata.is_dir() {
+            return Err(format!(
+                "{label} ancestor is not a directory: {}",
+                current.display()
+            ));
+        }
+    }
+    Ok(Some(()))
+}
+
+fn reachable_package_ids(
+    context: &Context,
+    metadata: &CargoMetadata,
+) -> Result<BTreeSet<String>, String> {
+    let project_root = context
+        .root
+        .canonicalize()
+        .map_err(|error| format!("cannot canonicalize project root: {error}"))?;
+    let site_roots = metadata
+        .packages
+        .iter()
+        .filter(|package| package.name == context.manifest.project.site_package)
+        .filter_map(|package| {
+            let package_root = package.manifest_path.parent()?.canonicalize().ok()?;
+            package_root
+                .starts_with(&project_root)
+                .then(|| package.id.clone())
+        })
+        .collect::<Vec<_>>();
+    if site_roots.len() != 1 {
+        return Err(format!(
+            "Cargo resolution must contain exactly one site package {:?} below the project root",
+            context.manifest.project.site_package
+        ));
+    }
+    let mut root_ids = site_roots;
+    if let Some(client) = &context.manifest.client {
+        let matches = metadata
+            .packages
+            .iter()
+            .filter(|package| package.name == client.package)
+            .map(|package| package.id.clone())
+            .collect::<Vec<_>>();
+        if matches.len() != 1 {
+            return Err(format!(
+                "Cargo resolution must contain exactly one client package {:?}",
+                client.package
+            ));
+        }
+        root_ids.extend(matches);
+    }
+    let nodes = &metadata
+        .resolve
+        .as_ref()
+        .ok_or_else(|| "cargo metadata omitted the resolved dependency graph".to_owned())?
+        .nodes;
+    let dependencies = nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node.dependencies.as_slice()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut reachable = BTreeSet::new();
+    let mut pending = root_ids;
+    while let Some(id) = pending.pop() {
+        if !reachable.insert(id.clone()) {
+            continue;
+        }
+        let next = dependencies.get(id.as_str()).ok_or_else(|| {
+            format!("Cargo dependency graph omitted a node for resolved package {id:?}")
+        })?;
+        pending.extend(next.iter().cloned());
+    }
+    Ok(reachable)
 }
 
 fn path_argument(path: &Path) -> Result<String, String> {
@@ -1128,11 +2449,26 @@ fn path_argument(path: &Path) -> Result<String, String> {
 }
 
 fn execute(root: &Path, program: &str, arguments: &[&str]) -> Result<(), String> {
-    let mut child = Command::new(program)
+    execute_with_environment(root, program, arguments, None)
+}
+
+fn execute_with_environment(
+    root: &Path,
+    program: &str,
+    arguments: &[&str],
+    environment: Option<(&str, &Path)>,
+) -> Result<(), String> {
+    let directory = command_working_directory(root)?;
+    let mut command = Command::new(program);
+    command
         .args(arguments)
-        .current_dir(root)
+        .current_dir(&directory)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some((name, value)) = environment {
+        command.env(name, value);
+    }
+    let mut child = command
         .spawn()
         .map_err(|error| format!("cannot run {program}: {error}"))?;
     let stdout = child
@@ -1170,6 +2506,22 @@ fn execute(root: &Path, program: &str, arguments: &[&str]) -> Result<(), String>
     }
 }
 
+struct FileCleanup {
+    path: PathBuf,
+}
+
+impl FileCleanup {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
+impl Drop for FileCleanup {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
 fn tee_command_output(mut source: impl Read, error_stream: bool) -> String {
     let mut captured = Vec::new();
     let mut buffer = [0_u8; 16 * 1024];
@@ -1197,33 +2549,39 @@ fn tee_command_output(mut source: impl Read, error_stream: bool) -> String {
     String::from_utf8_lossy(&captured).into_owned()
 }
 
-fn inspect(manifest: &Path) -> Result<(), String> {
-    let files = read_build_files(manifest)?;
-    let bytes: u64 = files.iter().filter_map(|file| file["bytes"].as_u64()).sum();
-    let html = files
-        .iter()
-        .filter(|file| {
-            file["path"]
-                .as_str()
-                .is_some_and(|path| path.ends_with(".html"))
-        })
-        .count();
-    println!(
-        "PLIEGO inspect: {html} HTML routes / {} files / {bytes} bytes",
-        files.len()
-    );
-    Ok(())
+fn verify_project_build(
+    context: &Context,
+    output_root: &Path,
+) -> Result<pliego_artifact::VerifiedBuild, String> {
+    validate_reproducible_command_context(context)?;
+    let verified = verify_build_report(output_root).map_err(|error| error.to_string())?;
+    let metadata = cargo_metadata(&context.root)?;
+    validate_cargo_target_directory(context, &metadata)?;
+    let (expected, _) = capture_project_build_context(context, &metadata)?;
+    if verified.report.receipt.context != expected {
+        return Err(
+            "artifact receipt does not match the current project, sources, configuration, or toolchain"
+                .to_owned(),
+        );
+    }
+    Ok(verified)
 }
 
-fn read_build_files(manifest: &Path) -> Result<Vec<serde_json::Value>, String> {
-    let bytes = fs::read(manifest)
-        .map_err(|error| format!("missing build ledger {}: {error}", manifest.display()))?;
-    let value: serde_json::Value = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("invalid build ledger {}: {error}", manifest.display()))?;
-    value["files"]
-        .as_array()
-        .cloned()
-        .ok_or_else(|| format!("invalid build ledger {}: missing files", manifest.display()))
+fn inspect(context: &Context) -> Result<(), String> {
+    let output_root = context.root.join(&context.manifest.project.output);
+    let verified = verify_project_build(context, &output_root)?;
+    let files = &verified.report.receipt.outputs.files;
+    let html = files
+        .iter()
+        .filter(|file| file.path.ends_with(".html"))
+        .count();
+    println!(
+        "PLIEGO inspect: VERIFIED {} / {html} HTML routes / {} files / {} bytes",
+        &verified.report.receipt_sha256[..12],
+        verified.files,
+        verified.bytes
+    );
+    Ok(())
 }
 
 enum DevFailure {
@@ -1270,6 +2628,7 @@ impl DevState {
 }
 
 fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
+    validate_reproducible_command_context(context).map_err(DevFailure::Project)?;
     let initial_failure = match build(context) {
         Ok(()) => None,
         Err(error) => {
@@ -1394,7 +2753,7 @@ fn file_digest(path: &Path) -> Result<[u8; 32], String> {
 
 fn should_ignore_directory(relative: &Path, output: &Path) -> bool {
     relative.starts_with(output)
-        || relative.components().any(|component| {
+        || relative.components().next().is_some_and(|component| {
             matches!(
                 component.as_os_str().to_str(),
                 Some(".git" | "target" | "node_modules")
@@ -1406,9 +2765,23 @@ fn should_ignore_development_file(relative: &Path) -> bool {
     let Some(name) = relative.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
-    name.starts_with('.')
-        && (name.ends_with(".pliego.lock")
-            || (name.contains(".pliego-") && (name.ends_with(".tmp") || name.ends_with(".bak"))))
+    let Some(private) = name.strip_prefix(".pliego-") else {
+        return false;
+    };
+    if private.len() <= 64 {
+        return false;
+    }
+    let (token, suffix) = private.split_at(64);
+    token
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+        && (suffix == ".lock"
+            || suffix
+                .strip_prefix("-stage-")
+                .is_some_and(|value| !value.is_empty())
+            || suffix
+                .strip_prefix("-backup-")
+                .is_some_and(|value| !value.is_empty()))
 }
 
 fn serve(root: PathBuf, options: ServerOptions, mode: &str) -> Result<(), String> {
@@ -1812,6 +3185,7 @@ mod tests {
         let manifest: ProjectManifest = toml::from_str(
             r#"
                 [project]
+                id = "example-site"
                 name = "Example"
                 site_package = "example-site"
                 output = "target/example"
@@ -1832,6 +3206,7 @@ mod tests {
         let manifest: ProjectManifest = toml::from_str(
             r#"
                 [project]
+                id = "bad-site"
                 name = "Bad"
                 site_package = "bad-site"
                 output = "../outside"
@@ -1842,14 +3217,241 @@ mod tests {
     }
 
     #[test]
+    fn project_manifest_requires_a_stable_portable_owner_id() {
+        for id in ["pliego-site", "site2"] {
+            let manifest: ProjectManifest = toml::from_str(&format!(
+                r#"
+                    [project]
+                    id = "{id}"
+                    name = "Portable"
+                    site_package = "portable-site"
+                    output = "target/site"
+                "#
+            ))
+            .expect("parseable manifest");
+            assert!(
+                validate_manifest(&manifest).is_ok(),
+                "valid id rejected: {id}"
+            );
+        }
+
+        for id in ["", "Uppercase", "starts_with_underscore", "two words"] {
+            let manifest: ProjectManifest = toml::from_str(&format!(
+                r#"
+                    [project]
+                    id = "{id}"
+                    name = "Portable"
+                    site_package = "portable-site"
+                    output = "target/site"
+                "#
+            ))
+            .expect("parseable manifest");
+            assert!(
+                validate_manifest(&manifest).is_err(),
+                "non-portable id accepted: {id:?}"
+            );
+        }
+    }
+
+    #[test]
     fn generated_paths_cannot_target_project_sources_or_windows_prefixes() {
         assert!(validate_generated_path(Path::new("target/site"), "output").is_ok());
-        for path in [".", "target", "src", "../outside", r"\outside", "C:outside"] {
+        for path in [
+            ".",
+            "target",
+            "src",
+            "../outside",
+            r"\outside",
+            "C:outside",
+            "TARGET/site",
+            "target/CON",
+            "target/site.",
+            "target/cafe\u{301}",
+        ] {
             assert!(
                 validate_generated_path(Path::new(path), "output").is_err(),
                 "unsafe generated path accepted: {path}"
             );
         }
+    }
+
+    #[test]
+    fn generated_manifest_paths_are_pairwise_disjoint_from_reserved_state() {
+        let manifest = |output: &str, bindgen: &str| {
+            toml::from_str::<ProjectManifest>(&format!(
+                r#"
+                    [project]
+                    id = "path-proof"
+                    name = "Path Proof"
+                    site_package = "path-proof"
+                    output = "{output}"
+
+                    [client]
+                    package = "path-proof-client"
+                    wasm_name = "path_proof_client"
+                    bindgen_output = "{bindgen}"
+                "#
+            ))
+            .expect("parse manifest fixture")
+        };
+        assert!(validate_manifest(&manifest("target/site", "target/client/pkg")).is_ok());
+        for (output, bindgen) in [
+            ("target/.pliego", "target/client"),
+            ("target/.pliego/site", "target/client"),
+            ("target/site", "target/.pliego/cache"),
+            ("target/.PLIEGO/site", "target/client"),
+            ("target/site", "target/site/client"),
+            ("target/site/client", "target/site"),
+            ("target/Site", "target/site/client"),
+            ("target/Stra\u{df}e", "target/STRASSE/client"),
+            ("target/\u{ff26}\u{ff2f}\u{ff2f}", "target/foo/client"),
+        ] {
+            assert!(
+                validate_manifest(&manifest(output, bindgen)).is_err(),
+                "overlapping generated paths were accepted: {output}, {bindgen}"
+            );
+        }
+    }
+
+    #[test]
+    fn command_output_uses_the_requested_project_root() {
+        let root = std::env::temp_dir().join(format!(
+            "pliego-command-root-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let canonical = root.canonicalize().unwrap();
+
+        #[cfg(windows)]
+        let reported = command_output(
+            &canonical,
+            "powershell.exe",
+            &[
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "(Get-Location).Path",
+            ],
+        )
+        .unwrap();
+        #[cfg(not(windows))]
+        let reported = command_output(&canonical, "pwd", &[]).unwrap();
+
+        let reported = reported
+            .strip_prefix("Microsoft.PowerShell.Core\\FileSystem::")
+            .unwrap_or(&reported);
+        assert_eq!(
+            cargo_path(reported).to_ascii_lowercase(),
+            cargo_path(canonical.to_str().unwrap()).to_ascii_lowercase(),
+            "tool discovery must run from the discovered project root"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn reproducible_commands_reject_undeclared_cargo_and_rustc_overrides() {
+        for name in [
+            "RUSTC",
+            "rustc_wrapper",
+            "RUSTC_WORKSPACE_WRAPPER",
+            "RUSTC_BOOTSTRAP",
+            "RUSTFLAGS",
+            "CARGO_ENCODED_RUSTFLAGS",
+            "CARGO_INCREMENTAL",
+            "CARGO_BUILD_TARGET",
+            "CARGO_PROFILE_RELEASE_LTO",
+            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
+        ] {
+            assert!(
+                forbidden_build_environment_name(OsStr::new(name)),
+                "override was accepted: {name}"
+            );
+        }
+        for name in ["CARGO_TARGET_DIR", "CARGO_HOME", "RUSTUP_TOOLCHAIN", "PATH"] {
+            assert!(
+                !forbidden_build_environment_name(OsStr::new(name)),
+                "supported environment was rejected: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn loaded_context_requires_a_canonical_root_and_current_manifest() {
+        let base = std::env::temp_dir().join(format!(
+            "pliego-context-proof-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        fs::write(
+            base.join(PROJECT_FILE),
+            "[project]\nid = \"context-proof\"\nname = \"Proof\"\nsite_package = \"proof\"\noutput = \"target/site\"\n",
+        )
+        .unwrap();
+        let root = base.canonicalize().unwrap();
+        let manifest: ProjectManifest =
+            toml::from_str(&fs::read_to_string(root.join(PROJECT_FILE)).unwrap()).unwrap();
+        let context = Context {
+            root: root.clone(),
+            manifest: manifest.clone(),
+        };
+        validate_loaded_context(&context).expect("canonical current context");
+
+        let noncanonical = Context {
+            root: PathBuf::from("."),
+            manifest: manifest.clone(),
+        };
+        assert!(validate_loaded_context(&noncanonical).is_err());
+
+        fs::write(
+            root.join(PROJECT_FILE),
+            "[project]\nid = \"context-proof\"\nname = \"Changed\"\nsite_package = \"proof\"\noutput = \"target/site\"\n",
+        )
+        .unwrap();
+        assert!(validate_loaded_context(&context).is_err());
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    #[cfg(any(unix, windows))]
+    fn generated_path_validation_rejects_linked_ancestors() {
+        let base = std::env::temp_dir().join(format!(
+            "pliego-generated-link-proof-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = base.join("project");
+        let outside = base.join("outside");
+        fs::create_dir_all(&project).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        #[cfg(unix)]
+        let linked = std::os::unix::fs::symlink(&outside, project.join("target"));
+        #[cfg(windows)]
+        let linked = std::os::windows::fs::symlink_dir(&outside, project.join("target"));
+        if linked.is_err() {
+            let _ = fs::remove_dir_all(base);
+            return;
+        }
+        let project = project.canonicalize().unwrap();
+        assert!(
+            validate_existing_generated_ancestors(
+                &project,
+                Path::new("target/site"),
+                "project.output"
+            )
+            .is_err()
+        );
+        let _ = fs::remove_dir_all(base);
     }
 
     #[test]
@@ -2058,25 +3660,80 @@ mod tests {
             Path::new("src"),
             Path::new("dist")
         ));
+        assert!(!should_ignore_directory(
+            Path::new("src/target"),
+            Path::new("dist")
+        ));
+        assert!(!should_ignore_directory(
+            Path::new("src/node_modules"),
+            Path::new("dist")
+        ));
     }
 
     #[test]
     fn development_snapshot_ignores_atomic_publication_coordination_files() {
-        assert!(should_ignore_development_file(Path::new(
-            "assets/.pliego.css.pliego.lock"
-        )));
-        assert!(should_ignore_development_file(Path::new(
-            "assets/.pliego.css.pliego-123-0.tmp"
-        )));
-        assert!(should_ignore_development_file(Path::new(
-            "assets/.pliego.css.pliego-123-0.bak"
-        )));
+        let token = "a".repeat(64);
+        assert!(should_ignore_development_file(Path::new(&format!(
+            "assets/.pliego-{token}.lock"
+        ))));
+        assert!(should_ignore_development_file(Path::new(&format!(
+            "assets/.pliego-{token}-stage-123-0"
+        ))));
+        assert!(should_ignore_development_file(Path::new(&format!(
+            "assets/.pliego-{token}-backup-123-0"
+        ))));
         assert!(!should_ignore_development_file(Path::new(
             "assets/pliego.css"
         )));
         assert!(!should_ignore_development_file(Path::new(
             "assets/.keep.tmp"
         )));
+        assert!(!should_ignore_development_file(Path::new(
+            "assets/.pliego.css.pliego.lock"
+        )));
+        assert!(!should_ignore_development_file(Path::new(&format!(
+            "assets/.pliego-{}-stage-123-0",
+            "A".repeat(64)
+        ))));
+    }
+
+    #[test]
+    fn development_snapshot_tracks_nested_target_but_ignores_root_target() {
+        let root = std::env::temp_dir().join(format!(
+            "pliego-watch-root-only-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let nested = root.join("src/target/input.txt");
+        let generated = root.join("target/generated.txt");
+        fs::create_dir_all(nested.parent().unwrap()).unwrap();
+        fs::create_dir_all(generated.parent().unwrap()).unwrap();
+        fs::write(&nested, b"before").unwrap();
+        fs::write(&generated, b"before").unwrap();
+
+        let before = project_snapshot(&root, Path::new("dist")).unwrap();
+        assert!(
+            before
+                .iter()
+                .any(|file| file.path == Path::new("src/target/input.txt"))
+        );
+        assert!(
+            !before
+                .iter()
+                .any(|file| file.path == Path::new("target/generated.txt"))
+        );
+
+        fs::write(&nested, b"change").unwrap();
+        let nested_changed = project_snapshot(&root, Path::new("dist")).unwrap();
+        assert_ne!(nested_changed, before);
+
+        fs::write(&generated, b"change").unwrap();
+        let root_target_changed = project_snapshot(&root, Path::new("dist")).unwrap();
+        assert_eq!(root_target_changed, nested_changed);
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

@@ -86,6 +86,10 @@ artifact outside the validated manifest.
 - Recipes allow at most 512 sources, 4,096 jobs, 2 GiB per source/artifact, and
   8 GiB each of source material and staged artifacts per plan. Aggregate staged
   bytes are checked before any artifact validation or hashing.
+- These are processing-plan ceilings, not the static-site publication budget.
+  Receipt v2 publication is intentionally narrower: at most 512 MiB per output
+  file and 4 GiB for the complete payload set. Larger processed media must be
+  split or delivered through a separately verified external origin.
 - Unknown JSON fields, duplicate IDs, duplicate toolchain pins, unpinned
   capabilities, malformed hashes, incompatible operations, and forged decoded
   memory or geometry estimates are rejected.

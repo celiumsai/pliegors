@@ -1,4 +1,5 @@
 [project]
+id = "minimal-pliego"
 name = "Minimal PliegoRS"
 site_package = "minimal-pliego"
 output = "target/site"

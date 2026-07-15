@@ -14,12 +14,30 @@ for (const project of projects) {
   const output = path.join(project, "target", "site");
   const ledgerPath = path.join(output, "pliego.build.json");
   const ledger = JSON.parse(await readFile(ledgerPath, "utf8"));
-  if (ledger.reportVersion !== "1.0.0" || !Array.isArray(ledger.files)) {
+  const files = ledger?.receipt?.outputs?.files;
+  if (
+    ledger.reportVersion !== "2.0.0" ||
+    ledger.receipt?.receiptVersion !== "2.0.0" ||
+    !Array.isArray(files)
+  ) {
     throw new Error(`${project}: invalid PliegoRS build ledger`);
+  }
+  const receiptDigest = createHash("sha256")
+    .update(JSON.stringify(ledger.receipt))
+    .digest("hex");
+  const outputDigest = createHash("sha256")
+    .update(JSON.stringify(files))
+    .digest("hex");
+  if (
+    receiptDigest !== ledger.receiptSha256 ||
+    outputDigest !== ledger.receipt.outputs.sha256 ||
+    files.length !== ledger.receipt.outputs.fileCount
+  ) {
+    throw new Error(`${project}: self-inconsistent or tampered PliegoRS artifact receipt`);
   }
 
   const tracked = new Set();
-  for (const file of ledger.files) {
+  for (const file of files) {
     const absolute = path.join(output, ...file.path.split("/"));
     const bytes = await readFile(absolute);
     const digest = createHash("sha256").update(bytes).digest("hex");
@@ -67,9 +85,12 @@ for (const project of projects) {
     }
   }
 
-  const totalBytes = ledger.files.reduce((sum, file) => sum + file.bytes, 0);
+  const totalBytes = files.reduce((sum, file) => sum + file.bytes, 0);
+  if (totalBytes !== ledger.receipt.outputs.totalBytes) {
+    throw new Error(`${project}: invalid receipt byte total`);
+  }
   process.stdout.write(
-    `starter PASS ${path.basename(project)}: ${htmlFiles.length} routes / ${ledger.files.length} files / ${totalBytes} bytes\n`,
+    `starter PASS ${path.basename(project)}: ${htmlFiles.length} routes / ${files.length} files / ${totalBytes} bytes\n`,
   );
 }
 

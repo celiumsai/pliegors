@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "PliegoRS site: {} routes and {} files -> {}",
         route_count,
-        report.files.len(),
+        report.receipt.outputs.files.len(),
         output.display()
     );
     Ok(())

@@ -358,7 +358,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "PLIEGO cinematic build: {} files -> {}",
-        report.files.len(),
+        report.receipt.outputs.files.len(),
         output.display()
     );
     Ok(())

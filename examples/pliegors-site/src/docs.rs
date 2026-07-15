@@ -488,11 +488,12 @@ fn project_structure(locale: Locale) -> View {
             paragraph(locale, "A site can remain one Rust package or grow into a workspace with a native site package and a separate cdylib browser client. The manifest owns that boundary explicitly.", "Un sitio puede permanecer como un paquete Rust o crecer hacia un workspace con un paquete nativo del sitio y un cliente de navegador cdylib separado. El manifest controla ese límite explícitamente."),
         ]),
         doc_section(locale, "manifest", "pliego.toml", "pliego.toml", vec![
-            code_block(locale, "toml", "[project]\nname = \"My App\"\nsite_package = \"my-app\"\noutput = \"target/site\""),
+            code_block(locale, "toml", "[project]\nid = \"my-app\"\nname = \"My App\"\nsite_package = \"my-app\"\noutput = \"target/site\""),
             paragraph(locale, "Generated paths must stay inside the project, use portable names, and avoid the source tree. The nearest pliego.toml defines the active project for every CLI command.", "Las rutas generadas deben permanecer dentro del proyecto, usar nombres portables y evitar el árbol de fuentes. El pliego.toml más cercano define el proyecto activo para cada comando del CLI."),
         ]),
         doc_section(locale, "packages", "Site and client packages", "Paquetes de sitio y cliente", vec![
             definition_list(locale, &[
+                ("id", "A stable portable identity that owns the artifact lineage", "Una identidad portable estable que posee el linaje de artefactos"),
                 ("site_package", "A native binary that authors complete pages and writes the output ledger", "Un binario nativo que crea páginas completas y escribe el ledger de salida"),
                 ("client.package", "An optional cdylib compiled to wasm32-unknown-unknown", "Un cdylib opcional compilado a wasm32-unknown-unknown"),
                 ("client.bindgen_output", "Generated JS/WASM glue consumed by the site package", "Glue JS/WASM generado y consumido por el paquete del sitio"),

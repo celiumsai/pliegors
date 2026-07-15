@@ -15,6 +15,7 @@ source workspace.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
+| `id` | yes | Stable portable ownership identity recorded in artifact receipts |
 | `name` | yes | Human-readable project identity used in command output |
 | `site_package` | yes | Cargo package that owns routes, documents, and output |
 | `output` | yes | Relative build directory |
@@ -29,8 +30,13 @@ source workspace.
 
 The entire table is optional for projects without browser-side Rust.
 
-The parser denies unknown fields, empty package identifiers, absolute paths,
-parent-directory traversal, and invalid WASM artifact identifiers.
+The parser denies unknown fields, invalid project identities, empty package
+identifiers, absolute paths, parent-directory traversal, and invalid WASM
+artifact identifiers. `project.id` must start with a lowercase ASCII letter,
+contain only lowercase ASCII letters, digits, or hyphens, and be at most 64
+characters. Keep it stable across machines and builds. Changing it creates a
+different ownership identity, so the new project cannot overwrite output owned
+by the old ID.
 
 ## Commands
 
@@ -54,12 +60,55 @@ site output.
 
 `pliego build` executes this pipeline:
 
-1. Parse and validate `pliego.toml`.
-2. Compile the optional client package for `wasm32-unknown-unknown` in release
-   mode.
-3. Run `wasm-bindgen --target web --no-typescript` when a client exists.
-4. Run the declared site package with the configured output path.
-5. Require the site to emit the deterministic `pliego.build.json` ledger.
+1. Validate the canonical project root, current `pliego.toml`, environment, and
+   disjoint generated paths.
+2. Materialize the effective lockfile, repeat Cargo metadata with `--locked`,
+   and resolve the site/client graph and exactly one reachable `pliego-ssg`.
+3. Capture project sources, effective configuration, supported toolchains,
+   framework provenance, and reachable local materials into a build context;
+   write its private roots and selections to the ephemeral invocation sidecar.
+4. Compile the optional client package for `wasm32-unknown-unknown` in release
+   mode, with the captured inputs revalidated immediately before and after.
+5. Run `wasm-bindgen --target web --no-typescript` when a client exists, again
+   bracketed by input revalidation.
+6. Run the declared site package with the configured output path and the
+   ephemeral build-invocation sidecar.
+7. Require the site to emit a deterministic `pliego.build.json` v2 report, then
+   recalculate both build inputs and the exact output set before accepting the
+   build.
+
+The first metadata pass may materialize an absent effective workspace
+`Cargo.lock`; capture happens only after that pass. The build itself, subsequent
+metadata checks, `inspect`, and `preview` use locked resolution. The public
+receipt aggregates reachable external path-package evidence without publishing
+absolute roots or individual leaf names. Private roots exist only in the
+bounded sidecar under `target/.pliego`, which is removed after the site process
+returns.
+
+`check`, `build`, `dev`, `preview`, and `inspect` reject build-affecting
+environment overrides: `RUSTC`, compiler wrappers, `RUSTC_BOOTSTRAP`, Rust
+flags, `CARGO_INCREMENTAL`, and the `CARGO_BUILD_*`, `CARGO_PROFILE_*`, or
+`CARGO_TARGET_*` families other than `CARGO_TARGET_DIR`. Effective
+`.cargo/config.toml`, `.cargo/config`, `rust-toolchain.toml`, and
+`rust-toolchain` files are captured from the project and its ancestors;
+`config.toml` and `config` are also captured from the resolved `CARGO_HOME`.
+Intentional file-based settings must live in one of those locations so the
+artifact receipt binds their contents. `CARGO_TARGET_DIR` remains an allowed
+selector rather than a receipt field; R1 does not claim a hermetic environment.
+After every Cargo metadata pass, its resolved target directory is checked for
+portable/canonical spelling and overlap with the configured output, bindgen
+directory, and `target/.pliego`. The normal project `target/` layout also
+reserves Cargo's standard directories, built-in Rust targets, and the effective
+configured `build.target`; validation happens before compilation can write into
+a publication root.
+
+This is the only production publication path. `Site::build` requires the
+complete `BuildInvocation` delivered through `PLIEGO_BUILD_CONTEXT`; it fails
+before publication when that invocation is absent. The lower-level
+context-bearing SSG entry point exists only for framework tests, so application
+code cannot opt into a partial Cargo input graph. The invocation binds the
+portable `project.output` value as `outputPath`; another relative or absolute
+destination is rejected before the SSG opens its parent.
 
 The client build intentionally follows stable Rust's
 `wasm32-unknown-unknown` panic policy. A panic traps and terminates that WASM
@@ -73,26 +122,80 @@ project files, and rebuilds after a debounced change. A failed rebuild leaves
 the last valid site available and the watcher alive. Development HTML receives
 a small EventSource hook that reloads after the next successful build; this
 hook is never written to production output. Generated directories (`target`,
-`node_modules`, `.git`, and the configured output) are excluded from watching. Files in the
-reserved atomic-publication namespace (`.*.pliego.lock` and the adjacent
-`.*.pliego-<process>-<sequence>.tmp|bak` transaction files) are also excluded: only a changed final
-artifact or manifest destination may trigger a site rebuild. Snapshots include a streaming SHA-256
-fingerprint per source file, so edits
+`node_modules`, `.git`, and the configured output) are excluded from watching.
+Current SSG coordination entries are sibling
+`.pliego-<output-sha256>-stage-<process>-<sequence>` and
+`.pliego-<output-sha256>-backup-<process>-<sequence>` directories plus the
+`.pliego-<output-sha256>.lock` file. The digest comes from the portable
+collision key of the output leaf, keeping names below filesystem limits and
+making case/Unicode aliases contend on the same lock. Because generated outputs
+and their siblings live below `target`, the watcher ignores that root tree
+wholesale rather than observing publication churn. Nested source directories
+named `target`, `node_modules`, or `.git` remain observable. Snapshots include a
+streaming SHA-256 fingerprint per
+source file, so edits
 remain observable even when byte length and filesystem timestamps coincide.
 Use `--lan` for deliberate `0.0.0.0` exposure on a trusted network or
 `--host <ip>` for one explicit interface. The reload endpoint has exact routing,
 a 4,096-byte request-target ceiling, and a separate bounded 16-worker/32-request
 pool, so long polls cannot consume the eight workers serving project files.
 
-`pliego preview [port]` validates the existing build ledger and serves the
-output without rebuilding or injecting development behavior. It is also
-loopback-only unless `--lan` or `--host` is explicit.
+`pliego preview [port]` validates the existing v2 report, recalculates the exact
+output tree and current build context, and serves the output without rebuilding
+or injecting development behavior. It is also loopback-only unless `--lan` or
+`--host` is explicit.
 
 Both servers resolve clean routes to `index.html`, apply explicit MIME types,
 and return the project's `404.html` with HTTP 404 for missing paths.
 
-`pliego inspect` reads the configured output ledger and reports HTML route,
-file, and byte totals.
+`pliego inspect` recalculates the configured output and current project evidence
+from disk, then reports the verified receipt prefix and HTML route, payload file,
+and byte totals. It never creates or repairs `Cargo.lock`.
+
+## Artifact trust and ownership
+
+Routes, assets, and the reserved ledger name share one portable namespace.
+PliegoRS rejects aliases caused by route normalization, Unicode normalization,
+case folding, ambiguous directory spelling, and file/directory overlap before
+it creates the publication stage.
+
+Receipt v2 binds project ownership, framework source identity, supported
+toolchain versions, configuration, project sources, effective workspace Cargo
+inputs, reachable external local packages, and every emitted payload byte. The
+verifier rejects missing, extra, modified, symlinked, hard-linked, or
+non-regular entries and also rejects undeclared empty directories. Receipt v2
+limits each payload file to 512 MiB, the payload set to 4 GiB, and bounds both
+namespace components and stored path-prefix bytes before hashing.
+
+`replacementPolicy.requiredPreviousProjectId` is a reproducible rule for who
+may replace the output next. For a changed replacement,
+`previousOwnership` records the actual verified prior report's `projectId`,
+`sitePackage`, and `receiptSha256`. Before publication, the SSG independently
+verifies the existing tree, checks its `projectId`, and confirms that its
+receipt did not change during the staged build. When inputs and payload bytes
+match the verified prior artifact, the build is a no-op: it returns that report
+without replacing the output, preserving identical ledger bytes.
+
+These unkeyed hashes provide deterministic integrity and lineage, not a
+cryptographic identity or authority signature. A writer who can replace both
+payload and ledger can calculate a different internally consistent receipt.
+
+Build evidence exposes project-relative paths and hashes. Secret-looking files
+therefore fail capture instead of being silently omitted. Keep runtime secrets
+outside build input roots; the filename guard is not a content-aware secret
+scanner.
+
+The complete schema, threat model, migration procedure, and residual risks are
+recorded in
+[`docs/evidence/r1-artifact-trust.md`](evidence/r1-artifact-trust.md).
+
+### Migrating a v1 output
+
+Add `project.id`, update `BuildReport` consumers from `report.files` to
+`report.receipt.outputs.files`, and move the existing output directory aside.
+The current SSG deliberately refuses to infer ownership from a legacy marker.
+Run `pliego build` and `pliego inspect` to create and verify a v2 output; there
+is no in-place or automatic migration.
 
 `pliego version` prints the CLI package version without requiring a project.
 

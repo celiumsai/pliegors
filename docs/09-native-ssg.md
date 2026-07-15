@@ -7,11 +7,19 @@ documents and deterministic static routes. It owns head metadata, canonical
 links, stylesheets, assets, route validation, output hashes, guarded publication,
 and the `pliego.build.json` ledger.
 
-The smallest executable reference is `examples/minimal-pliego`:
+The smallest executable reference is `examples/minimal-pliego`. Build the CLI
+once, then use the verified project entry point from inside the example:
 
-```powershell
-cargo run -p minimal-pliego -- examples/minimal-pliego/target/site
+```sh
+cargo build -p pliego-cli --locked
+cd examples/minimal-pliego
+../../target/debug/pliego build
+../../target/debug/pliego inspect
 ```
+
+Running the site package directly is intentionally unsupported in production:
+it would omit the CLI-resolved Cargo input graph required by artifact receipt
+v2.
 
 The resulting pages require no framework runtime. Rust/WASM is added only when a
 route declares resumable behavior.

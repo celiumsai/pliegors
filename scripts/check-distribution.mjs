@@ -16,7 +16,7 @@ const crates = metadata.packages
   .filter((pkg) => pkg.manifest_path.replaceAll('\\', '/').includes('/crates/'))
   .sort((left, right) => left.name.localeCompare(right.name));
 const expected = [
-  'pliego-adapters', 'pliego-assets', 'pliego-cli', 'pliego-content', 'pliego-dom',
+  'pliego-adapters', 'pliego-artifact', 'pliego-assets', 'pliego-cli', 'pliego-content', 'pliego-dom',
   'pliego-fold', 'pliego-hyphae', 'pliego-inspect', 'pliego-log', 'pliego-macros',
   'pliego-reactive', 'pliego-resume', 'pliego-ssg', 'pliego-starters',
 ].sort();

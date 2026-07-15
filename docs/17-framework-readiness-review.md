@@ -26,7 +26,7 @@ the earlier readiness conclusion until they are reproduced or closed:
 1. reactive child reclamation and arena retention;
 2. panic safety and update reentrancy;
 3. normalized output-path collisions;
-4. complete, non-forgeable artifact ledgers;
+4. complete exact-set artifact ledgers with deterministic integrity;
 5. cryptographically verified and type-gated Hyphae replay.
 
 The full findings and acceptance sequence are in the

@@ -58,6 +58,7 @@ candidate distribution, and R7 an external flagship. See the
 | `pliego-dom` | Escaped view and DOM construction |
 | `pliego-macros` | Typed `view!` and component props |
 | `pliego-content` | Typed content, safe CommonMark, limits, and diagnostics |
+| `pliego-artifact` | Portable namespaces, build receipts, and exact-set verification |
 | `pliego-ssg` | Documents, routes, assets, SEO, and staged builds |
 | `pliego-resume` | Resumable standard browser actions |
 | `pliego-adapters` | External ESM lifecycle and WASM bootstrap |

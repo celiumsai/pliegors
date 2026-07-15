@@ -10,6 +10,7 @@ members = [
     "crates/pliego-dom",
     "crates/pliego-hyphae",
     "crates/pliego-inspect",
+    "crates/pliego-artifact",
     "crates/pliego-assets",
     "crates/pliego-content",
     "crates/pliego-ssg",
@@ -54,6 +55,7 @@ web-sys = "=0.3.103"
 pliego-dom = { path = "crates/pliego-dom" }
 pliego-log = { path = "crates/pliego-log" }
 pliego-reactive = { path = "crates/pliego-reactive" }
+pliego-artifact = { path = "crates/pliego-artifact" }
 pliego-starters = { path = "crates/pliego-starters" }
 
 [profile.release]

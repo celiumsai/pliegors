@@ -5,9 +5,15 @@ Rust routes. It exercises typed collection loading, deterministic ordering,
 safe CommonMark rendering, metadata, canonical URLs, static assets, and the
 PliegoRS build ledger.
 
-```powershell
-cargo run -p content-collections-pliegors -- examples/content-collections-pliegors/target/site
+```sh
+cargo build -p pliego-cli --locked
+cd examples/content-collections-pliegors
+../../target/debug/pliego build
+../../target/debug/pliego inspect
 ```
+
+The direct site binary does not publish without the bounded build invocation
+created by `pliego build`.
 
 The source corpus lives at `fixtures/content/reference`. The example is
 self-contained and contains no customer or private product material.

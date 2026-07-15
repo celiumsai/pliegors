@@ -105,6 +105,19 @@ jobs:
                 "$GITHUB_WORKSPACE/target/debug/pliego" check
               CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/starter-cargo" \
                 "$GITHUB_WORKSPACE/target/debug/pliego" build
+              CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/starter-cargo" \
+                "$GITHUB_WORKSPACE/target/debug/pliego" inspect
+              ledger="target/site/pliego.build.json"
+              first_ledger="$RUNNER_TEMP/pliego-$template-first-build.json"
+              cp -- "$ledger" "$first_ledger"
+              first_sha="$(sha256sum "$ledger" | cut -d ' ' -f 1)"
+              CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/starter-cargo" \
+                "$GITHUB_WORKSPACE/target/debug/pliego" build
+              CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/starter-cargo" \
+                "$GITHUB_WORKSPACE/target/debug/pliego" inspect
+              second_sha="$(sha256sum "$ledger" | cut -d ' ' -f 1)"
+              test "$first_sha" = "$second_sha"
+              cmp -s -- "$first_ledger" "$ledger"
             )
           done
           node scripts/check-starter-builds.mjs \
@@ -116,9 +129,16 @@ jobs:
         shell: bash
         run: |
           output="examples/content-collections-pliegors/target/site"
-          cargo run -p content-collections-pliegors --locked -- "$output"
+          (
+            cd examples/content-collections-pliegors
+            "$GITHUB_WORKSPACE/target/debug/pliego" build
+            "$GITHUB_WORKSPACE/target/debug/pliego" inspect
+          )
           first="$(sha256sum "$output/pliego.build.json" | cut -d ' ' -f 1)"
-          cargo run -p content-collections-pliegors --locked -- "$output"
+          (
+            cd examples/content-collections-pliegors
+            "$GITHUB_WORKSPACE/target/debug/pliego" build
+          )
           second="$(sha256sum "$output/pliego.build.json" | cut -d ' ' -f 1)"
           test "$first" = "$second"
           node scripts/check-starter-builds.mjs examples/content-collections-pliegors
@@ -142,6 +162,7 @@ jobs:
             cd examples/pliegors-site
             "$GITHUB_WORKSPACE/target/debug/pliego" check
             "$GITHUB_WORKSPACE/target/debug/pliego" build
+            "$GITHUB_WORKSPACE/target/debug/pliego" inspect
             first="$(sha256sum target/site/pliego.build.json | cut -d ' ' -f 1)"
             "$GITHUB_WORKSPACE/target/debug/pliego" build
             second="$(sha256sum target/site/pliego.build.json | cut -d ' ' -f 1)"
