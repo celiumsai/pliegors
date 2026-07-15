@@ -924,6 +924,7 @@ dependencies = [
  "pliego-hyphae",
  "pliego-log",
  "pliego-reactive",
+ "serde",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

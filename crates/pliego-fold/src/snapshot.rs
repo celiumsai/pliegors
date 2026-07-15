@@ -30,6 +30,58 @@ pub struct ReducerIdentity {
     config_hash: Hash,
 }
 
+/// Stable identity of the state encoding contract used by a projection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodecIdentity {
+    id: String,
+    revision: u64,
+    config_hash: Hash,
+}
+
+impl CodecIdentity {
+    /// Build a validated codec identity. Encoding changes require a new
+    /// revision; configuration changes require a new `config_hash`.
+    pub fn new(
+        id: impl Into<String>,
+        revision: u64,
+        config_hash: Hash,
+    ) -> Result<Self, SnapshotError> {
+        let id = id.into();
+        validate_contract_id("codec", &id)?;
+        Ok(Self {
+            id,
+            revision,
+            config_hash,
+        })
+    }
+
+    /// Canonicalize serializable codec configuration and bind its digest.
+    pub fn from_serializable_config<T: Serialize>(
+        id: impl Into<String>,
+        revision: u64,
+        config: &T,
+    ) -> Result<Self, SnapshotError> {
+        let bytes = encode_canonical_json(config)
+            .map_err(|error| SnapshotError::CodecConfig(error.to_string()))?;
+        Self::new(id, revision, digest(&bytes))
+    }
+
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    #[must_use]
+    pub const fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    #[must_use]
+    pub const fn config_hash(&self) -> &Hash {
+        &self.config_hash
+    }
+}
+
 impl ReducerIdentity {
     /// Build a validated reducer identity. Configuration changes require a new
     /// `config_hash`; code or semantic changes require a new `revision`.
@@ -95,6 +147,7 @@ pub enum SnapshotError {
         reason: &'static str,
     },
     ReducerConfig(String),
+    CodecConfig(String),
     StateTooLarge {
         actual: usize,
         maximum: usize,
@@ -124,6 +177,9 @@ impl fmt::Display for SnapshotError {
             Self::ReducerConfig(message) => {
                 write!(f, "reducer configuration encoding failed: {message}")
             }
+            Self::CodecConfig(message) => {
+                write!(f, "codec configuration encoding failed: {message}")
+            }
             Self::StateTooLarge { actual, maximum } => {
                 write!(f, "snapshot state is {actual} bytes; limit is {maximum}")
             }
@@ -148,7 +204,7 @@ pub struct ProjectionSnapshot {
     history: LogCursor,
     schema_set_digest: Hash,
     reducer: ReducerIdentity,
-    codec_id: String,
+    codec: CodecIdentity,
     state_bytes: Vec<u8>,
     state_digest: Hash,
     snapshot_digest: Hash,
@@ -159,11 +215,9 @@ impl ProjectionSnapshot {
         history: LogCursor,
         schema_set_digest: Hash,
         reducer: ReducerIdentity,
-        codec_id: impl Into<String>,
+        codec: CodecIdentity,
         state_bytes: Vec<u8>,
     ) -> Result<Self, SnapshotError> {
-        let codec_id = codec_id.into();
-        validate_contract_id("codec", &codec_id)?;
         if state_bytes.len() > MAX_CANONICAL_STATE_BYTES {
             return Err(SnapshotError::StateTooLarge {
                 actual: state_bytes.len(),
@@ -176,7 +230,7 @@ impl ProjectionSnapshot {
             history,
             schema_set_digest,
             reducer,
-            codec_id,
+            codec,
             state_bytes,
             state_digest,
             snapshot_digest: [0; 32],
@@ -210,6 +264,8 @@ impl ProjectionSnapshot {
         let reducer_revision = decoder.u64("reducer revision")?;
         let reducer_config_hash = decoder.hash("reducer config hash")?;
         let codec_id = decoder.string("codec id", "codec")?;
+        let codec_revision = decoder.u64("codec revision")?;
+        let codec_config_hash = decoder.hash("codec config hash")?;
         let state_len = decoder.u32("state length")? as usize;
         if state_len > MAX_CANONICAL_STATE_BYTES {
             return Err(SnapshotError::StateTooLarge {
@@ -224,13 +280,13 @@ impl ProjectionSnapshot {
             return Err(SnapshotError::TrailingBytes(decoder.remaining()));
         }
         let reducer = ReducerIdentity::new(reducer_id, reducer_revision, reducer_config_hash)?;
-        validate_contract_id("codec", &codec_id)?;
+        let codec = CodecIdentity::new(codec_id, codec_revision, codec_config_hash)?;
         let snapshot = Self {
             format,
             history,
             schema_set_digest,
             reducer,
-            codec_id,
+            codec,
             state_bytes,
             state_digest,
             snapshot_digest,
@@ -253,7 +309,9 @@ impl ProjectionSnapshot {
                 + 8
                 + 32
                 + 2
-                + self.codec_id.len()
+                + self.codec.id.len()
+                + 8
+                + 32
                 + 4
                 + self.state_bytes.len()
                 + 64,
@@ -266,7 +324,9 @@ impl ProjectionSnapshot {
         push_string(&mut bytes, &self.reducer.id);
         bytes.extend_from_slice(&self.reducer.revision.to_be_bytes());
         bytes.extend_from_slice(&self.reducer.config_hash);
-        push_string(&mut bytes, &self.codec_id);
+        push_string(&mut bytes, &self.codec.id);
+        bytes.extend_from_slice(&self.codec.revision.to_be_bytes());
+        bytes.extend_from_slice(&self.codec.config_hash);
         bytes.extend_from_slice(&(self.state_bytes.len() as u32).to_be_bytes());
         bytes.extend_from_slice(&self.state_bytes);
         bytes.extend_from_slice(&self.state_digest);
@@ -301,7 +361,13 @@ impl ProjectionSnapshot {
     /// Stable state codec identifier.
     #[must_use]
     pub fn codec_id(&self) -> &str {
-        &self.codec_id
+        self.codec.id()
+    }
+
+    /// Complete codec identity, revision, and configuration binding.
+    #[must_use]
+    pub const fn codec(&self) -> &CodecIdentity {
+        &self.codec
     }
 
     /// Number of canonical state bytes in the snapshot.
@@ -346,7 +412,9 @@ impl ProjectionSnapshot {
         update_len_prefixed(&mut hasher, self.reducer.id.as_bytes());
         hasher.update(self.reducer.revision.to_be_bytes());
         hasher.update(self.reducer.config_hash);
-        update_len_prefixed(&mut hasher, self.codec_id.as_bytes());
+        update_len_prefixed(&mut hasher, self.codec.id.as_bytes());
+        hasher.update(self.codec.revision.to_be_bytes());
+        hasher.update(self.codec.config_hash);
         update_len_prefixed(&mut hasher, &self.state_bytes);
         hasher.update(self.state_digest);
         hasher.finalize().into()
@@ -466,7 +534,7 @@ mod tests {
             },
             [5; 32],
             ReducerIdentity::new("tasks", 7, [6; 32]).unwrap(),
-            "test/json/1",
+            CodecIdentity::new("test/json", 1, [7; 32]).unwrap(),
             br#"{"count":3}"#.to_vec(),
         )
         .unwrap()
@@ -490,7 +558,7 @@ mod tests {
         );
         assert_eq!(
             pliego_log::hex(snapshot.snapshot_digest()),
-            "ed9d191e4f8b6451a54402931d52190ea5992ea08cf6c3fa2266dd03ab73d77f"
+            "efda8ff16da4a1ea540de90d036141bd1c4187f19dfdbcf83cc7f50bb8ab7227"
         );
     }
 
@@ -518,6 +586,68 @@ mod tests {
         assert_eq!(
             ProjectionSnapshot::decode(&trailing),
             Err(SnapshotError::TrailingBytes(1))
+        );
+    }
+
+    #[test]
+    fn snapshot_digest_binds_every_contract_field() {
+        macro_rules! rejects_envelope_mutation {
+            ($mutation:expr) => {{
+                let mut changed = sample();
+                $mutation(&mut changed);
+                assert_eq!(
+                    changed.verify_integrity(),
+                    Err(SnapshotError::SnapshotDigestMismatch)
+                );
+            }};
+        }
+
+        rejects_envelope_mutation!(|value: &mut ProjectionSnapshot| value.format += 1);
+        rejects_envelope_mutation!(|value: &mut ProjectionSnapshot| value.history.position += 1);
+        rejects_envelope_mutation!(
+            |value: &mut ProjectionSnapshot| value.history.head_hash[0] ^= 1
+        );
+        rejects_envelope_mutation!(
+            |value: &mut ProjectionSnapshot| value.schema_set_digest[0] ^= 1
+        );
+        rejects_envelope_mutation!(|value: &mut ProjectionSnapshot| value.reducer.id.push('x'));
+        rejects_envelope_mutation!(|value: &mut ProjectionSnapshot| value.reducer.revision += 1);
+        rejects_envelope_mutation!(
+            |value: &mut ProjectionSnapshot| value.reducer.config_hash[0] ^= 1
+        );
+        rejects_envelope_mutation!(|value: &mut ProjectionSnapshot| value.codec.id.push('x'));
+        rejects_envelope_mutation!(|value: &mut ProjectionSnapshot| value.codec.revision += 1);
+        rejects_envelope_mutation!(
+            |value: &mut ProjectionSnapshot| value.codec.config_hash[0] ^= 1
+        );
+
+        let mut state = sample();
+        state.state_bytes[0] ^= 1;
+        assert_eq!(
+            state.verify_integrity(),
+            Err(SnapshotError::StateDigestMismatch)
+        );
+
+        let mut rebound_state = sample();
+        rebound_state.state_bytes[0] ^= 1;
+        rebound_state.state_digest = digest(&rebound_state.state_bytes);
+        assert_eq!(
+            rebound_state.verify_integrity(),
+            Err(SnapshotError::SnapshotDigestMismatch)
+        );
+
+        let mut state_digest = sample();
+        state_digest.state_digest[0] ^= 1;
+        assert_eq!(
+            state_digest.verify_integrity(),
+            Err(SnapshotError::StateDigestMismatch)
+        );
+
+        let mut envelope_digest = sample();
+        envelope_digest.snapshot_digest[0] ^= 1;
+        assert_eq!(
+            envelope_digest.verify_integrity(),
+            Err(SnapshotError::SnapshotDigestMismatch)
         );
     }
 }

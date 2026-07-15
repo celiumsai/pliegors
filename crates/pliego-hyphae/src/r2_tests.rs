@@ -27,7 +27,7 @@ impl EventSchema for TaskAdded {
     const SCHEMA_ID: &'static str = "pliego.test/task-added/1";
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 enum FixtureEvent {
     TaskAdded(TaskAdded),
 }
@@ -35,7 +35,10 @@ enum FixtureEvent {
 fn fixture_catalog() -> SealedEventCatalog<FixtureEvent> {
     let mut builder = EventCatalogBuilder::new();
     builder
-        .register_current::<TaskAdded, _>(FixtureEvent::TaskAdded)
+        .register_current::<TaskAdded, _>(
+            "pliego.test/fixture-task-added-map/1",
+            FixtureEvent::TaskAdded,
+        )
         .unwrap();
     builder.seal().unwrap()
 }

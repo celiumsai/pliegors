@@ -73,7 +73,7 @@ impl EventSchema for TaskRemovedV1 {
 }
 
 /// Reducer-facing event set produced only by the sealed schema catalog.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum TaskEvent {
     Added(TaskAddedV1),
     Toggled(TaskToggledV1),
@@ -105,11 +105,20 @@ impl TaskEvent {
 pub fn task_catalog() -> SealedEventCatalog<TaskEvent> {
     let mut builder = EventCatalogBuilder::new();
     builder
-        .register_current::<TaskAddedV1, _>(TaskEvent::Added)
+        .register_current::<TaskAddedV1, _>(
+            "pliego.example/task-event-added-map/1",
+            TaskEvent::Added,
+        )
         .expect("static task-added schema is valid")
-        .register_current::<TaskToggledV1, _>(TaskEvent::Toggled)
+        .register_current::<TaskToggledV1, _>(
+            "pliego.example/task-event-toggled-map/1",
+            TaskEvent::Toggled,
+        )
         .expect("static task-toggled schema is valid")
-        .register_current::<TaskRemovedV1, _>(TaskEvent::Removed)
+        .register_current::<TaskRemovedV1, _>(
+            "pliego.example/task-event-removed-map/1",
+            TaskEvent::Removed,
+        )
         .expect("static task-removed schema is valid");
     builder
         .seal()

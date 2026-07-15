@@ -9,63 +9,14 @@ use std::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::rc::Rc;
 
-use pliego_log::{CursorError, Event, Hash, LogCursor, SealedEventCatalog};
+use pliego_log::{CursorError, Hash, LogCursor, SealedEventCatalog};
 use pliego_reactive::Memo;
 
 use crate::ReactiveLog;
-use crate::codec::{CodecError, StateCodec};
-use crate::snapshot::{ProjectionSnapshot, ReducerIdentity, SnapshotError, validate_contract_id};
+use crate::codec::{CodecError, MAX_CANONICAL_STATE_BYTES, StateCodec};
+use crate::snapshot::{CodecIdentity, ProjectionSnapshot, ReducerIdentity, SnapshotError};
 
 const MAX_FAILURE_MESSAGE_BYTES: usize = 2048;
-
-/// A schema/upcast rejection normalized for the projection boundary.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EventResolveError {
-    message: String,
-}
-
-impl EventResolveError {
-    #[must_use]
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: bounded_message(message.into()),
-        }
-    }
-
-    #[must_use]
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-}
-
-impl fmt::Display for EventResolveError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
-    }
-}
-
-impl Error for EventResolveError {}
-
-/// Resolves stored events into the exact reducer input and identifies the
-/// accepted schema/upcaster graph.
-pub trait EventResolver<E>: 'static {
-    /// Digest of every accepted `(kind, version, schema_id)` and upcast edge.
-    fn schema_set_digest(&self) -> Hash;
-
-    /// Validate and upcast one stored event.
-    fn resolve(&self, event: &Event) -> Result<E, EventResolveError>;
-}
-
-impl<E: 'static> EventResolver<E> for SealedEventCatalog<E> {
-    fn schema_set_digest(&self) -> Hash {
-        SealedEventCatalog::schema_set_digest(self)
-    }
-
-    fn resolve(&self, event: &Event) -> Result<E, EventResolveError> {
-        SealedEventCatalog::decode(self, event)
-            .map_err(|error| EventResolveError::new(error.to_string()))
-    }
-}
 
 /// A deterministic application-level reducer rejection.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,10 +102,13 @@ pub enum ProjectionError {
         actual: Box<ReducerIdentity>,
     },
     CodecMismatch {
-        expected: String,
-        actual: String,
+        expected: Box<CodecIdentity>,
+        actual: Box<CodecIdentity>,
     },
     NonCanonicalState,
+    CodecPanicked {
+        operation: &'static str,
+    },
     Schema {
         sequence: u64,
         message: String,
@@ -187,17 +141,31 @@ impl fmt::Display for ProjectionError {
             ),
             Self::ReducerMismatch { expected, actual } => write!(
                 f,
-                "reducer mismatch: expected {}@{}, got {}@{}",
+                "reducer mismatch: expected {}@{} config {}, got {}@{} config {}",
                 expected.id(),
                 expected.revision(),
+                pliego_log::hex(expected.config_hash()),
                 actual.id(),
-                actual.revision()
+                actual.revision(),
+                pliego_log::hex(actual.config_hash())
             ),
             Self::CodecMismatch { expected, actual } => {
-                write!(f, "codec mismatch: expected {expected}, got {actual}")
+                write!(
+                    f,
+                    "codec mismatch: expected {}@{} config {}, got {}@{} config {}",
+                    expected.id(),
+                    expected.revision(),
+                    pliego_log::hex(expected.config_hash()),
+                    actual.id(),
+                    actual.revision(),
+                    pliego_log::hex(actual.config_hash())
+                )
             }
             Self::NonCanonicalState => {
-                f.write_str("decoded snapshot state does not re-encode byte-for-byte")
+                f.write_str("state codec did not round-trip state canonically")
+            }
+            Self::CodecPanicked { operation } => {
+                write!(f, "state codec panicked during {operation}")
             }
             Self::Schema { sequence, message } => {
                 write!(f, "schema rejected event {sequence}: {message}")
@@ -241,13 +209,20 @@ impl From<CursorError> for ProjectionError {
 
 struct Stable<S> {
     state: S,
+    state_bytes: Vec<u8>,
     history: LogCursor,
     folded: u64,
 }
 
-#[derive(Clone, PartialEq)]
-struct ProjectionRead<S> {
+struct StableSeed<'a, S> {
     state: S,
+    expected_state_bytes: Option<&'a [u8]>,
+    history: LogCursor,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct ProjectionRead {
+    history: LogCursor,
     error: Option<ProjectionError>,
 }
 
@@ -258,12 +233,18 @@ struct ProjectionRead<S> {
 /// succeeds. Resolver/reducer `Err` and panic both leave the stable checkpoint
 /// unchanged. There is no public constructor from a `(state, position)` tuple.
 pub struct Projection<S: 'static, E: 'static> {
-    memo: Memo<ProjectionRead<S>>,
+    memo: Memo<ProjectionRead>,
     stable: Rc<RefCell<Stable<S>>>,
     schema_set_digest: Hash,
     reducer_identity: ReducerIdentity,
-    codec: Rc<dyn StateCodec<S>>,
+    codec_identity: CodecIdentity,
     _event: std::marker::PhantomData<fn() -> E>,
+}
+
+impl<S: 'static, E: 'static> Drop for Projection<S, E> {
+    fn drop(&mut self) {
+        let _ = catch_unwind(AssertUnwindSafe(|| self.memo.dispose()));
+    }
 }
 
 impl<S, E> Projection<S, E>
@@ -275,13 +256,25 @@ where
     pub fn new(
         log: ReactiveLog,
         initial: S,
-        resolver: impl EventResolver<E>,
+        catalog: SealedEventCatalog<E>,
         reducer: Reducer<S, E>,
         codec: impl StateCodec<S>,
     ) -> Result<Self, ProjectionError> {
         let history = log.with(|raw| raw.cursor_at(0))?;
         debug_assert_eq!(history.position, 0);
-        Self::from_stable(log, initial, history, resolver, reducer, codec)
+        let codec_identity = checked_codec_identity(&codec)?;
+        Self::from_stable(
+            log,
+            StableSeed {
+                state: initial,
+                expected_state_bytes: None,
+                history,
+            },
+            catalog,
+            reducer,
+            codec,
+            codec_identity,
+        )
     }
 
     /// Restore an integrity-checked snapshot, validate every bound contract,
@@ -289,12 +282,12 @@ where
     pub fn restore(
         log: ReactiveLog,
         snapshot: ProjectionSnapshot,
-        resolver: impl EventResolver<E>,
+        catalog: SealedEventCatalog<E>,
         reducer: Reducer<S, E>,
         codec: impl StateCodec<S>,
     ) -> Result<Self, ProjectionError> {
-        validate_contract_id("codec", codec.id())?;
-        let actual_schema = resolver.schema_set_digest();
+        let codec_identity = checked_codec_identity(&codec)?;
+        let actual_schema = catalog.schema_set_digest();
         if snapshot.schema_set_digest() != &actual_schema {
             return Err(ProjectionError::SchemaSetMismatch {
                 expected: *snapshot.schema_set_digest(),
@@ -307,19 +300,27 @@ where
                 actual: Box::new(reducer.identity().clone()),
             });
         }
-        if snapshot.codec_id() != codec.id() {
+        if snapshot.codec() != &codec_identity {
             return Err(ProjectionError::CodecMismatch {
-                expected: snapshot.codec_id().to_owned(),
-                actual: codec.id().to_owned(),
+                expected: Box::new(snapshot.codec().clone()),
+                actual: Box::new(codec_identity),
             });
         }
         log.with(|raw| raw.tail(snapshot.history()).map(|_| ()))?;
         let actual_history = *snapshot.history();
-        let state = codec.decode(snapshot.state_bytes())?;
-        if codec.encode(&state)? != snapshot.state_bytes() {
-            return Err(ProjectionError::NonCanonicalState);
-        }
-        let projection = Self::from_stable(log, state, actual_history, resolver, reducer, codec)?;
+        let state = codec_decode(&codec, snapshot.state_bytes())?;
+        let projection = Self::from_stable(
+            log,
+            StableSeed {
+                state,
+                expected_state_bytes: Some(snapshot.state_bytes()),
+                history: actual_history,
+            },
+            catalog,
+            reducer,
+            codec,
+            snapshot.codec().clone(),
+        )?;
         if let Err(error) = projection.try_get() {
             projection.dispose();
             return Err(error);
@@ -331,39 +332,59 @@ where
     pub fn restore_bytes(
         log: ReactiveLog,
         bytes: &[u8],
-        resolver: impl EventResolver<E>,
+        catalog: SealedEventCatalog<E>,
         reducer: Reducer<S, E>,
         codec: impl StateCodec<S>,
     ) -> Result<Self, ProjectionError> {
         let snapshot = ProjectionSnapshot::decode(bytes)?;
-        Self::restore(log, snapshot, resolver, reducer, codec)
+        Self::restore(log, snapshot, catalog, reducer, codec)
     }
 
     fn from_stable(
         log: ReactiveLog,
-        state: S,
-        history: LogCursor,
-        resolver: impl EventResolver<E>,
+        seed: StableSeed<'_, S>,
+        catalog: SealedEventCatalog<E>,
         reducer: Reducer<S, E>,
         codec: impl StateCodec<S>,
+        codec_identity: CodecIdentity,
     ) -> Result<Self, ProjectionError> {
-        validate_contract_id("codec", codec.id())?;
-        let schema_set_digest = resolver.schema_set_digest();
+        let StableSeed {
+            state,
+            expected_state_bytes,
+            history,
+        } = seed;
+        let state_bytes = canonical_state_bytes(&codec, &state)?;
+        if expected_state_bytes.is_some_and(|expected| expected != state_bytes) {
+            return Err(ProjectionError::NonCanonicalState);
+        }
+        let schema_set_digest = catalog.schema_set_digest();
         let reducer_identity = reducer.identity().clone();
+        let codec: Rc<dyn StateCodec<S>> = Rc::new(codec);
         let stable = Rc::new(RefCell::new(Stable {
             state,
+            state_bytes,
             history,
             folded: 0,
         }));
         let memo_stable = stable.clone();
-        let resolver: Rc<dyn EventResolver<E>> = Rc::new(resolver);
-        let memo_resolver = resolver.clone();
+        let catalog = Rc::new(catalog);
+        let memo_catalog = catalog.clone();
         let memo_reducer = reducer.clone();
+        let memo_codec = codec.clone();
         let memo = Memo::new(move || {
-            match synchronize(log, &memo_stable, memo_resolver.as_ref(), &memo_reducer) {
-                Ok(state) => ProjectionRead { state, error: None },
+            match synchronize(
+                log,
+                &memo_stable,
+                memo_catalog.as_ref(),
+                &memo_reducer,
+                memo_codec.as_ref(),
+            ) {
+                Ok(history) => ProjectionRead {
+                    history,
+                    error: None,
+                },
                 Err(error) => ProjectionRead {
-                    state: memo_stable.borrow().state.clone(),
+                    history: memo_stable.borrow().history,
                     error: Some(error),
                 },
             }
@@ -373,17 +394,28 @@ where
             stable,
             schema_set_digest,
             reducer_identity,
-            codec: Rc::new(codec),
+            codec_identity,
             _event: std::marker::PhantomData,
         })
     }
 
     /// Settle the reactive node and return state or its fail-closed error.
     pub fn try_get(&self) -> Result<S, ProjectionError> {
+        self.settle()?;
+        Ok(self.stable.borrow().state.clone())
+    }
+
+    fn settle(&self) -> Result<(), ProjectionError> {
         let read = self.memo.get();
         match read.error {
             Some(error) => Err(error),
-            None => Ok(read.state),
+            None => {
+                let stable = self.stable.borrow();
+                if stable.history != read.history {
+                    return Err(ProjectionError::ConcurrentMutation);
+                }
+                Ok(())
+            }
         }
     }
 
@@ -403,14 +435,16 @@ where
 
     /// Create a complete, contract-bound checkpoint at the current log head.
     pub fn snapshot(&self) -> Result<ProjectionSnapshot, ProjectionError> {
-        let state = self.try_get()?;
-        let stable = self.stable.borrow();
-        let bytes = self.codec.encode(&state)?;
+        self.settle()?;
+        let (history, bytes) = {
+            let stable = self.stable.borrow();
+            (stable.history, stable.state_bytes.clone())
+        };
         ProjectionSnapshot::create(
-            stable.history,
+            history,
             self.schema_set_digest,
             self.reducer_identity.clone(),
-            self.codec.id(),
+            self.codec_identity.clone(),
             bytes,
         )
         .map_err(ProjectionError::from)
@@ -418,7 +452,7 @@ where
 
     /// Exact stable history checkpoint. Failing tails do not advance it.
     pub fn history(&self) -> Result<LogCursor, ProjectionError> {
-        self.try_get()?;
+        self.settle()?;
         Ok(self.stable.borrow().history)
     }
 
@@ -451,31 +485,38 @@ where
 fn synchronize<S, E>(
     log: ReactiveLog,
     stable: &Rc<RefCell<Stable<S>>>,
-    resolver: &dyn EventResolver<E>,
+    catalog: &SealedEventCatalog<E>,
     reducer: &Reducer<S, E>,
-) -> Result<S, ProjectionError>
+    codec: &dyn StateCodec<S>,
+) -> Result<LogCursor, ProjectionError>
 where
-    S: Clone,
+    S: Clone + PartialEq + 'static,
     E: 'static,
 {
     let (mut candidate, expected) = {
         let stable = stable.borrow();
         (stable.state.clone(), stable.history)
     };
-    let (events, next) = log.with(|raw| {
-        let tail = raw.tail(&expected).map_err(ProjectionError::from)?;
-        Ok::<_, ProjectionError>((tail.to_vec(), raw.cursor()))
+    let next = log.with(|raw| {
+        raw.tail(&expected).map_err(ProjectionError::from)?;
+        Ok::<_, ProjectionError>(raw.cursor())
     })?;
-    if events.is_empty() {
-        return Ok(candidate);
+    if next.position == expected.position {
+        return Ok(expected);
     }
-    for stored in &events {
+    let event_count = next
+        .position
+        .checked_sub(expected.position)
+        .ok_or(ProjectionError::ConcurrentMutation)?;
+    for sequence in expected.position..next.position {
+        let stored = log.with(|raw| raw.get(sequence).cloned());
+        let stored = stored.ok_or(ProjectionError::ConcurrentMutation)?;
         let sequence = stored.seq();
-        let resolved = catch_unwind(AssertUnwindSafe(|| resolver.resolve(stored)))
+        let resolved = catch_unwind(AssertUnwindSafe(|| catalog.decode(&stored)))
             .map_err(|_| ProjectionError::SchemaPanicked { sequence })?
             .map_err(|error| ProjectionError::Schema {
                 sequence,
-                message: error.message,
+                message: bounded_message(error.to_string()),
             })?;
         catch_unwind(AssertUnwindSafe(|| {
             reducer.apply(&mut candidate, &resolved)
@@ -486,8 +527,13 @@ where
             message: error.message,
         })?;
     }
-    let event_count = u64::try_from(events.len()).map_err(|_| ProjectionError::CounterOverflow)?;
-    let published = candidate.clone();
+    let candidate_bytes = canonical_state_bytes(codec, &candidate)?;
+    {
+        let stable = stable.borrow();
+        if candidate == stable.state && candidate_bytes != stable.state_bytes {
+            return Err(ProjectionError::NonCanonicalState);
+        }
+    }
     let mut stable = stable.borrow_mut();
     if stable.history != expected {
         return Err(ProjectionError::ConcurrentMutation);
@@ -496,10 +542,65 @@ where
         .folded
         .checked_add(event_count)
         .ok_or(ProjectionError::CounterOverflow)?;
-    stable.state = candidate;
+    let previous_state = std::mem::replace(&mut stable.state, candidate);
+    stable.state_bytes = candidate_bytes;
     stable.history = next;
     stable.folded = folded;
-    Ok(published)
+    drop(stable);
+    drop(previous_state);
+    Ok(next)
+}
+
+fn canonical_state_bytes<S>(
+    codec: &dyn StateCodec<S>,
+    state: &S,
+) -> Result<Vec<u8>, ProjectionError>
+where
+    S: PartialEq + 'static,
+{
+    let bytes = codec_encode(codec, state)?;
+    let decoded = codec_decode(codec, &bytes)?;
+    if &decoded != state || codec_encode(codec, &decoded)? != bytes {
+        return Err(ProjectionError::NonCanonicalState);
+    }
+    Ok(bytes)
+}
+
+fn codec_encode<S: 'static>(
+    codec: &dyn StateCodec<S>,
+    state: &S,
+) -> Result<Vec<u8>, ProjectionError> {
+    let bytes = catch_unwind(AssertUnwindSafe(|| codec.encode(state)))
+        .map_err(|_| ProjectionError::CodecPanicked {
+            operation: "encode",
+        })?
+        .map_err(ProjectionError::Codec)?;
+    if bytes.len() > MAX_CANONICAL_STATE_BYTES {
+        return Err(ProjectionError::Codec(CodecError::TooLarge {
+            actual: bytes.len(),
+            maximum: MAX_CANONICAL_STATE_BYTES,
+        }));
+    }
+    Ok(bytes)
+}
+
+fn codec_decode<S: 'static>(codec: &dyn StateCodec<S>, bytes: &[u8]) -> Result<S, ProjectionError> {
+    catch_unwind(AssertUnwindSafe(|| codec.decode(bytes)))
+        .map_err(|_| ProjectionError::CodecPanicked {
+            operation: "decode",
+        })?
+        .map_err(ProjectionError::Codec)
+}
+
+fn checked_codec_identity<S: 'static>(
+    codec: &dyn StateCodec<S>,
+) -> Result<CodecIdentity, ProjectionError> {
+    let identity = catch_unwind(AssertUnwindSafe(|| codec.identity())).map_err(|_| {
+        ProjectionError::CodecPanicked {
+            operation: "identity",
+        }
+    })?;
+    Ok(identity)
 }
 
 fn bounded_message(mut message: String) -> String {

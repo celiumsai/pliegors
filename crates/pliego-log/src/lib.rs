@@ -15,12 +15,12 @@
 //!
 //! Projection/fold behavior deliberately lives in `pliego-fold`, not here.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::error::Error;
 use std::fmt;
 use std::io::{self, Write};
 use std::marker::PhantomData;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde::de::{DeserializeOwned, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -47,11 +47,18 @@ pub const MAX_SCHEMA_VERSION: u32 = 4_096;
 pub const MAX_CATALOG_KINDS: usize = 1_024;
 /// Maximum admitted schema versions for one event kind.
 pub const MAX_SCHEMAS_PER_KIND: usize = 1_024;
+/// Maximum remembered input/output pairs for one mapper or upcaster.
+///
+/// The cache is a bounded runtime tripwire for transforms that change their
+/// result across repeated decodes of the same canonical input. It supplements,
+/// but cannot replace, the requirement that application transforms are pure.
+pub const MAX_TRANSFORM_OBSERVATIONS: usize = 256;
 
 /// A 32-byte SHA-256 digest.
 pub type Hash = [u8; 32];
 
 const GENESIS_HASH: Hash = [0; 32];
+const SERDE_ARBITRARY_PRECISION_NUMBER_KEY: &str = "$serde_json::private::Number";
 
 /// Stable schema identity for an application payload type.
 ///
@@ -69,6 +76,10 @@ pub trait EventSchema {
 }
 
 /// A bounded, deterministic JSON encoding.
+///
+/// Decimal numbers are normalized from their exact JSON lexeme without a
+/// binary floating-point conversion. Equivalent decimal spellings converge,
+/// while distinct arbitrary-precision values remain distinct.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CanonicalJson(Vec<u8>);
 
@@ -83,12 +94,15 @@ impl CanonicalJson {
                 limit: MAX_JSON_BYTES,
             });
         }
+        reject_reserved_number_keys(raw)?;
 
         let mut deserializer = serde_json::Deserializer::from_slice(raw);
-        let NoDuplicates(value) = NoDuplicates::deserialize(&mut deserializer)
+        NoDuplicates::deserialize(&mut deserializer)
             .map_err(|error| classify_json_error(error, raw.len()))?;
         deserializer
             .end()
+            .map_err(|error| CanonicalJsonError::Invalid(error.to_string()))?;
+        let value: Value = serde_json::from_slice(raw)
             .map_err(|error| CanonicalJsonError::Invalid(error.to_string()))?;
         validate_json_shape(&value)?;
 
@@ -355,6 +369,44 @@ fn classify_json_error(error: serde_json::Error, raw_len: usize) -> CanonicalJso
     CanonicalJsonError::Invalid(message)
 }
 
+fn reject_reserved_number_keys(raw: &[u8]) -> Result<(), CanonicalJsonError> {
+    let mut index = 0;
+    while index < raw.len() {
+        if raw[index] != b'"' {
+            index += 1;
+            continue;
+        }
+
+        let start = index;
+        index += 1;
+        while index < raw.len() && raw[index] != b'"' {
+            if raw[index] == b'\\' {
+                index += 1;
+            }
+            index += 1;
+        }
+
+        let end = index;
+        index += 1;
+        let mut next = index;
+        while next < raw.len() && raw[next].is_ascii_whitespace() {
+            next += 1;
+        }
+        if next >= raw.len() || raw[next] != b':' {
+            continue;
+        }
+
+        let key: String = serde_json::from_slice(&raw[start..=end])
+            .map_err(|error| CanonicalJsonError::Invalid(error.to_string()))?;
+        if key == SERDE_ARBITRARY_PRECISION_NUMBER_KEY {
+            return Err(CanonicalJsonError::Invalid(format!(
+                "object key `{SERDE_ARBITRARY_PRECISION_NUMBER_KEY}` is reserved"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn validate_json_shape(root: &Value) -> Result<(), CanonicalJsonError> {
     let mut stack = vec![(root, 1usize)];
     let mut nodes = 0usize;
@@ -389,12 +441,200 @@ fn validate_json_shape(root: &Value) -> Result<(), CanonicalJsonError> {
     Ok(())
 }
 
+fn canonical_number(number: &serde_json::Number) -> Result<String, CanonicalJsonError> {
+    let raw = number.to_string();
+    let (negative, unsigned) = raw
+        .strip_prefix('-')
+        .map_or((false, raw.as_str()), |value| (true, value));
+    let (mantissa, explicit_exponent) =
+        unsigned.find(['e', 'E']).map_or((unsigned, None), |index| {
+            (&unsigned[..index], Some(&unsigned[index + 1..]))
+        });
+    let (integer, fraction) = mantissa
+        .split_once('.')
+        .map_or((mantissa, ""), |(integer, fraction)| (integer, fraction));
+    if integer.is_empty()
+        || !integer.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return Err(CanonicalJsonError::Invalid(
+            "number has an invalid decimal significand".to_owned(),
+        ));
+    }
+
+    let mut digits = String::with_capacity(integer.len().saturating_add(fraction.len()));
+    digits.push_str(integer);
+    digits.push_str(fraction);
+    let Some(first_nonzero) = digits.bytes().position(|byte| byte != b'0') else {
+        return Ok("0".to_owned());
+    };
+    let last_nonzero = digits
+        .bytes()
+        .rposition(|byte| byte != b'0')
+        .expect("a nonzero digit was found");
+    let trailing_zeros = digits.len() - last_nonzero - 1;
+    let significant = &digits[first_nonzero..=last_nonzero];
+
+    let (exponent_negative, exponent_magnitude) = parse_decimal_exponent(explicit_exponent)?;
+    let adjustment =
+        -(fraction.len() as i64) + trailing_zeros as i64 + (significant.len() - 1) as i64;
+    let (scientific_negative, scientific_magnitude) =
+        add_signed_decimal(exponent_negative, &exponent_magnitude, adjustment);
+    let small_exponent = small_signed_decimal(scientific_negative, &scientific_magnitude);
+
+    let mut output = String::with_capacity(raw.len());
+    if negative {
+        output.push('-');
+    }
+    match small_exponent {
+        Some(exponent @ 0..=20) => {
+            let point = exponent as usize + 1;
+            if point >= significant.len() {
+                output.push_str(significant);
+                output.extend(std::iter::repeat_n('0', point - significant.len()));
+            } else {
+                output.push_str(&significant[..point]);
+                output.push('.');
+                output.push_str(&significant[point..]);
+            }
+        }
+        Some(exponent @ -6..=-1) => {
+            output.push_str("0.");
+            output.extend(std::iter::repeat_n('0', (-exponent - 1) as usize));
+            output.push_str(significant);
+        }
+        _ => {
+            output.push(significant.as_bytes()[0] as char);
+            if significant.len() > 1 {
+                output.push('.');
+                output.push_str(&significant[1..]);
+            }
+            output.push('e');
+            output.push(if scientific_negative { '-' } else { '+' });
+            output.push_str(&scientific_magnitude);
+        }
+    }
+    Ok(output)
+}
+
+fn parse_decimal_exponent(raw: Option<&str>) -> Result<(bool, String), CanonicalJsonError> {
+    let Some(raw) = raw else {
+        return Ok((false, "0".to_owned()));
+    };
+    let (negative, digits) = if let Some(digits) = raw.strip_prefix('-') {
+        (true, digits)
+    } else {
+        (false, raw.strip_prefix('+').unwrap_or(raw))
+    };
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(CanonicalJsonError::Invalid(
+            "number has an invalid decimal exponent".to_owned(),
+        ));
+    }
+    let magnitude = digits.trim_start_matches('0');
+    if magnitude.is_empty() {
+        Ok((false, "0".to_owned()))
+    } else {
+        Ok((negative, magnitude.to_owned()))
+    }
+}
+
+fn add_signed_decimal(negative: bool, magnitude: &str, adjustment: i64) -> (bool, String) {
+    if adjustment == 0 {
+        return (negative, magnitude.to_owned());
+    }
+    let adjustment_negative = adjustment.is_negative();
+    let adjustment_magnitude = adjustment.unsigned_abs();
+    if negative == adjustment_negative {
+        return (
+            negative,
+            add_decimal_magnitude(magnitude, adjustment_magnitude),
+        );
+    }
+
+    match compare_decimal_magnitude_to_small(magnitude, adjustment_magnitude) {
+        std::cmp::Ordering::Greater => (
+            negative,
+            subtract_small_from_decimal_magnitude(magnitude, adjustment_magnitude),
+        ),
+        std::cmp::Ordering::Equal => (false, "0".to_owned()),
+        std::cmp::Ordering::Less => {
+            let parsed = magnitude
+                .parse::<u64>()
+                .expect("a magnitude smaller than the small adjustment fits u64");
+            (
+                adjustment_negative,
+                (adjustment_magnitude - parsed).to_string(),
+            )
+        }
+    }
+}
+
+fn compare_decimal_magnitude_to_small(magnitude: &str, small: u64) -> std::cmp::Ordering {
+    let small = small.to_string();
+    magnitude
+        .len()
+        .cmp(&small.len())
+        .then_with(|| magnitude.cmp(&small))
+}
+
+fn add_decimal_magnitude(magnitude: &str, small: u64) -> String {
+    let mut bytes = magnitude.as_bytes().to_vec();
+    let mut carry = small;
+    for byte in bytes.iter_mut().rev() {
+        if carry == 0 {
+            break;
+        }
+        let sum = u64::from(*byte - b'0') + carry % 10;
+        *byte = b'0' + (sum % 10) as u8;
+        carry = carry / 10 + sum / 10;
+    }
+    let mut prefix = Vec::new();
+    while carry != 0 {
+        prefix.push(b'0' + (carry % 10) as u8);
+        carry /= 10;
+    }
+    prefix.reverse();
+    prefix.extend(bytes);
+    String::from_utf8(prefix).expect("decimal magnitude remains ASCII")
+}
+
+fn subtract_small_from_decimal_magnitude(magnitude: &str, small: u64) -> String {
+    let mut bytes = magnitude.as_bytes().to_vec();
+    let mut borrow = small;
+    for byte in bytes.iter_mut().rev() {
+        if borrow == 0 {
+            break;
+        }
+        let subtrahend = (borrow % 10) as u8;
+        borrow /= 10;
+        let digit = *byte - b'0';
+        if digit < subtrahend {
+            *byte = b'0' + 10 + digit - subtrahend;
+            borrow += 1;
+        } else {
+            *byte = b'0' + digit - subtrahend;
+        }
+    }
+    debug_assert_eq!(borrow, 0);
+    let first_nonzero = bytes
+        .iter()
+        .position(|byte| *byte != b'0')
+        .unwrap_or(bytes.len() - 1);
+    String::from_utf8(bytes[first_nonzero..].to_vec()).expect("decimal magnitude remains ASCII")
+}
+
+fn small_signed_decimal(negative: bool, magnitude: &str) -> Option<i32> {
+    let parsed = magnitude.parse::<i32>().ok()?;
+    Some(if negative { -parsed } else { parsed })
+}
+
 fn write_canonical(value: &Value, output: &mut Vec<u8>) -> Result<(), CanonicalJsonError> {
     match value {
         Value::Null => output.extend_from_slice(b"null"),
         Value::Bool(true) => output.extend_from_slice(b"true"),
         Value::Bool(false) => output.extend_from_slice(b"false"),
-        Value::Number(number) => output.extend_from_slice(number.to_string().as_bytes()),
+        Value::Number(number) => output.extend_from_slice(canonical_number(number)?.as_bytes()),
         Value::String(string) => serde_json::to_writer(output, string)
             .map_err(|error| CanonicalJsonError::Invalid(error.to_string()))?,
         Value::Array(values) => {
@@ -625,30 +865,44 @@ impl Log {
         self.append_canonical(T::KIND, T::VERSION, payload)
     }
 
-    /// Import untrusted serialized history. Every field is validated and the
-    /// full chain must verify before a [`Log`] is returned.
+    /// Import untrusted serialized history. Every field is validated and each
+    /// link is verified before that event is retained.
+    ///
+    /// There is deliberately no global event-count cap so this can round-trip
+    /// every [`Log`] produced by [`Log::append_typed`]. A caller accepting a
+    /// potentially valid, unbounded iterator must enforce its own transport or
+    /// storage quota; malformed history is rejected at its first broken link.
     pub fn import_raw<I>(events: I) -> Result<Self, LogError>
     where
         I: IntoIterator<Item = RawEvent>,
     {
         let mut admitted = Vec::new();
+        let mut previous = GENESIS_HASH;
         for raw in events {
             validate_kind(&raw.kind).map_err(LogError::InvalidKind)?;
             if !(1..=MAX_SCHEMA_VERSION).contains(&raw.schema_version) {
                 return Err(LogError::InvalidSchemaVersion);
             }
-            admitted.push(Event {
+            let expected_seq =
+                u64::try_from(admitted.len()).map_err(|_| LogError::SequenceOverflow)?;
+            if raw.seq != expected_seq || raw.prev_hash != previous {
+                return Err(LogError::TamperedAt(expected_seq));
+            }
+            let event = Event {
                 seq: raw.seq,
                 kind: raw.kind,
                 schema_version: raw.schema_version,
                 payload: CanonicalJson::parse(raw.payload_json)?,
                 prev_hash: raw.prev_hash,
                 hash: raw.hash,
-            });
+            };
+            if event.hash != event_hash(&event) {
+                return Err(LogError::TamperedAt(expected_seq));
+            }
+            previous = event.hash;
+            admitted.push(event);
         }
-        let log = Self { events: admitted };
-        log.verify()?;
-        Ok(log)
+        Ok(Self { events: admitted })
     }
 
     /// All admitted events.
@@ -769,6 +1023,44 @@ pub fn hex(hash: &Hash) -> String {
     encoded
 }
 
+#[derive(Default)]
+struct TransformObservations {
+    outputs: BTreeMap<Hash, Hash>,
+    insertion_order: VecDeque<Hash>,
+}
+
+impl TransformObservations {
+    fn accepts(&mut self, input: &CanonicalJson, output: &CanonicalJson) -> bool {
+        let input_digest: Hash = Sha256::digest(input.as_bytes()).into();
+        let output_digest: Hash = Sha256::digest(output.as_bytes()).into();
+        if let Some(expected) = self.outputs.get(&input_digest) {
+            return *expected == output_digest;
+        }
+
+        if self.outputs.len() == MAX_TRANSFORM_OBSERVATIONS {
+            let oldest = self
+                .insertion_order
+                .pop_front()
+                .expect("a full observation cache has an oldest entry");
+            self.outputs.remove(&oldest);
+        }
+        self.outputs.insert(input_digest, output_digest);
+        self.insertion_order.push_back(input_digest);
+        true
+    }
+}
+
+fn observed_transform_is_stable(
+    observations: &Mutex<TransformObservations>,
+    input: &CanonicalJson,
+    output: &CanonicalJson,
+) -> bool {
+    observations
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .accepts(input, output)
+}
+
 /// Mutable construction phase for a typed event schema catalog.
 pub struct EventCatalogBuilder<E> {
     kinds: BTreeMap<String, KindBuilder<E>>,
@@ -790,12 +1082,25 @@ impl<E: 'static> EventCatalogBuilder<E> {
     }
 
     /// Register the reducer-facing current schema for one event kind.
-    pub fn register_current<T, F>(&mut self, into_event: F) -> Result<&mut Self, CatalogError>
+    ///
+    /// `mapping_id` is a stable identity for the typed `T -> E` mapping and is
+    /// included in the sealed schema-set digest. The mapper is executed twice
+    /// per decode and checked against a bounded history of prior observations.
+    /// This detects observed divergence; application mapper code must still be
+    /// pure because finite runtime sampling cannot prove arbitrary host code.
+    pub fn register_current<T, F>(
+        &mut self,
+        mapping_id: impl Into<String>,
+        into_event: F,
+    ) -> Result<&mut Self, CatalogError>
     where
         T: EventSchema + DeserializeOwned + 'static,
+        E: Serialize + PartialEq,
         F: Fn(T) -> E + Send + Sync + 'static,
     {
         validate_schema::<T>().map_err(CatalogError::InvalidSchema)?;
+        let mapping_id = mapping_id.into();
+        validate_contract_id(&mapping_id).map_err(CatalogError::InvalidMappingId)?;
         if !self.kinds.contains_key(T::KIND) && self.kinds.len() >= MAX_CATALOG_KINDS {
             return Err(CatalogError::TooManyKinds);
         }
@@ -804,18 +1109,48 @@ impl<E: 'static> EventCatalogBuilder<E> {
         if kind.current.is_some() {
             return Err(CatalogError::DuplicateCurrent(T::KIND.to_owned()));
         }
+        let observations = Mutex::new(TransformObservations::default());
         let decoder = move |json: &CanonicalJson| {
-            let value = json.decode::<T>().map_err(CatalogError::Payload)?;
-            Ok(into_event(value))
+            let run_once = || {
+                let value = json.decode::<T>().map_err(CatalogError::Payload)?;
+                Ok::<E, CatalogError>(into_event(value))
+            };
+            let first = run_once()?;
+            let second = run_once()?;
+            if first != second {
+                return Err(CatalogError::NondeterministicMapping {
+                    kind: T::KIND.to_owned(),
+                    version: T::VERSION,
+                });
+            }
+            let first_json =
+                CanonicalJson::from_serialize(&first).map_err(CatalogError::Payload)?;
+            let second_json =
+                CanonicalJson::from_serialize(&second).map_err(CatalogError::Payload)?;
+            if first_json != second_json
+                || !observed_transform_is_stable(&observations, json, &first_json)
+            {
+                return Err(CatalogError::NondeterministicMapping {
+                    kind: T::KIND.to_owned(),
+                    version: T::VERSION,
+                });
+            }
+            Ok(first)
         };
         kind.current = Some(CurrentSchema {
             version: T::VERSION,
+            mapping_id,
             decode: Arc::new(decoder),
         });
         Ok(self)
     }
 
     /// Register one explicit adjacent same-kind upcast edge.
+    ///
+    /// The transform is executed twice per decode and compared with a bounded
+    /// history of prior observations for the same canonical input. This is an
+    /// observed-divergence tripwire, not a proof that arbitrary host code is
+    /// pure; the application still owns that invariant.
     pub fn register_upcaster<From, To, F>(
         &mut self,
         step_id: impl Into<String>,
@@ -869,10 +1204,11 @@ impl<E: 'static> EventCatalogBuilder<E> {
             })?;
             CanonicalJson::from_serialize(&output).map_err(CatalogError::Payload)
         };
+        let observations = Mutex::new(TransformObservations::default());
         let deterministic = move |json: &CanonicalJson| {
             let first = run_once(json)?;
             let second = run_once(json)?;
-            if first != second {
+            if first != second || !observed_transform_is_stable(&observations, json, &first) {
                 return Err(CatalogError::NondeterministicUpcast {
                     kind: From::KIND.to_owned(),
                     from: From::VERSION,
@@ -1024,6 +1360,7 @@ type ApplyUpcast = dyn Fn(&CanonicalJson) -> Result<CanonicalJson, CatalogError>
 
 struct CurrentSchema<E> {
     version: u32,
+    mapping_id: String,
     decode: Arc<DecodeCurrent<E>>,
 }
 
@@ -1055,8 +1392,8 @@ impl<E> SealedEventCatalog<E> {
             .is_some_and(|entry| entry.schemas.contains_key(&schema_version))
     }
 
-    /// Deterministic digest of every schema identity, target version, and
-    /// upcaster edge/step identity in the sealed graph.
+    /// Deterministic digest of every schema identity, target version, current
+    /// mapper identity, and upcaster edge/step identity in the sealed graph.
     #[must_use]
     pub const fn schema_set_digest(&self) -> Hash {
         self.digest
@@ -1107,6 +1444,7 @@ pub enum CatalogError {
     TooManySchemas(String),
     TooManyUpcasters(String),
     InvalidSchema(LogError),
+    InvalidMappingId(String),
     InvalidStepId(String),
     DuplicateSchema {
         kind: String,
@@ -1164,6 +1502,10 @@ pub enum CatalogError {
         kind: String,
         from: u32,
     },
+    NondeterministicMapping {
+        kind: String,
+        version: u32,
+    },
 }
 
 impl fmt::Display for CatalogError {
@@ -1182,6 +1524,9 @@ impl fmt::Display for CatalogError {
                 write!(formatter, "event kind `{kind}` exceeds the upcaster limit")
             }
             Self::InvalidSchema(error) => write!(formatter, "invalid event schema: {error}"),
+            Self::InvalidMappingId(reason) => {
+                write!(formatter, "invalid current-schema mapping id: {reason}")
+            }
             Self::InvalidStepId(reason) => write!(formatter, "invalid upcaster step id: {reason}"),
             Self::DuplicateSchema { kind, version } => {
                 write!(formatter, "duplicate schema `{kind}` version {version}")
@@ -1251,6 +1596,10 @@ impl fmt::Display for CatalogError {
                 formatter,
                 "upcaster `{kind}` from version {from} produced different canonical outputs"
             ),
+            Self::NondeterministicMapping { kind, version } => write!(
+                formatter,
+                "current-schema mapper `{kind}` version {version} produced different outputs"
+            ),
         }
     }
 }
@@ -1305,6 +1654,7 @@ fn schema_set_digest<E>(kinds: &BTreeMap<String, SealedKind<E>>) -> Hash {
     for (name, kind) in kinds {
         update_len_prefixed(&mut hasher, name.as_bytes());
         hasher.update(kind.current.version.to_be_bytes());
+        update_len_prefixed(&mut hasher, kind.current.mapping_id.as_bytes());
         hasher.update((kind.schemas.len() as u64).to_be_bytes());
         for (version, schema_id) in &kind.schemas {
             hasher.update(version.to_be_bytes());
@@ -1401,7 +1751,18 @@ mod tests {
         const SCHEMA_ID: &'static str = "pliego.example/note-added/1";
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct BigAmount {
+        value: u128,
+    }
+
+    impl EventSchema for BigAmount {
+        const KIND: &'static str = "app_big_amount";
+        const VERSION: u32 = 1;
+        const SCHEMA_ID: &'static str = "pliego.example/big-amount/1";
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
     enum AppEvent {
         Task(TaskV2),
         Note(NoteV1),
@@ -1417,7 +1778,7 @@ mod tests {
                 })
             })
             .unwrap()
-            .register_current::<TaskV2, _>(AppEvent::Task)
+            .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
             .unwrap();
         builder.seal().unwrap()
     }
@@ -1439,6 +1800,95 @@ mod tests {
     }
 
     #[test]
+    fn canonical_json_preserves_significant_arbitrary_precision_numbers() {
+        let short = CanonicalJson::parse("0.1").unwrap();
+        let precise = CanonicalJson::parse("0.100000000000000000000000000000000001").unwrap();
+        assert_ne!(short, precise);
+        assert_eq!(precise.as_str(), "0.100000000000000000000000000000000001");
+
+        let first = CanonicalJson::parse("18446744073709551616").unwrap();
+        let second = CanonicalJson::parse("18446744073709551617").unwrap();
+        assert_ne!(first, second);
+        assert_eq!(second.as_str(), "18446744073709551617");
+    }
+
+    #[test]
+    fn canonical_json_normalizes_equivalent_decimal_lexemes_without_float_rounding() {
+        let one = CanonicalJson::parse("1").unwrap();
+        for equivalent in ["1.0", "1e0", "1E+000", "10e-1"] {
+            assert_eq!(CanonicalJson::parse(equivalent).unwrap(), one);
+        }
+        assert_eq!(CanonicalJson::from_serialize(&1.0f64).unwrap(), one);
+        assert_eq!(one.as_str(), "1");
+
+        let zero = CanonicalJson::parse("0").unwrap();
+        for equivalent in ["-0", "0.0", "-0.000e+999"] {
+            assert_eq!(CanonicalJson::parse(equivalent).unwrap(), zero);
+        }
+        assert_eq!(CanonicalJson::from_serialize(&-0.0f64).unwrap(), zero);
+        assert_eq!(zero.as_str(), "0");
+
+        assert_eq!(CanonicalJson::parse("12345e-2").unwrap().as_str(), "123.45");
+        assert_eq!(
+            CanonicalJson::parse("1000000000000000000000")
+                .unwrap()
+                .as_str(),
+            "1e+21"
+        );
+        assert_eq!(
+            CanonicalJson::parse("1e+000000000000000000021")
+                .unwrap()
+                .as_str(),
+            "1e+21"
+        );
+        assert_eq!(
+            CanonicalJson::parse("0.000001").unwrap().as_str(),
+            "0.000001"
+        );
+        assert_eq!(CanonicalJson::parse("0.0000001").unwrap().as_str(), "1e-7");
+
+        for coefficient in 1..=97i32 {
+            for exponent in -24..=24i32 {
+                let base = CanonicalJson::parse(format!("{coefficient}e{exponent}")).unwrap();
+                let shifted =
+                    CanonicalJson::parse(format!("{coefficient}0e{}", exponent - 1)).unwrap();
+                let decimal = CanonicalJson::parse(format!("{coefficient}.0e{exponent}")).unwrap();
+                assert_eq!(base, shifted);
+                assert_eq!(base, decimal);
+            }
+        }
+    }
+
+    #[test]
+    fn decimal_exponent_arithmetic_handles_large_carry_and_borrow() {
+        assert_eq!(
+            add_signed_decimal(false, "999", 1),
+            (false, "1000".to_owned())
+        );
+        assert_eq!(
+            add_signed_decimal(true, "1000", 1),
+            (true, "999".to_owned())
+        );
+        assert_eq!(
+            add_signed_decimal(true, "999", -1),
+            (true, "1000".to_owned())
+        );
+        assert_eq!(add_signed_decimal(false, "1", -2), (true, "1".to_owned()));
+        assert_eq!(add_signed_decimal(true, "1", 2), (false, "1".to_owned()));
+
+        let nines = "9".repeat(100);
+        let power = "1".to_owned() + &"0".repeat(100);
+        assert_eq!(add_decimal_magnitude(&nines, 1), power);
+        assert_eq!(subtract_small_from_decimal_magnitude(&power, 1), nines);
+
+        let huge = "9".repeat(100);
+        let one = CanonicalJson::parse(format!("1e+{huge}")).unwrap();
+        let shifted_exponent = subtract_small_from_decimal_magnitude(&huge, 1);
+        let ten = CanonicalJson::parse(format!("10e+{shifted_exponent}")).unwrap();
+        assert_eq!(one, ten);
+    }
+
+    #[test]
     fn canonical_json_rejects_duplicate_keys_at_any_depth() {
         assert!(matches!(
             CanonicalJson::parse(br#"{"x":1,"x":2}"#),
@@ -1451,11 +1901,53 @@ mod tests {
     }
 
     #[test]
+    fn canonical_json_rejects_serde_number_sentinel_object_keys() {
+        let number = CanonicalJson::parse("1").unwrap();
+        assert_eq!(number.as_str(), "1");
+
+        for raw in [
+            r#"{"$serde_json::private::Number":"1"}"#,
+            r#"{"\u0024serde_json::private::Number":"1"}"#,
+            r#"{"\u0024\u0073\u0065\u0072\u0064\u0065\u005f\u006a\u0073\u006f\u006e\u003a\u003a\u0070\u0072\u0069\u0076\u0061\u0074\u0065\u003a\u003a\u004e\u0075\u006d\u0062\u0065\u0072":"1"}"#,
+            r#"{"nested":{"$serde_json::private::Number":"1"}}"#,
+        ] {
+            assert!(matches!(
+                CanonicalJson::parse(raw),
+                Err(CanonicalJsonError::Invalid(reason)) if reason.contains("is reserved")
+            ));
+        }
+
+        assert_eq!(
+            CanonicalJson::parse(r#"{"value":"$serde_json::private::Number"}"#)
+                .unwrap()
+                .as_str(),
+            r#"{"value":"$serde_json::private::Number"}"#
+        );
+
+        for truncated in [
+            r#"{"$serde_json::private::Number":"1"#,
+            r#"{"$serde_json::private::Number"#,
+            r#"{"\u0024serde_json::private::Number":"1"#,
+            r#"{"unterminated\"#,
+        ] {
+            assert!(CanonicalJson::parse(truncated).is_err());
+        }
+    }
+
+    #[test]
     fn canonical_json_enforces_byte_depth_and_node_bounds() {
+        let exact_bytes = format!("\"{}\"", "a".repeat(MAX_JSON_BYTES - 2));
+        assert!(CanonicalJson::parse(exact_bytes).is_ok());
         assert!(matches!(
             CanonicalJson::parse(vec![b' '; MAX_JSON_BYTES + 1]),
             Err(CanonicalJsonError::TooLarge { .. })
         ));
+        let exact_depth = format!(
+            "{}0{}",
+            "[".repeat(MAX_JSON_DEPTH - 1),
+            "]".repeat(MAX_JSON_DEPTH - 1)
+        );
+        assert!(CanonicalJson::parse(exact_depth).is_ok());
         let too_deep = format!(
             "{}0{}",
             "[".repeat(MAX_JSON_DEPTH),
@@ -1465,6 +1957,8 @@ mod tests {
             CanonicalJson::parse(too_deep),
             Err(CanonicalJsonError::TooDeep { .. }) | Err(CanonicalJsonError::Invalid(_))
         ));
+        let exact_nodes = format!("[{}0]", "0,".repeat(MAX_JSON_NODES - 2));
+        assert!(CanonicalJson::parse(exact_nodes).is_ok());
         let too_many = format!("[{}]", "0,".repeat(MAX_JSON_NODES) + "0");
         assert!(matches!(
             CanonicalJson::parse(too_many),
@@ -1492,6 +1986,26 @@ mod tests {
         assert_eq!(stored.payload.as_str(), r#"{"title":"write tests"}"#);
         assert_eq!(stored.hash, event_hash(&stored));
         assert!(log.verify().is_ok());
+    }
+
+    #[test]
+    fn typed_u128_payload_round_trips_through_its_exact_catalog_schema() {
+        let source = BigAmount {
+            value: u128::from(u64::MAX) + 2,
+        };
+        let mut log = Log::new();
+        let stored = log.append_typed(&source).unwrap();
+        assert_eq!(
+            stored.payload().as_str(),
+            r#"{"value":18446744073709551617}"#
+        );
+
+        let mut builder = EventCatalogBuilder::new();
+        builder
+            .register_current::<BigAmount, _>("big-amount/identity/1", |value| value)
+            .unwrap();
+        let catalog = builder.seal().unwrap();
+        assert_eq!(catalog.decode(stored), Ok(source));
     }
 
     #[test]
@@ -1536,6 +2050,24 @@ mod tests {
         let mut tampered = raw;
         tampered.schema_version = 2;
         assert_eq!(Log::import_raw([tampered]), Err(LogError::TamperedAt(0)));
+    }
+
+    #[test]
+    fn import_raw_rejects_the_first_broken_link_without_consuming_the_tail() {
+        let mut consumed = 0usize;
+        let invalid = (0..10_000).map(|_| {
+            consumed += 1;
+            RawEvent {
+                seq: 99,
+                kind: TaskV1::KIND.to_owned(),
+                schema_version: TaskV1::VERSION,
+                payload_json: br#"{"title":"never parsed"}"#.to_vec(),
+                prev_hash: GENESIS_HASH,
+                hash: GENESIS_HASH,
+            }
+        });
+        assert_eq!(Log::import_raw(invalid), Err(LogError::TamperedAt(0)));
+        assert_eq!(consumed, 1);
     }
 
     #[test]
@@ -1629,7 +2161,7 @@ mod tests {
 
         let mut current_only: EventCatalogBuilder<AppEvent> = EventCatalogBuilder::new();
         current_only
-            .register_current::<TaskV2, _>(AppEvent::Task)
+            .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
             .unwrap();
         assert!(current_only.seal().is_ok());
 
@@ -1656,7 +2188,7 @@ mod tests {
                 })
             })
             .unwrap()
-            .register_current::<TaskV3, _>(|value| {
+            .register_current::<TaskV3, _>("app-event/task-v3/1", |value| {
                 AppEvent::Task(TaskV2 {
                     title: value.title,
                     priority: value.priority,
@@ -1676,7 +2208,7 @@ mod tests {
             })
         })
         .unwrap()
-        .register_current::<TaskV4, _>(|value| {
+        .register_current::<TaskV4, _>("app-event/task-v4/1", |value| {
             AppEvent::Task(TaskV2 {
                 title: value.title,
                 priority: 0,
@@ -1690,15 +2222,18 @@ mod tests {
 
         let mut conflicting: EventCatalogBuilder<AppEvent> = EventCatalogBuilder::new();
         conflicting
-            .register_current::<TaskV2, _>(AppEvent::Task)
+            .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
             .unwrap();
         assert!(matches!(
-            conflicting.register_current::<AlternateTaskV2, _>(|value| {
-                AppEvent::Task(TaskV2 {
-                    title: value.title,
-                    priority: value.priority,
-                })
-            }),
+            conflicting.register_current::<AlternateTaskV2, _>(
+                "app-event/alternate-task-v2/1",
+                |value| {
+                    AppEvent::Task(TaskV2 {
+                        title: value.title,
+                        priority: value.priority,
+                    })
+                },
+            ),
             Err(CatalogError::DuplicateSchema { version: 2, .. })
         ));
     }
@@ -1709,7 +2244,7 @@ mod tests {
             let mut builder = EventCatalogBuilder::new();
             if reverse {
                 builder
-                    .register_current::<NoteV1, _>(AppEvent::Note)
+                    .register_current::<NoteV1, _>("app-event/note-v1/1", AppEvent::Note)
                     .unwrap();
             }
             builder
@@ -1720,11 +2255,11 @@ mod tests {
                     })
                 })
                 .unwrap()
-                .register_current::<TaskV2, _>(AppEvent::Task)
+                .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
                 .unwrap();
             if !reverse {
                 builder
-                    .register_current::<NoteV1, _>(AppEvent::Note)
+                    .register_current::<NoteV1, _>("app-event/note-v1/1", AppEvent::Note)
                     .unwrap();
             }
             builder.seal().unwrap().schema_set_digest()
@@ -1733,7 +2268,7 @@ mod tests {
     }
 
     #[test]
-    fn catalog_digest_binds_schema_and_step_ids() {
+    fn catalog_digest_binds_schema_step_and_mapping_ids() {
         fn digest(step: &str) -> Hash {
             let mut builder = EventCatalogBuilder::new();
             builder
@@ -1744,15 +2279,30 @@ mod tests {
                     })
                 })
                 .unwrap()
-                .register_current::<TaskV2, _>(AppEvent::Task)
+                .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
                 .unwrap();
             builder.seal().unwrap().schema_set_digest()
         }
         assert_ne!(digest("step/1"), digest("step/2"));
 
+        fn current_digest(mapping_id: &str) -> Hash {
+            let mut builder = EventCatalogBuilder::new();
+            builder
+                .register_current::<TaskV2, _>(mapping_id, AppEvent::Task)
+                .unwrap();
+            builder.seal().unwrap().schema_set_digest()
+        }
+        assert_ne!(current_digest("mapping/1"), current_digest("mapping/2"));
+
+        let mut invalid_mapping = EventCatalogBuilder::new();
+        assert!(matches!(
+            invalid_mapping.register_current::<TaskV2, _>("not portable!", AppEvent::Task),
+            Err(CatalogError::InvalidMappingId(_))
+        ));
+
         let mut builder = EventCatalogBuilder::new();
         builder
-            .register_current::<AlternateTaskV2, _>(|value| {
+            .register_current::<AlternateTaskV2, _>("app-event/alternate-task-v2/1", |value| {
                 AppEvent::Task(TaskV2 {
                     title: value.title,
                     priority: value.priority,
@@ -1766,11 +2316,11 @@ mod tests {
 
         let mut standard = EventCatalogBuilder::new();
         standard
-            .register_current::<TaskV2, _>(AppEvent::Task)
+            .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
             .unwrap();
         let mut alternate = EventCatalogBuilder::new();
         alternate
-            .register_current::<AlternateTaskV2, _>(|value| {
+            .register_current::<AlternateTaskV2, _>("app-event/alternate-task-v2/1", |value| {
                 AppEvent::Task(TaskV2 {
                     title: value.title,
                     priority: value.priority,
@@ -1789,7 +2339,7 @@ mod tests {
         failing
             .register_upcaster::<TaskV1, TaskV2, _>("failure/1", |_| Err("nope".into()))
             .unwrap()
-            .register_current::<TaskV2, _>(AppEvent::Task)
+            .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
             .unwrap();
         let failing = failing.seal().unwrap();
 
@@ -1815,11 +2365,59 @@ mod tests {
                 })
             })
             .unwrap()
-            .register_current::<TaskV2, _>(AppEvent::Task)
+            .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
             .unwrap();
         assert!(matches!(
             changing.seal().unwrap().decode(event),
             Err(CatalogError::NondeterministicUpcast { .. })
+        ));
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = Arc::clone(&calls);
+        let mut paired = EventCatalogBuilder::new();
+        paired
+            .register_upcaster::<TaskV1, TaskV2, _>("paired/1", move |old| {
+                Ok(TaskV2 {
+                    title: old.title,
+                    priority: (observed.fetch_add(1, Ordering::SeqCst) / 2) as u8,
+                })
+            })
+            .unwrap()
+            .register_current::<TaskV2, _>("app-event/task-v2/1", AppEvent::Task)
+            .unwrap();
+        let paired = paired.seal().unwrap();
+        assert!(paired.decode(event).is_ok());
+        assert!(matches!(
+            paired.decode(event),
+            Err(CatalogError::NondeterministicUpcast { .. })
+        ));
+    }
+
+    #[test]
+    fn current_mapper_identity_and_observed_output_fail_closed() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = Arc::clone(&calls);
+        let mut builder = EventCatalogBuilder::new();
+        builder
+            .register_current::<TaskV1, _>("app-event/task-v1-dynamic/1", move |old| {
+                AppEvent::Task(TaskV2 {
+                    title: old.title,
+                    priority: (observed.fetch_add(1, Ordering::SeqCst) / 2) as u8,
+                })
+            })
+            .unwrap();
+        let catalog = builder.seal().unwrap();
+
+        let mut log = Log::new();
+        let event = log
+            .append_typed(&TaskV1 {
+                title: "old".into(),
+            })
+            .unwrap();
+        assert!(catalog.decode(event).is_ok());
+        assert!(matches!(
+            catalog.decode(event),
+            Err(CatalogError::NondeterministicMapping { .. })
         ));
     }
 
@@ -1839,7 +2437,7 @@ mod tests {
         ));
         let mut catalog: EventCatalogBuilder<AppEvent> = EventCatalogBuilder::new();
         assert!(matches!(
-            catalog.register_current::<Bad, _>(|_| unreachable!()),
+            catalog.register_current::<Bad, _>("bad/1", |_| unreachable!()),
             Err(CatalogError::InvalidSchema(LogError::InvalidKind(_)))
         ));
 
@@ -1855,7 +2453,7 @@ mod tests {
             Err(LogError::InvalidSchemaVersion)
         ));
         assert!(matches!(
-            catalog.register_current::<ExtremeVersion, _>(|_| unreachable!()),
+            catalog.register_current::<ExtremeVersion, _>("extreme/1", |_| unreachable!()),
             Err(CatalogError::InvalidSchema(LogError::InvalidSchemaVersion))
         ));
     }
@@ -1873,7 +2471,7 @@ mod tests {
         );
         assert_eq!(
             hex(&task_catalog().schema_set_digest()),
-            "5b2d76539641f9562cb0e7ab403348bf68e79a34d42ba44779069974a7fb84b9"
+            "88dd035aa6c68b2af282d43d2500b0d1d40d6fcdcc7bf3d986dedc9f462aca18"
         );
     }
 

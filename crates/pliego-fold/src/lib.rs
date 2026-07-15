@@ -20,15 +20,14 @@ use pliego_reactive::Signal;
 use serde::Serialize;
 
 pub use codec::{
-    CANONICAL_JSON_CODEC_ID, CanonicalJsonCodec, CodecError, MAX_CANONICAL_STATE_BYTES, StateCodec,
+    CANONICAL_JSON_CODEC_ID, CanonicalJsonCodec, CodecError, MAX_CANONICAL_STATE_BYTES,
+    MAX_CANONICAL_STATE_DEPTH, MAX_CANONICAL_STATE_NODES, StateCodec,
 };
 pub use pliego_log::LogCursor;
-pub use projection::{
-    EventResolveError, EventResolver, Projection, ProjectionError, Reducer, ReducerError,
-};
+pub use projection::{Projection, ProjectionError, Reducer, ReducerError};
 pub use snapshot::{
-    MAX_CONTRACT_ID_BYTES, MAX_PROJECTION_SNAPSHOT_BYTES, ProjectionSnapshot, ReducerIdentity,
-    SNAPSHOT_FORMAT_V1, SnapshotError,
+    CodecIdentity, MAX_CONTRACT_ID_BYTES, MAX_PROJECTION_SNAPSHOT_BYTES, ProjectionSnapshot,
+    ReducerIdentity, SNAPSHOT_FORMAT_V1, SnapshotError,
 };
 
 /// Compatibility name for the one projection implementation; it does not
