@@ -155,6 +155,34 @@ jobs:
           echo "$RUNNER_TEMP/wasm-bindgen" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/wasm-bindgen/wasm-bindgen" --version
 
+      - name: Test DOM lifecycle in real Chromium
+        shell: bash
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
+          WASM_BINDGEN_TEST_DRIVER_TIMEOUT: "15"
+          WASM_BINDGEN_TEST_TIMEOUT: "120"
+          WASM_BINDGEN_TEST_WEBDRIVER_JSON: ${{ github.workspace }}/crates/pliego-dom/tests/webdriver.json
+        run: |
+          if test -n "${CHROMEWEBDRIVER:-}"; then
+            if test -d "$CHROMEWEBDRIVER"; then
+              export CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver"
+            else
+              export CHROMEDRIVER="$CHROMEWEBDRIVER"
+            fi
+          else
+            export CHROMEDRIVER="$(command -v chromedriver)"
+          fi
+          test -x "$CHROMEDRIVER"
+          "$CHROMEDRIVER" --version
+          google-chrome --version
+          unset NO_HEADLESS
+          cargo test -p pliego-dom \
+            --target wasm32-unknown-unknown \
+            --test browser_lifecycle \
+            --locked \
+            --offline \
+            -- --nocapture
+
       - name: Validate the official PliegoRS site
         shell: bash
         run: |

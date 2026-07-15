@@ -18,11 +18,16 @@ wasm-bindgen = { workspace = true }
 web-sys = { workspace = true, features = [
     "Window",
     "Document",
+    "DocumentFragment",
     "Element",
     "HtmlElement",
+    "CharacterData",
     "Text",
     "Comment",
     "Node",
     "Event",
     "EventTarget",
 ] }
+
+[dev-dependencies]
+wasm-bindgen-test = { workspace = true }

@@ -1,0 +1,15 @@
+{
+  "browserName": "chrome",
+  "goog:chromeOptions": {
+    "args": [
+      "disable-background-networking",
+      "disable-component-update",
+      "disable-default-apps",
+      "disable-sync",
+      "metrics-recording-only",
+      "no-default-browser-check",
+      "no-first-run",
+      "host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost"
+    ]
+  }
+}

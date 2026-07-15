@@ -558,6 +558,7 @@ version = "0.0.1"
 dependencies = [
  "pliego-reactive",
  "wasm-bindgen",
+ "wasm-bindgen-test",
  "web-sys",
 ]
 
