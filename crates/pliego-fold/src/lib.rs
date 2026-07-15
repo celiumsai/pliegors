@@ -17,7 +17,7 @@ mod snapshot;
 
 use pliego_log::{EventSchema, Log};
 use pliego_reactive::Signal;
-use serde::Serialize;
+use serde::{Serialize, de::DeserializeOwned};
 
 pub use codec::{
     CANONICAL_JSON_CODEC_ID, CanonicalJsonCodec, CodecError, MAX_CANONICAL_STATE_BYTES,
@@ -61,7 +61,7 @@ impl ReactiveLog {
     /// the event type rather than free-form call-site strings.
     pub fn append_typed<T>(&self, event: &T) -> Result<(), pliego_log::LogError>
     where
-        T: EventSchema + Serialize,
+        T: EventSchema + Serialize + DeserializeOwned + PartialEq,
     {
         let mut result = None;
         self.inner.update(|log| {

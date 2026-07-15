@@ -23,6 +23,10 @@ use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use serde::de::{DeserializeOwned, MapAccess, SeqAccess, Visitor};
+use serde::ser::{
+    Error as _, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
+    SerializeTuple, SerializeTupleStruct, SerializeTupleVariant, Serializer,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -121,7 +125,7 @@ impl CanonicalJson {
     /// aware, bounded canonicalization path used for untrusted source bytes.
     pub fn from_serialize<T: Serialize + ?Sized>(value: &T) -> Result<Self, CanonicalJsonError> {
         let mut writer = BoundedWriter::new(MAX_JSON_BYTES);
-        if let Err(error) = serde_json::to_writer(&mut writer, value) {
+        if let Err(error) = serde_json::to_writer(&mut writer, &FiniteJson(value)) {
             if let Some(actual) = writer.attempted_size {
                 return Err(CanonicalJsonError::TooLarge {
                     actual,
@@ -218,6 +222,330 @@ impl fmt::Display for CanonicalJsonError {
 }
 
 impl Error for CanonicalJsonError {}
+
+struct FiniteJson<'a, T: ?Sized>(&'a T);
+
+impl<T: Serialize + ?Sized> Serialize for FiniteJson<'_, T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(RejectNonFinite(serializer))
+    }
+}
+
+struct RejectNonFinite<S>(S);
+
+impl<S: Serializer> Serializer for RejectNonFinite<S> {
+    type Ok = S::Ok;
+    type Error = S::Error;
+    type SerializeSeq = RejectNonFiniteCompound<S::SerializeSeq>;
+    type SerializeTuple = RejectNonFiniteCompound<S::SerializeTuple>;
+    type SerializeTupleStruct = RejectNonFiniteCompound<S::SerializeTupleStruct>;
+    type SerializeTupleVariant = RejectNonFiniteCompound<S::SerializeTupleVariant>;
+    type SerializeMap = RejectNonFiniteCompound<S::SerializeMap>;
+    type SerializeStruct = RejectNonFiniteCompound<S::SerializeStruct>;
+    type SerializeStructVariant = RejectNonFiniteCompound<S::SerializeStructVariant>;
+
+    fn serialize_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_bool(value)
+    }
+
+    fn serialize_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_i8(value)
+    }
+
+    fn serialize_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_i16(value)
+    }
+
+    fn serialize_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_i32(value)
+    }
+
+    fn serialize_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_i64(value)
+    }
+
+    fn serialize_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_i128(value)
+    }
+
+    fn serialize_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_u8(value)
+    }
+
+    fn serialize_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_u16(value)
+    }
+
+    fn serialize_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_u32(value)
+    }
+
+    fn serialize_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_u64(value)
+    }
+
+    fn serialize_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_u128(value)
+    }
+
+    fn serialize_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
+        if !value.is_finite() {
+            return Err(S::Error::custom("non-finite f32 is not valid JSON"));
+        }
+        self.0.serialize_f32(value)
+    }
+
+    fn serialize_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
+        if !value.is_finite() {
+            return Err(S::Error::custom("non-finite f64 is not valid JSON"));
+        }
+        self.0.serialize_f64(value)
+    }
+
+    fn serialize_char(self, value: char) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_char(value)
+    }
+
+    fn serialize_str(self, value: &str) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_str(value)
+    }
+
+    fn serialize_bytes(self, value: &[u8]) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_bytes(value)
+    }
+
+    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_none()
+    }
+
+    fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_some(&FiniteJson(value))
+    }
+
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_unit()
+    }
+
+    fn serialize_unit_struct(self, name: &'static str) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_unit_struct(name)
+    }
+
+    fn serialize_unit_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_unit_variant(name, variant_index, variant)
+    }
+
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(
+        self,
+        name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        self.0.serialize_newtype_struct(name, &FiniteJson(value))
+    }
+
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        self.0
+            .serialize_newtype_variant(name, variant_index, variant, &FiniteJson(value))
+    }
+
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        self.0.serialize_seq(len).map(RejectNonFiniteCompound)
+    }
+
+    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        self.0.serialize_tuple(len).map(RejectNonFiniteCompound)
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        self.0
+            .serialize_tuple_struct(name, len)
+            .map(RejectNonFiniteCompound)
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        self.0
+            .serialize_tuple_variant(name, variant_index, variant, len)
+            .map(RejectNonFiniteCompound)
+    }
+
+    fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        self.0.serialize_map(len).map(RejectNonFiniteCompound)
+    }
+
+    fn serialize_struct(
+        self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        self.0
+            .serialize_struct(name, len)
+            .map(RejectNonFiniteCompound)
+    }
+
+    fn serialize_struct_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        self.0
+            .serialize_struct_variant(name, variant_index, variant, len)
+            .map(RejectNonFiniteCompound)
+    }
+
+    fn collect_str<T: fmt::Display + ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error> {
+        self.0.collect_str(value)
+    }
+
+    fn is_human_readable(&self) -> bool {
+        self.0.is_human_readable()
+    }
+}
+
+struct RejectNonFiniteCompound<C>(C);
+
+impl<C: SerializeSeq> SerializeSeq for RejectNonFiniteCompound<C> {
+    type Ok = C::Ok;
+    type Error = C::Error;
+
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.0.serialize_element(&FiniteJson(value))
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.0.end()
+    }
+}
+
+impl<C: SerializeTuple> SerializeTuple for RejectNonFiniteCompound<C> {
+    type Ok = C::Ok;
+    type Error = C::Error;
+
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.0.serialize_element(&FiniteJson(value))
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.0.end()
+    }
+}
+
+impl<C: SerializeTupleStruct> SerializeTupleStruct for RejectNonFiniteCompound<C> {
+    type Ok = C::Ok;
+    type Error = C::Error;
+
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.0.serialize_field(&FiniteJson(value))
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.0.end()
+    }
+}
+
+impl<C: SerializeTupleVariant> SerializeTupleVariant for RejectNonFiniteCompound<C> {
+    type Ok = C::Ok;
+    type Error = C::Error;
+
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.0.serialize_field(&FiniteJson(value))
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.0.end()
+    }
+}
+
+impl<C: SerializeMap> SerializeMap for RejectNonFiniteCompound<C> {
+    type Ok = C::Ok;
+    type Error = C::Error;
+
+    fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<(), Self::Error> {
+        self.0.serialize_key(&FiniteJson(key))
+    }
+
+    fn serialize_value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
+        self.0.serialize_value(&FiniteJson(value))
+    }
+
+    fn serialize_entry<K: Serialize + ?Sized, V: Serialize + ?Sized>(
+        &mut self,
+        key: &K,
+        value: &V,
+    ) -> Result<(), Self::Error> {
+        self.0.serialize_entry(&FiniteJson(key), &FiniteJson(value))
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.0.end()
+    }
+}
+
+impl<C: SerializeStruct> SerializeStruct for RejectNonFiniteCompound<C> {
+    type Ok = C::Ok;
+    type Error = C::Error;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        self.0.serialize_field(key, &FiniteJson(value))
+    }
+
+    fn skip_field(&mut self, key: &'static str) -> Result<(), Self::Error> {
+        self.0.skip_field(key)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.0.end()
+    }
+}
+
+impl<C: SerializeStructVariant> SerializeStructVariant for RejectNonFiniteCompound<C> {
+    type Ok = C::Ok;
+    type Error = C::Error;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        self.0.serialize_field(key, &FiniteJson(value))
+    }
+
+    fn skip_field(&mut self, key: &'static str) -> Result<(), Self::Error> {
+        self.0.skip_field(key)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        self.0.end()
+    }
+}
 
 struct BoundedWriter {
     bytes: Vec<u8>,
@@ -757,6 +1085,8 @@ pub enum LogError {
     InvalidSchemaVersion,
     InvalidSchemaId(String),
     InvalidPayload(CanonicalJsonError),
+    TypedPayloadDecode(CanonicalJsonError),
+    TypedPayloadMismatch,
     SequenceOverflow,
     TamperedAt(u64),
 }
@@ -771,6 +1101,12 @@ impl fmt::Display for LogError {
             ),
             Self::InvalidSchemaId(reason) => write!(formatter, "invalid schema id: {reason}"),
             Self::InvalidPayload(error) => write!(formatter, "invalid event payload: {error}"),
+            Self::TypedPayloadDecode(error) => write!(
+                formatter,
+                "typed event payload does not decode as its declared schema: {error}"
+            ),
+            Self::TypedPayloadMismatch => formatter
+                .write_str("typed event payload changes value during its serialization round trip"),
             Self::SequenceOverflow => formatter.write_str("event sequence exceeds u64"),
             Self::TamperedAt(seq) => write!(formatter, "event chain is invalid at sequence {seq}"),
         }
@@ -855,14 +1191,25 @@ impl Log {
         }
     }
 
-    /// Append a typed schema payload after canonical serialization.
+    /// Append a typed schema payload after canonical serialization and an exact
+    /// value round trip through the same schema type.
+    ///
+    /// Custom `Serialize`, `Deserialize`, and `PartialEq` implementations are
+    /// trusted contract code; they must faithfully represent every field that
+    /// can affect application behavior.
     pub fn append_typed<T>(&mut self, payload: &T) -> Result<&Event, LogError>
     where
-        T: EventSchema + Serialize + ?Sized,
+        T: EventSchema + Serialize + DeserializeOwned + PartialEq,
     {
         validate_schema::<T>()?;
-        let payload = CanonicalJson::from_serialize(payload)?;
-        self.append_canonical(T::KIND, T::VERSION, payload)
+        let canonical = CanonicalJson::from_serialize(payload)?;
+        let decoded = canonical
+            .decode::<T>()
+            .map_err(LogError::TypedPayloadDecode)?;
+        if &decoded != payload {
+            return Err(LogError::TypedPayloadMismatch);
+        }
+        self.append_canonical(T::KIND, T::VERSION, canonical)
     }
 
     /// Import untrusted serialized history. Every field is validated and each
@@ -1762,6 +2109,58 @@ mod tests {
         const SCHEMA_ID: &'static str = "pliego.example/big-amount/1";
     }
 
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct Measurement {
+        value: f64,
+    }
+
+    impl EventSchema for Measurement {
+        const KIND: &'static str = "app_measurement";
+        const VERSION: u32 = 1;
+        const SCHEMA_ID: &'static str = "pliego.example/measurement/1";
+    }
+
+    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    struct OmittedRequired {
+        visible: u8,
+        #[serde(skip_serializing)]
+        required: u8,
+    }
+
+    impl EventSchema for OmittedRequired {
+        const KIND: &'static str = "app_omitted_required";
+        const VERSION: u32 = 1;
+        const SCHEMA_ID: &'static str = "pliego.example/omitted-required/1";
+    }
+
+    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    struct OmittedDefault {
+        visible: u8,
+        #[serde(skip_serializing, default)]
+        omitted: u8,
+    }
+
+    impl EventSchema for OmittedDefault {
+        const KIND: &'static str = "app_omitted_default";
+        const VERSION: u32 = 1;
+        const SCHEMA_ID: &'static str = "pliego.example/omitted-default/1";
+    }
+
+    struct CountedFloat<'a> {
+        calls: &'a AtomicUsize,
+        value: f64,
+    }
+
+    impl Serialize for CountedFloat<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            serializer.serialize_f64(self.value)
+        }
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
     enum AppEvent {
         Task(TaskV2),
@@ -1857,6 +2256,61 @@ mod tests {
                 assert_eq!(base, decimal);
             }
         }
+    }
+
+    #[test]
+    fn typed_serialization_rejects_non_finite_floats_at_any_depth_in_one_pass() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                CanonicalJson::from_serialize(&value),
+                Err(CanonicalJsonError::Invalid(reason)) if reason.contains("non-finite f64")
+            ));
+
+            let mut by_name = BTreeMap::new();
+            by_name.insert("reading".to_owned(), value);
+            let nested = vec![by_name];
+            assert!(matches!(
+                CanonicalJson::from_serialize(&nested),
+                Err(CanonicalJsonError::Invalid(reason)) if reason.contains("non-finite f64")
+            ));
+
+            let mut log = Log::new();
+            assert!(matches!(
+                log.append_typed(&Measurement { value }),
+                Err(LogError::InvalidPayload(CanonicalJsonError::Invalid(reason)))
+                    if reason.contains("non-finite f64")
+            ));
+            assert!(log.is_empty());
+        }
+
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let nested = Some(vec![value]);
+            assert!(matches!(
+                CanonicalJson::from_serialize(&nested),
+                Err(CanonicalJsonError::Invalid(reason)) if reason.contains("non-finite f32")
+            ));
+        }
+
+        let finite = BTreeMap::from([
+            ("negative".to_owned(), -1.5f64),
+            ("positive".to_owned(), 2.25f64),
+        ]);
+        assert_eq!(
+            CanonicalJson::from_serialize(&finite).unwrap().as_str(),
+            r#"{"negative":-1.5,"positive":2.25}"#
+        );
+
+        let calls = AtomicUsize::new(0);
+        assert_eq!(
+            CanonicalJson::from_serialize(&CountedFloat {
+                calls: &calls,
+                value: 1.25,
+            })
+            .unwrap()
+            .as_str(),
+            "1.25"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -2006,6 +2460,37 @@ mod tests {
             .unwrap();
         let catalog = builder.seal().unwrap();
         assert_eq!(catalog.decode(stored), Ok(source));
+    }
+
+    #[test]
+    fn typed_append_requires_an_exact_schema_value_round_trip() {
+        let mut log = Log::new();
+        assert!(matches!(
+            log.append_typed(&OmittedRequired {
+                visible: 1,
+                required: 2,
+            }),
+            Err(LogError::TypedPayloadDecode(_))
+        ));
+        assert!(log.is_empty());
+
+        assert_eq!(
+            log.append_typed(&OmittedDefault {
+                visible: 1,
+                omitted: 2,
+            }),
+            Err(LogError::TypedPayloadMismatch)
+        );
+        assert!(log.is_empty());
+
+        assert!(
+            log.append_typed(&OmittedDefault {
+                visible: 1,
+                omitted: 0,
+            })
+            .is_ok()
+        );
+        assert_eq!(log.len(), 1);
     }
 
     #[test]
@@ -2423,7 +2908,7 @@ mod tests {
 
     #[test]
     fn schema_constants_fail_closed() {
-        #[derive(Serialize, Deserialize)]
+        #[derive(PartialEq, Eq, Serialize, Deserialize)]
         struct Bad;
         impl EventSchema for Bad {
             const KIND: &'static str = "task";
@@ -2441,7 +2926,7 @@ mod tests {
             Err(CatalogError::InvalidSchema(LogError::InvalidKind(_)))
         ));
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(PartialEq, Eq, Serialize, Deserialize)]
         struct ExtremeVersion;
         impl EventSchema for ExtremeVersion {
             const KIND: &'static str = "app_extreme";
