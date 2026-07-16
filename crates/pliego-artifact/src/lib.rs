@@ -19,12 +19,15 @@ use unicode_casefold::UnicodeCaseFold;
 use unicode_normalization::UnicodeNormalization;
 
 pub const BUILD_LEDGER_NAME: &str = "pliego.build.json";
+pub const BUILD_GRAPH_NAME: &str = "pliego.graph.json";
+pub const BUILD_GRAPH_VERSION: &str = "1.0.0";
 pub const BUILD_CONTEXT_ENV: &str = "PLIEGO_BUILD_CONTEXT";
 pub const BUILD_REPORT_VERSION: &str = "2.0.0";
 pub const RECEIPT_VERSION: &str = "2.0.0";
 pub const NAMESPACE_VERSION: &str = "1.0.0";
 pub const MAX_LEDGER_BYTES: u64 = 8 * 1024 * 1024;
 pub const MAX_CONTEXT_BYTES: u64 = 8 * 1024 * 1024;
+pub const MAX_BUILD_GRAPH_BYTES: u64 = 8 * 1024 * 1024;
 pub const MAX_ARTIFACT_FILES: usize = 100_000;
 pub const MAX_OUTPUT_FILE_BYTES: u64 = 512 * 1024 * 1024;
 pub const MAX_OUTPUT_TOTAL_BYTES: u64 = 4 * 1024 * 1024 * 1024;
@@ -407,6 +410,61 @@ pub struct OutputFile {
     pub sha256: String,
 }
 
+/// A project source captured by the build receipt and addressable by the
+/// causal build graph.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphSource {
+    pub path: String,
+    pub sha256: String,
+}
+
+/// Source dependencies for a route or standalone artifact.
+///
+/// `AllSources` is the compatibility fallback for producers that have not yet
+/// declared precise inputs. It is deliberately visible rather than pretending
+/// that an imprecise edge is incremental.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "mode", rename_all = "camelCase", deny_unknown_fields)]
+pub enum SourceDependencies {
+    AllSources,
+    Explicit { paths: Vec<String> },
+}
+
+/// One public route and the artifact paths it emits.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphRoute {
+    pub route: String,
+    pub sources: SourceDependencies,
+    pub artifacts: Vec<String>,
+}
+
+/// One emitted payload and its direct or route-mediated source dependencies.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphArtifact {
+    pub path: String,
+    pub kind: String,
+    pub producer: String,
+    pub route: Option<String>,
+    pub sources: SourceDependencies,
+    pub sha256: String,
+}
+
+/// Deterministic source -> route -> artifact evidence emitted beside the build
+/// receipt. The graph itself is an output covered by that receipt.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BuildGraph {
+    pub graph_version: String,
+    pub project_id: String,
+    pub source_set_sha256: String,
+    pub sources: Vec<GraphSource>,
+    pub routes: Vec<GraphRoute>,
+    pub artifacts: Vec<GraphArtifact>,
+}
+
 impl OutputFile {
     pub fn new(
         path: impl Into<String>,
@@ -551,6 +609,29 @@ pub fn encode_build_report(report: &BuildReport) -> Result<Vec<u8>, ArtifactErro
         )));
     }
     Ok(bytes)
+}
+
+pub fn encode_build_graph(graph: &BuildGraph) -> Result<Vec<u8>, ArtifactError> {
+    validate_build_graph(graph)?;
+    let mut bytes = serde_json::to_vec_pretty(graph)?;
+    bytes.push(b'\n');
+    if bytes.len() as u64 > MAX_BUILD_GRAPH_BYTES {
+        return Err(ArtifactError::InvalidReceipt(format!(
+            "build graph exceeds {MAX_BUILD_GRAPH_BYTES} bytes"
+        )));
+    }
+    Ok(bytes)
+}
+
+pub fn decode_build_graph(bytes: &[u8]) -> Result<BuildGraph, ArtifactError> {
+    if bytes.len() as u64 > MAX_BUILD_GRAPH_BYTES {
+        return Err(ArtifactError::InvalidReceipt(format!(
+            "build graph exceeds {MAX_BUILD_GRAPH_BYTES} bytes"
+        )));
+    }
+    let graph: BuildGraph = serde_json::from_slice(bytes)?;
+    validate_build_graph(&graph)?;
+    Ok(graph)
 }
 
 pub fn read_build_report(output_root: &Path) -> Result<BuildReport, ArtifactError> {
@@ -1305,6 +1386,215 @@ fn validate_outputs(files: &[OutputFile]) -> Result<(), ArtifactError> {
             })?;
         validate_sha256(&file.sha256, "output")?;
         previous = Some(&file.path);
+    }
+    Ok(())
+}
+
+fn validate_build_graph(graph: &BuildGraph) -> Result<(), ArtifactError> {
+    if graph.graph_version != BUILD_GRAPH_VERSION {
+        return Err(ArtifactError::InvalidReceipt(format!(
+            "unsupported build graph version {:?}",
+            graph.graph_version
+        )));
+    }
+    validate_project_id(&graph.project_id)?;
+    validate_sha256(&graph.source_set_sha256, "build graph source set")?;
+    if graph.sources.len() > MAX_ARTIFACT_FILES
+        || graph.routes.len() > MAX_ARTIFACT_FILES
+        || graph.artifacts.len() > MAX_ARTIFACT_FILES
+    {
+        return Err(ArtifactError::InvalidReceipt(format!(
+            "build graph exceeds {MAX_ARTIFACT_FILES} nodes per kind"
+        )));
+    }
+
+    let mut source_paths = BTreeSet::new();
+    let mut previous_source = None;
+    for source in &graph.sources {
+        let portable = PortablePath::parse(&source.path)?;
+        if portable.as_str() != source.path
+            || previous_source.is_some_and(|previous: &str| previous >= source.path.as_str())
+        {
+            return Err(ArtifactError::InvalidReceipt(
+                "build graph sources are duplicated, non-canonical, or not strictly ordered"
+                    .to_owned(),
+            ));
+        }
+        validate_sha256(&source.sha256, "build graph source")?;
+        source_paths.insert(source.path.as_str());
+        previous_source = Some(source.path.as_str());
+    }
+
+    let mut route_names = BTreeSet::new();
+    let mut previous_route = None;
+    for route in &graph.routes {
+        if route.route.len() > MAX_PORTABLE_PATH_BYTES
+            || !route.route.starts_with('/')
+            || route.route.contains(['\\', '\0'])
+            || previous_route.is_some_and(|previous: &str| previous >= route.route.as_str())
+        {
+            return Err(ArtifactError::InvalidReceipt(format!(
+                "build graph route is invalid, duplicated, or not strictly ordered: {:?}",
+                route.route
+            )));
+        }
+        validate_graph_dependencies(&route.sources, &source_paths)?;
+        validate_strict_portable_paths(&route.artifacts, "route artifacts")?;
+        route_names.insert(route.route.as_str());
+        previous_route = Some(route.route.as_str());
+    }
+
+    let mut artifact_paths = BTreeSet::new();
+    let mut previous_artifact = None;
+    for artifact in &graph.artifacts {
+        let portable = PortablePath::parse(&artifact.path)?;
+        if portable.as_str() != artifact.path
+            || previous_artifact.is_some_and(|previous: &str| previous >= artifact.path.as_str())
+            || artifact.kind.is_empty()
+            || artifact.kind.len() > 64
+            || artifact.producer.is_empty()
+            || artifact.producer.len() > MAX_PORTABLE_PATH_BYTES
+        {
+            return Err(ArtifactError::InvalidReceipt(format!(
+                "build graph artifact is invalid, duplicated, or not strictly ordered: {:?}",
+                artifact.path
+            )));
+        }
+        if let Some(route) = artifact.route.as_deref() {
+            if !route_names.contains(route) {
+                return Err(ArtifactError::InvalidReceipt(format!(
+                    "build graph artifact {:?} references unknown route {route:?}",
+                    artifact.path
+                )));
+            }
+        }
+        validate_graph_dependencies(&artifact.sources, &source_paths)?;
+        validate_sha256(&artifact.sha256, "build graph artifact")?;
+        artifact_paths.insert(artifact.path.as_str());
+        previous_artifact = Some(artifact.path.as_str());
+    }
+
+    for route in &graph.routes {
+        for artifact in &route.artifacts {
+            if !artifact_paths.contains(artifact.as_str()) {
+                return Err(ArtifactError::InvalidReceipt(format!(
+                    "build graph route {:?} references unknown artifact {artifact:?}",
+                    route.route
+                )));
+            }
+            let node = graph
+                .artifacts
+                .iter()
+                .find(|node| node.path == *artifact)
+                .expect("artifact path was checked against the graph set");
+            if node.route.as_deref() != Some(route.route.as_str()) || node.sources != route.sources
+            {
+                return Err(ArtifactError::InvalidReceipt(format!(
+                    "build graph route {:?} and artifact {artifact:?} disagree on their causal edge",
+                    route.route
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_graph_dependencies<'a>(
+    dependencies: &'a SourceDependencies,
+    sources: &BTreeSet<&'a str>,
+) -> Result<(), ArtifactError> {
+    let SourceDependencies::Explicit { paths } = dependencies else {
+        return Ok(());
+    };
+    if paths.is_empty() {
+        return Err(ArtifactError::InvalidReceipt(
+            "explicit build graph dependencies cannot be empty".to_owned(),
+        ));
+    }
+    validate_strict_portable_paths(paths, "source dependencies")?;
+    for path in paths {
+        if !sources.contains(path.as_str()) {
+            return Err(ArtifactError::InvalidReceipt(format!(
+                "build graph dependency {path:?} is not a captured project source"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_strict_portable_paths(paths: &[String], label: &str) -> Result<(), ArtifactError> {
+    let mut previous = None;
+    for path in paths {
+        let portable = PortablePath::parse(path)?;
+        if portable.as_str() != path
+            || previous.is_some_and(|previous: &str| previous >= path.as_str())
+        {
+            return Err(ArtifactError::InvalidReceipt(format!(
+                "build graph {label} are duplicated, non-canonical, or not strictly ordered"
+            )));
+        }
+        previous = Some(path.as_str());
+    }
+    Ok(())
+}
+
+pub fn validate_build_graph_against_report(
+    graph: &BuildGraph,
+    report: &BuildReport,
+) -> Result<(), ArtifactError> {
+    validate_build_graph(graph)?;
+    validate_report(report)?;
+    if graph.project_id != report.receipt.context.ownership.project_id
+        || graph.source_set_sha256 != report.receipt.context.source_set_sha256
+    {
+        return Err(ArtifactError::InvalidReceipt(
+            "build graph identity does not match the artifact receipt".to_owned(),
+        ));
+    }
+    let expected_sources = report
+        .receipt
+        .context
+        .sources
+        .iter()
+        .map(|source| GraphSource {
+            path: source.path.clone(),
+            sha256: source.sha256.clone(),
+        })
+        .collect::<Vec<_>>();
+    if graph.sources != expected_sources {
+        return Err(ArtifactError::InvalidReceipt(
+            "build graph sources do not match the artifact receipt".to_owned(),
+        ));
+    }
+    let expected_artifacts = report
+        .receipt
+        .outputs
+        .files
+        .iter()
+        .filter(|file| file.path != BUILD_GRAPH_NAME)
+        .map(|file| (file.path.as_str(), file))
+        .collect::<BTreeMap<_, _>>();
+    if graph.artifacts.len() != expected_artifacts.len() {
+        return Err(ArtifactError::InvalidReceipt(
+            "build graph does not cover the exact payload artifact set".to_owned(),
+        ));
+    }
+    for artifact in &graph.artifacts {
+        let Some(output) = expected_artifacts.get(artifact.path.as_str()) else {
+            return Err(ArtifactError::InvalidReceipt(format!(
+                "build graph contains undeclared artifact {:?}",
+                artifact.path
+            )));
+        };
+        if artifact.kind != output.kind
+            || artifact.producer != output.producer
+            || artifact.sha256 != output.sha256
+        {
+            return Err(ArtifactError::InvalidReceipt(format!(
+                "build graph metadata does not match artifact {:?}",
+                artifact.path
+            )));
+        }
     }
     Ok(())
 }
@@ -2131,6 +2421,71 @@ mod tests {
         let report = BuildReport::new(receipt).unwrap();
         write_build_report(&root.join(BUILD_LEDGER_NAME), &report).unwrap();
         report
+    }
+
+    fn causal_graph_fixture() -> (BuildGraph, BuildReport) {
+        let context = context();
+        let graph = BuildGraph {
+            graph_version: BUILD_GRAPH_VERSION.to_owned(),
+            project_id: context.ownership.project_id.clone(),
+            source_set_sha256: context.source_set_sha256.clone(),
+            sources: vec![GraphSource {
+                path: "src/main.rs".to_owned(),
+                sha256: sha256_bytes(b"rs"),
+            }],
+            routes: vec![GraphRoute {
+                route: "/".to_owned(),
+                sources: SourceDependencies::Explicit {
+                    paths: vec!["src/main.rs".to_owned()],
+                },
+                artifacts: vec!["index.html".to_owned()],
+            }],
+            artifacts: vec![GraphArtifact {
+                path: "index.html".to_owned(),
+                kind: "route".to_owned(),
+                producer: "/".to_owned(),
+                route: Some("/".to_owned()),
+                sources: SourceDependencies::Explicit {
+                    paths: vec!["src/main.rs".to_owned()],
+                },
+                sha256: sha256_bytes(b"home"),
+            }],
+        };
+        let graph_bytes = encode_build_graph(&graph).unwrap();
+        let receipt = ArtifactReceipt::from_context_and_files(
+            context,
+            vec![
+                OutputFile::new("index.html", "route", "/", b"home"),
+                OutputFile::new(
+                    BUILD_GRAPH_NAME,
+                    "framework",
+                    "causal-build-graph",
+                    &graph_bytes,
+                ),
+            ],
+        )
+        .unwrap();
+        (graph, BuildReport::new(receipt).unwrap())
+    }
+
+    #[test]
+    fn build_graph_is_canonical_bounded_and_receipt_bound() {
+        let (graph, report) = causal_graph_fixture();
+        let encoded = encode_build_graph(&graph).unwrap();
+        assert_eq!(decode_build_graph(&encoded).unwrap(), graph);
+        validate_build_graph_against_report(&graph, &report).unwrap();
+
+        let mut unknown_source = graph.clone();
+        unknown_source.routes[0].sources = SourceDependencies::Explicit {
+            paths: vec!["src/missing.rs".to_owned()],
+        };
+        assert!(encode_build_graph(&unknown_source).is_err());
+
+        let mut wrong_output = graph.clone();
+        wrong_output.artifacts[0].sha256 = sha256_bytes(b"tampered");
+        assert!(validate_build_graph_against_report(&wrong_output, &report).is_err());
+
+        assert!(decode_build_graph(&encoded[..encoded.len() / 2]).is_err());
     }
 
     #[test]

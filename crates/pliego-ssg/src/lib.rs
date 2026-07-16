@@ -7,10 +7,11 @@ use cap_fs_ext::{DirExt, FollowSymlinks, MetadataExt, OpenOptionsFollowExt, ambi
 use cap_std::fs::{Dir, OpenOptions as CapOpenOptions};
 use fs2::FileExt;
 use pliego_artifact::{
-    ArtifactError, ArtifactReceipt, BuildContext, BuildInvocation, OutputFile, OutputNamespace,
-    PortablePath, PreviousOwnership, VerifiedBuild, encode_build_report,
-    invocation_from_environment, sha256_bytes, verify_build_context_with_materials,
-    verify_build_report,
+    ArtifactError, ArtifactReceipt, BuildContext, BuildGraph, BuildInvocation, GraphArtifact,
+    GraphRoute, GraphSource, OutputFile, OutputNamespace, PortablePath, PreviousOwnership,
+    SourceDependencies, VerifiedBuild, encode_build_graph, encode_build_report,
+    invocation_from_environment, sha256_bytes, validate_build_graph_against_report,
+    verify_build_context_with_materials, verify_build_report,
 };
 pub use pliego_artifact::{BUILD_REPORT_VERSION, BuildReport};
 #[cfg(test)]
@@ -205,6 +206,7 @@ pub struct Page {
     pub language: String,
     pub head: Head,
     pub body: View,
+    sources: Vec<String>,
 }
 
 impl Page {
@@ -214,12 +216,22 @@ impl Page {
             language: "en".to_owned(),
             head,
             body,
+            sources: Vec::new(),
         }
     }
 
     #[must_use]
     pub fn language(mut self, language: impl Into<String>) -> Self {
         self.language = language.into();
+        self
+    }
+
+    /// Declare one project-relative source that causally contributes to this
+    /// route. Omitting declarations keeps the safe, conservative all-sources
+    /// dependency used by pre-R5 applications.
+    #[must_use]
+    pub fn source(mut self, source: impl Into<String>) -> Self {
+        self.sources.push(source.into());
         self
     }
 
@@ -313,6 +325,7 @@ impl Page {
 pub struct Asset {
     pub path: String,
     pub bytes: Vec<u8>,
+    sources: Vec<String>,
 }
 
 impl Asset {
@@ -320,7 +333,16 @@ impl Asset {
         Self {
             path: path.into(),
             bytes: bytes.into(),
+            sources: Vec::new(),
         }
+    }
+
+    /// Declare one project-relative source that causally contributes to this
+    /// asset.
+    #[must_use]
+    pub fn source(mut self, source: impl Into<String>) -> Self {
+        self.sources.push(source.into());
+        self
     }
 }
 
@@ -411,6 +433,7 @@ impl Site {
         validate_output_target(output_dir)?;
         let mut namespace = OutputNamespace::new();
         namespace.insert_str(pliego_artifact::BUILD_LEDGER_NAME, "framework ledger")?;
+        namespace.insert_str(pliego_artifact::BUILD_GRAPH_NAME, "framework build graph")?;
         let mut files = BTreeMap::<String, PendingOutput>::new();
         let mut routes = BTreeSet::new();
 
@@ -422,26 +445,45 @@ impl Site {
             let output_path = route_output_path(&page.route);
             let output_path =
                 namespace.insert_str(&output_path, format!("route {}", page.route))?;
+            let sources = source_dependencies(&page.sources, &context)?;
             files.insert(
                 output_path.as_str().to_owned(),
                 PendingOutput {
                     bytes: page.render()?.into_bytes(),
                     kind: "route",
                     producer: page.route.clone(),
+                    route: Some(page.route.clone()),
+                    sources,
                 },
             );
         }
         for asset in &self.assets {
             let output_path = namespace.insert_str(&asset.path, format!("asset {}", asset.path))?;
+            let sources = source_dependencies(&asset.sources, &context)?;
             files.insert(
                 output_path.as_str().to_owned(),
                 PendingOutput {
                     bytes: asset.bytes.clone(),
                     kind: "asset",
                     producer: asset.path.clone(),
+                    route: None,
+                    sources,
                 },
             );
         }
+
+        let graph = causal_build_graph(&context, &files)?;
+        let graph_bytes = encode_build_graph(&graph)?;
+        files.insert(
+            pliego_artifact::BUILD_GRAPH_NAME.to_owned(),
+            PendingOutput {
+                bytes: graph_bytes,
+                kind: "framework",
+                producer: "causal-build-graph".to_owned(),
+                route: None,
+                sources: SourceDependencies::AllSources,
+            },
+        );
 
         validate_pending_output_sizes(files.values().map(|output| output.bytes.len()))?;
         let emitted = files
@@ -457,6 +499,7 @@ impl Site {
             .collect::<Vec<_>>();
         let mut receipt = ArtifactReceipt::from_context_and_files(context, emitted)?;
         let preflight_report = BuildReport::new(receipt.clone())?;
+        validate_build_graph_against_report(&graph, &preflight_report)?;
         encode_build_report(&preflight_report)?;
         let parent_path = output_dir.parent().unwrap_or_else(|| Path::new("."));
         let output_name = output_dir
@@ -631,6 +674,80 @@ struct PendingOutput {
     bytes: Vec<u8>,
     kind: &'static str,
     producer: String,
+    route: Option<String>,
+    sources: SourceDependencies,
+}
+
+fn source_dependencies(
+    declared: &[String],
+    context: &BuildContext,
+) -> Result<SourceDependencies, BuildError> {
+    if declared.is_empty() {
+        return Ok(SourceDependencies::AllSources);
+    }
+    let available = context
+        .sources
+        .iter()
+        .map(|source| source.path.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut paths = declared.to_vec();
+    paths.sort();
+    paths.dedup();
+    for path in &paths {
+        let portable = PortablePath::parse(path)?;
+        if portable.as_str() != path || !available.contains(path.as_str()) {
+            return Err(BuildError::InvalidPath(format!(
+                "causal source {path:?} is not a captured project source"
+            )));
+        }
+    }
+    Ok(SourceDependencies::Explicit { paths })
+}
+
+fn causal_build_graph(
+    context: &BuildContext,
+    files: &BTreeMap<String, PendingOutput>,
+) -> Result<BuildGraph, BuildError> {
+    let sources = context
+        .sources
+        .iter()
+        .map(|source| GraphSource {
+            path: source.path.clone(),
+            sha256: source.sha256.clone(),
+        })
+        .collect();
+    let mut routes = files
+        .iter()
+        .filter_map(|(path, output)| {
+            output.route.as_ref().map(|route| GraphRoute {
+                route: route.clone(),
+                sources: output.sources.clone(),
+                artifacts: vec![path.clone()],
+            })
+        })
+        .collect::<Vec<_>>();
+    routes.sort_by(|left, right| left.route.cmp(&right.route));
+    let artifacts = files
+        .iter()
+        .map(|(path, output)| GraphArtifact {
+            path: path.clone(),
+            kind: output.kind.to_owned(),
+            producer: output.producer.clone(),
+            route: output.route.clone(),
+            sources: output.sources.clone(),
+            sha256: sha256_bytes(&output.bytes),
+        })
+        .collect();
+    let graph = BuildGraph {
+        graph_version: pliego_artifact::BUILD_GRAPH_VERSION.to_owned(),
+        project_id: context.ownership.project_id.clone(),
+        source_set_sha256: context.source_set_sha256.clone(),
+        sources,
+        routes,
+        artifacts,
+    };
+    encode_build_graph(&graph)?;
+    Ok(graph)
 }
 
 fn validate_pending_output_sizes(sizes: impl IntoIterator<Item = usize>) -> Result<(), BuildError> {
@@ -1566,6 +1683,62 @@ mod tests {
         assert!(html.contains("<title>PliegoRS &amp; Reference</title>"));
         assert!(html.contains("content=\"&lt;quiet&gt;\""));
         assert!(html.contains("<body><main><h1>Reference</h1></main></body>"));
+    }
+
+    #[test]
+    fn build_emits_receipt_bound_precise_and_conservative_causal_edges() {
+        let root = std::env::temp_dir().join(format!(
+            "pliego-ssg-causal-{}-{}",
+            std::process::id(),
+            BUILD_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let (project, context) = test_project(&root, "causal-site");
+        fs::write(project.join("src/theme.css"), b"body{}\n").unwrap();
+        let context = capture_build_context(
+            &project,
+            context.ownership,
+            context.framework,
+            &["pliego.toml".to_owned()],
+            &[],
+        )
+        .unwrap();
+        let output = root.join("site");
+        Site::new()
+            .page(Page::new("/", Head::new("Causal"), el("main").into_view()).source("src/main.rs"))
+            .page(Page::new(
+                "/legacy/",
+                Head::new("Legacy"),
+                el("main").into_view(),
+            ))
+            .asset(Asset::new("assets/site.css", b"body{}".to_vec()).source("src/theme.css"))
+            .build_with_context(&output, &project, context)
+            .unwrap();
+
+        let graph = pliego_artifact::decode_build_graph(
+            &fs::read(output.join(pliego_artifact::BUILD_GRAPH_NAME)).unwrap(),
+        )
+        .unwrap();
+        let report = verify_build_report(&output).unwrap().report;
+        validate_build_graph_against_report(&graph, &report).unwrap();
+        assert_eq!(
+            graph.routes[0].sources,
+            SourceDependencies::Explicit {
+                paths: vec!["src/main.rs".to_owned()]
+            }
+        );
+        assert_eq!(graph.routes[1].sources, SourceDependencies::AllSources);
+        assert_eq!(
+            graph
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.path == "assets/site.css")
+                .unwrap()
+                .sources,
+            SourceDependencies::Explicit {
+                paths: vec!["src/theme.css".to_owned()]
+            }
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
