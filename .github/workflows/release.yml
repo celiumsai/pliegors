@@ -29,7 +29,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 0
   PLIEGORS_SOURCE_REV: ${{ github.sha }}
 
 jobs:
@@ -41,6 +40,8 @@ jobs:
           inputs.confirmation == format('draft:{0}', inputs.tag))
       }}
     name: Build ${{ matrix.target }} replica ${{ matrix.replica }}
+    env:
+      CARGO_INCREMENTAL: 0
     runs-on: >-
       ${{
         matrix.target == 'x86_64-unknown-linux-gnu' && 'ubuntu-24.04' ||
