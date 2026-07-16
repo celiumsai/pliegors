@@ -23,6 +23,9 @@ Versioning once a public release exists.
 - Transactional projections with reducer and codec identities, pre-commit state
   encoding, bounded fail-closed snapshot restore, exact-tail replay, and
   automatic reactive cleanup on drop.
+- A bilingual security Trust Center with explicit trust boundaries, R0-R7
+  evidence, release verification, scoped limitations, supported-version and
+  advisory status, coordinated disclosure, and RFC 9116 `security.txt`.
 
 ### Changed
 
@@ -50,6 +53,8 @@ Versioning once a public release exists.
   codec configuration, and canonical state bytes. Their SHA-256 digests provide
   integrity only; stream authority and signatures remain external trust
   contracts.
+- Static preview delivery serves `security.txt` as UTF-8 plain text and keeps
+  its disclosure metadata available under `/.well-known/security.txt`.
 
 ## 0.0.1 - Not published
 

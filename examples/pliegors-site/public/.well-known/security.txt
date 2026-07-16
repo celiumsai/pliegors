@@ -1,0 +1,5 @@
+Contact: mailto:hello@pliegors.dev
+Expires: 2027-07-16T00:00:00Z
+Preferred-Languages: en, es
+Canonical: https://pliegors.dev/.well-known/security.txt
+Policy: https://pliegors.dev/security/

@@ -25,4 +25,12 @@ test("protected preview denies crawlers through robots and response headers", as
   assert.equal(await page.text(), "site");
   assert.equal(page.headers.get("content-type"), "text/html");
   assert.equal(page.headers.get("x-robots-tag"), "noindex, nofollow, noarchive");
+
+  const security = await worker.fetch(
+    new Request("https://pliegors.dev/.well-known/security.txt"),
+    env,
+  );
+  assert.equal(security.status, 203);
+  assert.equal(security.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(security.headers.get("x-robots-tag"), "noindex, nofollow, noarchive");
 });
