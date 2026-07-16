@@ -63,9 +63,10 @@ outside the bounded R2 client contract.
 - Define event taxonomy, authority, conflicts, selective sync, compaction,
   privacy/erasure, effects, receipts, and unknown-version policy explicitly.
 
-The DOM-name, adapter-ownership, keyed-identity, and JavaScript safe-integer
-items in this historical list are closed by R2-R4 evidence. Compiler/tool locks
-and final release-manifest authenticity remain R5-R6 work.
+The DOM-name, adapter-ownership, keyed-identity, JavaScript safe-integer,
+compiler/tool-lock, and private candidate-manifest items in this historical list
+are closed by R2-R6 evidence. Public bootstrap authority and platform signing
+remain explicit post-candidate release decisions.
 
 ## Architecture boundary
 
@@ -130,6 +131,11 @@ diagnostic spans/fixes, replayable starter, and measured golden path.
 Run the complete cross-platform golden path, create exact release assets, sign
 the final manifest, verify installers, and keep the candidate private until a
 separate opening decision.
+Status: complete. The [candidate distribution contract](33-candidate-distribution-contract.md)
+and [R6 evidence](evidence/r6-candidate-distribution.md) cover two native builds
+for five targets, exact binary reproducibility, final Ed25519 sealing, five
+installer lifecycles, and a no-checkout distribution golden path. Draft and
+public promotion remain separate decisions.
 
 ### R7 - External flagship
 

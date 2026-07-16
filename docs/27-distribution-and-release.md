@@ -1,8 +1,10 @@
 # Distribution and release
 
-**Status:** GitHub Releases is the approved canonical distribution channel. The
-repository remains private, releases remain private or draft, and the
-`pliegors.dev` documentation site is deployed only as a protected preview.
+**Status:** R6 private candidate distribution is accepted. GitHub Releases is
+the approved future canonical release channel, but the accepted R6 workflow did
+not create or mutate a release. The repository remains private, releases remain
+private or draft, and the `pliegors.dev` documentation site remains a protected
+preview.
 
 ## Canonical ownership boundary
 
@@ -76,7 +78,10 @@ tag: v<VERSION>
 release: https://github.com/celiumsai/pliegors/releases/tag/v<VERSION>
 asset: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/pliego-<TARGET>.zip
 checksum: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/pliego-<TARGET>.zip.sha256
-manifest: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/SHA256SUMS
+manifest: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/RELEASE-MANIFEST.json
+signature: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/RELEASE-MANIFEST.json.sig
+reproducibility: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/REPRODUCIBILITY.json
+verifier: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/verify-release-bundle.mjs
 shell installer: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/install.sh
 PowerShell installer: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/install.ps1
 ```
@@ -90,12 +95,15 @@ explicitly approved. Rebuilding replacement bytes after validation is not
 allowed; promotion must use the exact validated bytes or rerun the complete
 matrix against the final assets.
 
-`.github/workflows/release.yml` is manual-only and restricted to `main`. Given a
-Cargo-matching tag and exact confirmation, it builds all five targets, runs the
-installer lifecycle on each native runner, verifies every sidecar, retains the
-candidate bytes privately, and assembles one GitHub Release as a draft. It never
-publishes, edits, replaces, or marks a release as latest. Every candidate run is
-therefore reviewable without changing the repository or release visibility.
+`.github/workflows/release.yml` is manual-only. Candidate mode builds two native
+replicas for each of five targets, runs the installer lifecycle on replica 1,
+downloads the ten private artifacts, rejects binary disagreement, selects exact
+archives, signs the final 15-asset manifest, and runs a distribution-only golden
+path. Candidate mode is read-only and creates only expiring private Actions
+artifacts. Draft mode is separate, restricted to `main`, requires its own exact
+confirmation and the complete green path, and is the only job with
+`contents: write`. It never publishes, edits, replaces, or marks a release as
+latest.
 
 The native reference products under `examples/` are validation fixtures, not
 framework distribution assets. Before the repository can become public, their
@@ -106,14 +114,21 @@ assumption granted by repository visibility.
 ## Integrity and authenticity gate
 
 SHA-256 sidecars detect corruption and accidental mismatch. They do not by
-themselves establish authenticity. Private candidates must describe them only
-as integrity checks.
+themselves establish authenticity. R6 adds a canonical Ed25519 manifest only
+after all ten uploaded builder artifacts have been downloaded and compared. The
+manifest binds the final installers, verifiers, reproducibility record,
+sidecars, archives, roles, sizes, version, and source commit. Its accepted key
+fingerprint is:
 
-Public promotion remains blocked until the GitHub Release contract adds an
-offline-signed manifest, publishes the verification-key fingerprint through an
-independent source surface, verifies the final uploaded assets, and applies
-platform signing where the target supports it. GitHub release identity and an
-independent signature are complementary controls.
+```text
+sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
+```
+
+Public promotion remains blocked until this fingerprint has an independent
+trusted publication/bootstrap surface, the exact sealed bytes receive final
+review, and platform signing or notarization is applied where required. The R6
+candidate key is an online private-CI key, not an offline public-release root.
+GitHub release identity and an independent signature remain complementary.
 
 Bootstrap documentation downloads an installer or archive to disk, verifies it,
 and executes it as a separate step. It never pipes a network response directly
@@ -122,9 +137,10 @@ into a shell.
 ## Install, upgrade, and rollback
 
 No unauthenticated network installation is available while releases remain
-private or draft. Authorized candidate testing uses an explicit local archive
-downloaded from its GitHub Release and then exercises install, second install,
-rollback, execution, and uninstall.
+private or draft. Authorized R6 testing downloads the sealed private Actions
+artifact, verifies the complete signature and exact set, then uses an explicit
+local archive to exercise install, second install, rollback, execution, and
+uninstall.
 
 Before public launch, `install.sh` and `install.ps1` must themselves ship as
 GitHub Release assets. Installation never selects latest implicitly:
@@ -135,10 +151,16 @@ GitHub Release assets. Installation never selects latest implicitly:
   `releases/latest/download/...`; and
 - omitting both selectors fails with an actionable usage message.
 
-The installers validate semantic-version input, target selection, manifests,
-and checksums before installing into `$PLIEGO_HOME/bin`, defaulting to
-`~/.pliego/bin`. Every network download resolves directly to the canonical
-GitHub Release.
+The installers validate semantic-version input, target selection, and checksums
+before installing into `$PLIEGO_HOME/bin`, defaulting to `~/.pliego/bin`. They
+do not yet verify the detached bundle signature internally; R6 verifies the
+whole bundle before invoking them. Every future network download resolves
+directly to the canonical GitHub Release.
 
 There is no alternate release registry or authoritative download-base override.
 Offline validation continues to use an explicit local archive.
+
+The complete normative R6 behavior is in the
+[candidate distribution contract](33-candidate-distribution-contract.md), with
+the exact accepted hashes in
+[R6 evidence](evidence/r6-candidate-distribution.md).

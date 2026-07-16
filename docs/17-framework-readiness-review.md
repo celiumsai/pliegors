@@ -24,6 +24,9 @@ Rust/WASM sites; not ready for a public compatibility or trust claim.
 - A replayable default application, receipt-bound causal build graph, native
   event watcher, typed CSS/content/adapter HMR, structured diagnostics, and
   measured install-to-first-replayable-app path.
+- A private five-target candidate with two matching native binary builds per
+  target, a final signed exact-set manifest, native installer lifecycles, and a
+  distribution-only first-application gate.
 - The official PliegoRS site and neutral references as native framework evidence.
 - Manual five-target GitHub Actions candidate workflow and installer lifecycle.
 
@@ -55,20 +58,20 @@ acceptance remain separate gates.
   production gateway, key distribution system, durable browser outbox, or
   deployed conforming Hyphae service.
 
-## Claims blocked before R6
+## Claims blocked after R6
 
 - forge-resistant provenance from a content hash alone;
 - production-verified Hyphae synchronization;
-- reproducible public binaries with independent authenticity verification;
+- public binary bootstrap with an independently published trust root and
+  platform signing/notarization;
 - broad server-framework parity;
 - 1.0 API stability or public support commitments.
 
 ## Next review
 
-R5 is closed by the [golden developer experience contract](32-golden-developer-experience.md)
-and its [committed acceptance evidence](evidence/r5-golden-developer-experience.md).
-Repeat this review after R6 proves the five candidate targets, final signed
-manifest, installer lifecycle, independent hashes, reproducibility, and a
-golden path that starts from the candidate distribution. Client-side R2 closure
-remains separate from production sync readiness. External product credibility
-is decided against R7, not visual completeness.
+R6 is closed by the [candidate distribution contract](33-candidate-distribution-contract.md)
+and its [committed acceptance evidence](evidence/r6-candidate-distribution.md).
+Repeat this review after R7 proves a real auditable human-agent workspace built
+outside the monorepo from the accepted candidate. Client-side R2 closure remains
+separate from production sync readiness. Public launch also remains a distinct
+trust-root, platform-signing, legal, and support decision.

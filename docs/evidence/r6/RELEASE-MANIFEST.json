@@ -1,0 +1,110 @@
+{
+  "schema": "dev.pliegors.release-manifest/v1",
+  "release": {
+    "version": "0.0.1",
+    "tag": "v0.0.1",
+    "commit": "db2ddb3b83d99f6d9ebb63218f1579a860935588",
+    "sourceDateEpoch": 1784210668
+  },
+  "signing": {
+    "algorithm": "Ed25519",
+    "keyId": "pliegors-candidate-2026-01",
+    "publicKeySha256": "sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250"
+  },
+  "reproducibility": {
+    "schema": "dev.pliegors.release-reproducibility/v1",
+    "replicasPerTarget": 2
+  },
+  "assets": [
+    {
+      "name": "install.ps1",
+      "role": "installer",
+      "bytes": 4501,
+      "sha256": "d3397136cac43e000c605598cbf11fae2f3b8695b251479b85545d41844ad606"
+    },
+    {
+      "name": "install.sh",
+      "role": "installer",
+      "bytes": 4239,
+      "sha256": "8cca0d9c9a5205abdb7ffaf62bfb7de01c95f01e9c1889aeaf3a8423abde91a0"
+    },
+    {
+      "name": "pliego-aarch64-apple-darwin.zip",
+      "role": "cli-archive",
+      "bytes": 2346062,
+      "sha256": "e644d38d48533f9fb1b3f323008be7baf096fca15d871b44e38177c86bbc459d"
+    },
+    {
+      "name": "pliego-aarch64-apple-darwin.zip.sha256",
+      "role": "integrity-sidecar",
+      "bytes": 97,
+      "sha256": "c4514aa532e7519e60f7bde8bb966cbd5edd760801f1e4f837844d69ad773b42"
+    },
+    {
+      "name": "pliego-aarch64-unknown-linux-gnu.zip",
+      "role": "cli-archive",
+      "bytes": 2425780,
+      "sha256": "13a6a2aea3588300ba79319e116550fb9080af9e64880ccc3d535cb5eeafe2fe"
+    },
+    {
+      "name": "pliego-aarch64-unknown-linux-gnu.zip.sha256",
+      "role": "integrity-sidecar",
+      "bytes": 102,
+      "sha256": "fec37a564079b8686f942403edc8b78f3998e08d36509f6db16330a39195bf75"
+    },
+    {
+      "name": "pliego-x86_64-apple-darwin.zip",
+      "role": "cli-archive",
+      "bytes": 2346056,
+      "sha256": "cd53134109c5d6c353eb36172306da63de01d973a0d087e9b257204bbd919ea1"
+    },
+    {
+      "name": "pliego-x86_64-apple-darwin.zip.sha256",
+      "role": "integrity-sidecar",
+      "bytes": 96,
+      "sha256": "7b0826aaee568d14495849c0f723d84dfc8093b33082b149a74553be95860670"
+    },
+    {
+      "name": "pliego-x86_64-pc-windows-msvc.zip",
+      "role": "cli-archive",
+      "bytes": 2370731,
+      "sha256": "e69696082594929930870c29e2db11881532ce449bbe5eff1f05d0d142183b35"
+    },
+    {
+      "name": "pliego-x86_64-pc-windows-msvc.zip.sha256",
+      "role": "integrity-sidecar",
+      "bytes": 99,
+      "sha256": "fb1496597d12f0c920298390ac5da83f518824e6c1dbd0bcea48031ca7c1e3d4"
+    },
+    {
+      "name": "pliego-x86_64-unknown-linux-gnu.zip",
+      "role": "cli-archive",
+      "bytes": 2431781,
+      "sha256": "e726f693649083cb15c50fa99e19c0e24726407a9bff5ae92bac5b26b6aaf8de"
+    },
+    {
+      "name": "pliego-x86_64-unknown-linux-gnu.zip.sha256",
+      "role": "integrity-sidecar",
+      "bytes": 101,
+      "sha256": "2cecbf781629ea0ab4e0fb4a972db777f723051e95c66d44a85fa37dc8898565"
+    },
+    {
+      "name": "release-bundle-lib.mjs",
+      "role": "bundle-verifier-library",
+      "bytes": 6564,
+      "sha256": "8833eaca6aad1a8824f4aeb3e2348408999ebb6525763842c0dcd219fc53f620"
+    },
+    {
+      "name": "REPRODUCIBILITY.json",
+      "role": "reproducibility-evidence",
+      "bytes": 3853,
+      "sha256": "70284457d2b9ef775de8d300f19951aa3b94af11ccfe86c36e7be65dcc2120fd"
+    },
+    {
+      "name": "verify-release-bundle.mjs",
+      "role": "bundle-verifier",
+      "bytes": 8524,
+      "sha256": "c6460de053ed10dcee8c4e8779dab72b8989d81545237fadaeee15ada31d3508"
+    }
+  ]
+}

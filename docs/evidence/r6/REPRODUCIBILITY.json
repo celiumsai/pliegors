@@ -1,0 +1,102 @@
+{
+  "schema": "dev.pliegors.release-reproducibility/v1",
+  "version": "0.0.1",
+  "commit": "db2ddb3b83d99f6d9ebb63218f1579a860935588",
+  "targets": [
+    {
+      "target": "aarch64-apple-darwin",
+      "support": "development",
+      "binarySha256": "e3153c39c54cdeeee69508f9597b151bcb8e124cbf7bfd0d64c10ed299ea2879",
+      "replicas": [
+        {
+          "replica": 1,
+          "binarySha256": "e3153c39c54cdeeee69508f9597b151bcb8e124cbf7bfd0d64c10ed299ea2879",
+          "archiveSha256": "e644d38d48533f9fb1b3f323008be7baf096fca15d871b44e38177c86bbc459d",
+          "archiveBytes": 2346062
+        },
+        {
+          "replica": 2,
+          "binarySha256": "e3153c39c54cdeeee69508f9597b151bcb8e124cbf7bfd0d64c10ed299ea2879",
+          "archiveSha256": "4dfe4f6c111367a6c2edad54b09dd6e9a5bc96f5806c677271b13ace6dada48a",
+          "archiveBytes": 2346062
+        }
+      ]
+    },
+    {
+      "target": "aarch64-unknown-linux-gnu",
+      "support": "production",
+      "binarySha256": "8abcaf69f1a4dde00364b060e2bd7ee5cc1517e4e3942c9788922578f4e0d482",
+      "replicas": [
+        {
+          "replica": 1,
+          "binarySha256": "8abcaf69f1a4dde00364b060e2bd7ee5cc1517e4e3942c9788922578f4e0d482",
+          "archiveSha256": "13a6a2aea3588300ba79319e116550fb9080af9e64880ccc3d535cb5eeafe2fe",
+          "archiveBytes": 2425780
+        },
+        {
+          "replica": 2,
+          "binarySha256": "8abcaf69f1a4dde00364b060e2bd7ee5cc1517e4e3942c9788922578f4e0d482",
+          "archiveSha256": "c614fb48a4875d8f426e06bb62b5384f0c3d753c83acf999adb7af662a0eaf89",
+          "archiveBytes": 2425780
+        }
+      ]
+    },
+    {
+      "target": "x86_64-apple-darwin",
+      "support": "development",
+      "binarySha256": "16282ca714e10034887603f8f770d9e7fb8c5597a58393f9f0e5d8f18d09e3c2",
+      "replicas": [
+        {
+          "replica": 1,
+          "binarySha256": "16282ca714e10034887603f8f770d9e7fb8c5597a58393f9f0e5d8f18d09e3c2",
+          "archiveSha256": "cd53134109c5d6c353eb36172306da63de01d973a0d087e9b257204bbd919ea1",
+          "archiveBytes": 2346056
+        },
+        {
+          "replica": 2,
+          "binarySha256": "16282ca714e10034887603f8f770d9e7fb8c5597a58393f9f0e5d8f18d09e3c2",
+          "archiveSha256": "6e662872fe77804313985973566e5524ef4a111c5f29465bdedca25a7a63d8f0",
+          "archiveBytes": 2346056
+        }
+      ]
+    },
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "support": "development",
+      "binarySha256": "abc4582de05c1ea6f80d134ec46f8d8b9a43a989b58946badc4c39b108840b77",
+      "replicas": [
+        {
+          "replica": 1,
+          "binarySha256": "abc4582de05c1ea6f80d134ec46f8d8b9a43a989b58946badc4c39b108840b77",
+          "archiveSha256": "e69696082594929930870c29e2db11881532ce449bbe5eff1f05d0d142183b35",
+          "archiveBytes": 2370731
+        },
+        {
+          "replica": 2,
+          "binarySha256": "abc4582de05c1ea6f80d134ec46f8d8b9a43a989b58946badc4c39b108840b77",
+          "archiveSha256": "f96e047c58399e662631b4c3040ea05a5ef4fcc2580715463a7928e8e9d42e01",
+          "archiveBytes": 2370731
+        }
+      ]
+    },
+    {
+      "target": "x86_64-unknown-linux-gnu",
+      "support": "production",
+      "binarySha256": "b9f9a0e2735e22633bbde61e3c144e5385d2a41c591cbf45806dd4d05c9ab3e2",
+      "replicas": [
+        {
+          "replica": 1,
+          "binarySha256": "b9f9a0e2735e22633bbde61e3c144e5385d2a41c591cbf45806dd4d05c9ab3e2",
+          "archiveSha256": "e726f693649083cb15c50fa99e19c0e24726407a9bff5ae92bac5b26b6aaf8de",
+          "archiveBytes": 2431781
+        },
+        {
+          "replica": 2,
+          "binarySha256": "b9f9a0e2735e22633bbde61e3c144e5385d2a41c591cbf45806dd4d05c9ab3e2",
+          "archiveSha256": "72a1202897ac5441b14247afcb09cff10fbd2b2775fd3cd0c2c4a57bee8d64ed",
+          "archiveBytes": 2431781
+        }
+      ]
+    }
+  ]
+}

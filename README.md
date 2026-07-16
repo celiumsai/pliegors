@@ -37,6 +37,8 @@ channel is available yet.
 - `pliego new`, `check`, `build`, native-event `dev`, `preview`, `inspect`,
   `why artifact`, `why-rebuilt`, causal graphs, typed HMR, and maintained
   replayable default, minimal, editorial, and cinematic starters;
+- a five-target, two-replica private candidate pipeline with a signed exact-set
+  manifest and a distribution-only golden path;
 - an official bilingual site authored by PliegoRS itself.
 
 ## Direction
@@ -108,10 +110,12 @@ npm run check:site
 - [Event schema and projection snapshot contract](docs/30-event-schema-and-snapshot-contract.md)
 - [DOM lifecycle contract](docs/31-dom-lifecycle-contract.md)
 - [Golden developer experience contract](docs/32-golden-developer-experience.md)
+- [Candidate distribution contract](docs/33-candidate-distribution-contract.md)
 - [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
 - [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)
 - [R4 acceptance evidence](docs/evidence/r4-dom-lifecycle.md)
 - [R5 acceptance evidence](docs/evidence/r5-golden-developer-experience.md)
+- [R6 acceptance evidence](docs/evidence/r6-candidate-distribution.md)
 - [Framework API boundaries](docs/15-framework-api-boundaries.md)
 - [Native migration gate](docs/16-native-migration-gate.md)
 - [Framework readiness review](docs/17-framework-readiness-review.md)

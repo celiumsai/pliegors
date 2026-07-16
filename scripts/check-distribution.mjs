@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createHash, createPublicKey } from 'node:crypto';
+import { createHash, createPublicKey, verify } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
@@ -179,6 +179,56 @@ assert.equal(
   candidateFingerprint,
   'sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250',
   'candidate public key fingerprint drift',
+);
+
+const r6Directory = path.join(root, 'docs/evidence/r6');
+const r6ManifestBytes = readFileSync(path.join(r6Directory, 'RELEASE-MANIFEST.json'));
+const r6ManifestText = r6ManifestBytes.toString('utf8');
+const r6Manifest = JSON.parse(r6ManifestText);
+assert.equal(
+  r6ManifestText,
+  `${JSON.stringify(r6Manifest, null, 2)}\n`,
+  'committed R6 manifest must remain canonical JSON',
+);
+assert.equal(r6Manifest.schema, 'dev.pliegors.release-manifest/v1');
+assert.equal(r6Manifest.signing.algorithm, 'Ed25519');
+assert.equal(r6Manifest.signing.publicKeySha256, candidateFingerprint);
+const r6SignatureText = readFileSync(
+  path.join(r6Directory, 'RELEASE-MANIFEST.json.sig'),
+  'utf8',
+);
+assert.match(r6SignatureText, /^[A-Za-z0-9+/]{86}==\n$/u, 'R6 signature encoding');
+assert.ok(
+  verify(null, r6ManifestBytes, candidateKey, Buffer.from(r6SignatureText.trim(), 'base64')),
+  'committed R6 manifest signature is invalid',
+);
+const r6ReproducibilityBytes = readFileSync(path.join(r6Directory, 'REPRODUCIBILITY.json'));
+const r6Reproducibility = JSON.parse(r6ReproducibilityBytes.toString('utf8'));
+assert.equal(r6Reproducibility.schema, 'dev.pliegors.release-reproducibility/v1');
+assert.equal(r6Reproducibility.commit, r6Manifest.release.commit);
+assert.equal(r6Reproducibility.version, r6Manifest.release.version);
+assert.deepEqual(
+  r6Reproducibility.targets.map((target) => target.target),
+  releaseTargets,
+  'R6 evidence target set drift',
+);
+for (const target of r6Reproducibility.targets) {
+  assert.equal(target.replicas.length, 2, `${target.target} replica count`);
+  assert.deepEqual(target.replicas.map((replica) => replica.replica), [1, 2]);
+  assert.ok(
+    target.replicas.every((replica) => replica.binarySha256 === target.binarySha256),
+    `${target.target} binary reproducibility drift`,
+  );
+}
+const r6ReproducibilityAsset = r6Manifest.assets.find(
+  (asset) => asset.name === 'REPRODUCIBILITY.json',
+);
+assert.ok(r6ReproducibilityAsset, 'R6 manifest lacks reproducibility evidence');
+assert.equal(r6ReproducibilityAsset.bytes, r6ReproducibilityBytes.length);
+assert.equal(
+  r6ReproducibilityAsset.sha256,
+  createHash('sha256').update(r6ReproducibilityBytes).digest('hex'),
+  'R6 reproducibility evidence hash drift',
 );
 const releaseBundleSources = [
   'scripts/assemble-release-candidate.mjs',
