@@ -123,6 +123,21 @@ fn long_poll(port: u16, since: u64) -> std::thread::JoinHandle<String> {
     })
 }
 
+fn get(port: u16, path: &str) -> String {
+    let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+    write!(
+        stream,
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+    )
+    .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    response
+}
+
 #[test]
 fn native_watcher_css_hmr_and_rebuild_explanation_work_end_to_end() {
     let project = temporary_directory();
@@ -169,6 +184,23 @@ fn native_watcher_css_hmr_and_rebuild_explanation_work_end_to_end() {
     let why = String::from_utf8(why.stdout).unwrap();
     assert!(why.contains("Css"), "{why}");
     assert!(why.contains("assets/site.css"), "{why}");
+
+    let pending = long_poll(port, 1);
+    std::thread::sleep(Duration::from_millis(250));
+    let main = project.join("src/main.rs");
+    let source = fs::read_to_string(&main).unwrap().replace(
+        "Your Rust site is running.",
+        "Causal content HMR is running.",
+    );
+    fs::write(&main, source).unwrap();
+    let response = pending.join().unwrap();
+    assert!(response.contains("\"kind\":\"content\""), "{response}");
+    assert!(response.contains("\"routes\":[\"/\""), "{response}");
+    assert!(get(port, "/").contains("Causal content HMR is running."));
+
+    let why = pliego(&["why-rebuilt"], &project);
+    assert!(why.status.success());
+    assert!(String::from_utf8(why.stdout).unwrap().contains("Content"));
 
     dev.stop();
     let _ = fs::remove_file(&dev.stdout);

@@ -451,4 +451,42 @@ mod tests {
         assert_eq!(record.affected_routes, ["/"]);
         assert_eq!(record.affected_artifacts.len(), 2);
     }
+
+    #[test]
+    fn content_and_adapter_outputs_select_their_hot_update_protocols() {
+        let before = graph(b"same", b"home");
+        let content = graph(b"same", b"changed");
+        let content_record = explain_rebuild(
+            9,
+            BTreeSet::from(["src/main.rs".to_owned()]),
+            Some(&before),
+            &content,
+        );
+        assert_eq!(content_record.hmr.kind, HmrKind::Content);
+
+        let adapter_graph = |bytes: &[u8]| {
+            let mut build = graph(b"same", b"home");
+            build.graph.routes.clear();
+            build.graph.artifacts = vec![GraphArtifact {
+                path: "assets/plugin.js".to_owned(),
+                kind: "asset".to_owned(),
+                producer: "adapter".to_owned(),
+                route: None,
+                sources: SourceDependencies::Explicit {
+                    paths: vec!["src/main.rs".to_owned()],
+                },
+                sha256: pliego_artifact::sha256_bytes(bytes),
+            }];
+            build
+        };
+        let before_adapter = adapter_graph(b"before");
+        let after_adapter = adapter_graph(b"after");
+        let adapter_record = explain_rebuild(
+            10,
+            BTreeSet::from(["src/main.rs".to_owned()]),
+            Some(&before_adapter),
+            &after_adapter,
+        );
+        assert_eq!(adapter_record.hmr.kind, HmrKind::Adapter);
+    }
 }

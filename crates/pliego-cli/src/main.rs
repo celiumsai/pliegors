@@ -3771,6 +3771,9 @@ mod tests {
         let html = String::from_utf8(html).unwrap();
         assert!(html.contains("/_pliego/reload?since="));
         assert!(html.contains("connect(7)"));
+        assert!(html.contains("pliego:content-hmr"));
+        assert!(html.contains("pliego:adapter-hmr"));
+        assert!(html.contains("pliego:css-hmr"));
         assert!(html.find("data-pliego-reload").unwrap() < html.find("</body>").unwrap());
     }
 
