@@ -24,6 +24,19 @@ Versioning once a public release exists.
   encoding, bounded fail-closed snapshot restore, exact-tail replay, and
   automatic reactive cleanup on drop.
 
+### Changed
+
+- Expanded the official bilingual site to 18 documentation topics covering the
+  R0-R7 contracts, including causal development, schemas and snapshots,
+  verified Hyphae sync, DOM ownership, artifact trust, and crate/API ownership.
+- Updated the public candidate narrative and changelog to distinguish accepted
+  private evidence from a future public release decision.
+- Added hierarchical documentation breadcrumbs, `TechArticle` and
+  `SoftwareSourceCode` structured data, machine-local path rejection, and
+  separate Cloudflare public and protected-preview delivery profiles.
+- Made documentation filtering and scroll reveals progressively enhanced: a
+  failed or absent client runtime cannot hide authored content.
+
 ### Security
 
 - Explicit capability boundaries, safe HTML defaults, bounded content inputs,

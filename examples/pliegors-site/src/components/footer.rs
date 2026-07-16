@@ -51,15 +51,21 @@ fn footer_directory(locale: Locale) -> View {
                 ("/docs", "Documentation", "Documentación"),
                 ("/docs/getting-started", "Getting started", "Primeros pasos"),
                 (
+                    "/docs/developer-loop",
+                    "Developer loop",
+                    "Bucle de desarrollo",
+                ),
+                (
                     "/docs/events-and-folds",
                     "Events and folds",
                     "Eventos y folds",
                 ),
                 (
-                    "/docs/errors-and-diagnostics",
-                    "Errors and diagnostics",
-                    "Errores y diagnósticos",
+                    "/docs/artifact-trust",
+                    "Artifact trust",
+                    "Confianza de artefactos",
                 ),
+                ("/docs/crate-reference", "Crates and API", "Crates y API"),
             ],
         ))
         .child(directory(

@@ -663,8 +663,8 @@ fn distribution(locale: Locale) -> View {
                 .child(el("h2").child(l(locale, "Built once. Verified per target.", "Compilado una vez. Verificado por target.")))
                 .child(el("p").child(l(
                     locale,
-                    "GitHub Releases is the canonical channel. Linux artifacts are production targets; macOS and Windows builds support local development. Every candidate remains private until its evidence is complete.",
-                    "GitHub Releases es el canal canónico. Los artefactos Linux son targets de producción; los builds de macOS y Windows sirven al desarrollo local. Cada candidato permanece privado hasta completar su evidencia.",
+                    "GitHub Releases is the canonical channel. Linux artifacts are production targets; macOS and Windows builds support local development. The accepted private candidate has complete R0-R7 evidence; public availability begins only when an explicit release is published.",
+                    "GitHub Releases es el canal canónico. Los artefactos Linux son targets de producción; los builds de macOS y Windows sirven al desarrollo local. El candidato privado aceptado tiene evidencia completa de R0-R7; la disponibilidad pública comienza únicamente cuando se publique un release explícito.",
                 ))),
         )
         .child(
@@ -684,8 +684,8 @@ fn closing(locale: Locale) -> View {
         .child(el("h2").child(l(locale, "The authored web, with a memory.", "La web con autoría, y con memoria.")))
         .child(el("p").child(l(
             locale,
-            "The private candidate is being hardened in the open shape it will eventually ship: documented, inspectable, and owned from source to output.",
-            "El candidato privado se fortalece con la misma forma abierta con la que finalmente se distribuirá: documentado, inspeccionable y controlado de fuente a salida.",
+            "The private candidate has completed R0-R7 hardening: documented, inspectable, independently exercised, and owned from source to output.",
+            "El candidato privado completó el fortalecimiento R0-R7: documentado, inspeccionable, ejercitado de forma independiente y controlado de fuente a salida.",
         )))
         .child(action("mailto:hello@pliegors.dev", "hello@pliegors.dev", true))
         .into_view()
@@ -909,8 +909,8 @@ fn about_release(locale: Locale) -> View {
         )))
         .child(el("p").child(l(
             locale,
-            "The framework remains private until source, documentation, security posture, platform builds, checksums, and release history agree. No registry package or public support promise exists before that gate closes.",
-            "El framework permanece privado hasta que código, documentación, postura de seguridad, builds por plataforma, checksums e historial del release coincidan. No existe paquete de registry ni promesa pública de soporte antes de cerrar ese gate.",
+            "Source, documentation, security posture, platform builds, checksums, and R0-R7 evidence now agree on the accepted private candidate. Publication remains a separate product decision; no public install channel or support promise exists until a release is explicitly published.",
+            "El código, la documentación, la postura de seguridad, los builds por plataforma, los checksums y la evidencia R0-R7 ya coinciden en el candidato privado aceptado. La publicación sigue siendo una decisión de producto separada; no existe canal público de instalación ni promesa de soporte hasta publicar un release de forma explícita.",
         )))
         .child(
             el("div")
@@ -933,22 +933,40 @@ pub fn changelog(locale: Locale) -> View {
     let entries = [
         (
             "0.0.1",
-            "2026-07",
-            l(locale, "Private candidate", "Candidato privado"),
+            "2026-07-16",
             l(
                 locale,
-                "Native SSG, typed content, Rust/WASM runtime, adapters, adaptive assets, verified Hyphae boundary, and cross-platform release workflow.",
-                "SSG nativo, contenido tipado, runtime Rust/WASM, adaptadores, assets adaptativos, límite Hyphae verificado y workflow multiplataforma.",
+                "Accepted private candidate",
+                "Candidato privado aceptado",
+            ),
+            l(
+                locale,
+                "Native SSG, typed content, Rust/WASM runtime, adapters, adaptive assets, verified Hyphae boundary, signed five-target distribution, and an independently exercised external application.",
+                "SSG nativo, contenido tipado, runtime Rust/WASM, adaptadores, assets adaptativos, límite Hyphae verificado, distribución firmada para cinco targets y una aplicación externa ejercitada de forma independiente.",
+            ),
+        ),
+        (
+            "R5–R7",
+            "ACCEPTED",
+            l(
+                locale,
+                "Delivery and external proof",
+                "Entrega y prueba externa",
+            ),
+            l(
+                locale,
+                "Causal HMR, why commands, replayable first use, signed reproducible candidates, installer lifecycle, and an external durable application passed their acceptance gates.",
+                "HMR causal, comandos why, primer uso reproducible, candidatos firmados y reproducibles, lifecycle de instaladores y una aplicación durable externa aprobaron sus gates de aceptación.",
             ),
         ),
         (
             "R0–R4",
-            "ACTIVE",
-            l(locale, "Hardening", "Fortalecimiento"),
+            "ACCEPTED",
+            l(locale, "Core hardening", "Fortalecimiento del núcleo"),
             l(
                 locale,
-                "Reactive safety, artifact trust, verified sync, snapshot identity, and DOM lifecycle gates.",
-                "Seguridad reactiva, confianza de artefactos, sync verificado, identidad de snapshots y gates del lifecycle DOM.",
+                "Reactive safety, artifact trust, verified sync, schema and snapshot identity, keyed reconciliation, SSR adoption, and deterministic DOM cleanup passed their acceptance gates.",
+                "Seguridad reactiva, confianza de artefactos, sync verificado, identidad de schemas y snapshots, reconciliación keyed, adopción SSR y cleanup determinista del DOM aprobaron sus gates de aceptación.",
             ),
         ),
     ];

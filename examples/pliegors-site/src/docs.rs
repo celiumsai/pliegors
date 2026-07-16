@@ -42,6 +42,15 @@ pub const TOPICS: &[DocTopic] = &[
         summary_es: "Usa new, check, build, dev, preview, inspect, templates y diagnósticos legibles por máquinas.",
     },
     DocTopic {
+        slug: "developer-loop",
+        group_en: "Start",
+        group_es: "Inicio",
+        title_en: "Developer loop",
+        title_es: "Bucle de desarrollo",
+        summary_en: "Follow native file events through typed HMR, causal build graphs, artifact explanations, and recovery without losing the last valid output.",
+        summary_es: "Sigue eventos nativos de archivos mediante HMR tipado, grafos causales, explicaciones de artefactos y recuperación sin perder la última salida válida.",
+    },
+    DocTopic {
         slug: "routing-and-pages",
         group_en: "Author",
         group_es: "Autoría",
@@ -69,6 +78,24 @@ pub const TOPICS: &[DocTopic] = &[
         summary_es: "Modela hechos durables, proyecciones deterministas, paridad de replay, snapshots y efectos explícitos.",
     },
     DocTopic {
+        slug: "schemas-and-snapshots",
+        group_en: "State",
+        group_es: "Estado",
+        title_en: "Schemas and snapshots",
+        title_es: "Schemas y snapshots",
+        summary_en: "Version events, seal adjacent upcasters, bind projection identity, and restore snapshots only against an exact compatible contract.",
+        summary_es: "Versiona eventos, sella upcasters adyacentes, vincula la identidad de proyección y restaura snapshots sólo contra un contrato compatible exacto.",
+    },
+    DocTopic {
+        slug: "hyphae-sync",
+        group_en: "State",
+        group_es: "Estado",
+        title_en: "Hyphae verified sync",
+        title_es: "Sync verificado con Hyphae",
+        summary_en: "Append and replay durable history through signed attestations, fixed snapshots, authority policy, and consuming verification types.",
+        summary_es: "Añade y reproduce historia durable mediante attestations firmadas, snapshots fijos, política de autoridad y tipos de verificación consumibles.",
+    },
+    DocTopic {
         slug: "content",
         group_en: "Author",
         group_es: "Autoría",
@@ -87,6 +114,15 @@ pub const TOPICS: &[DocTopic] = &[
         summary_es: "Reanuda comportamiento Rust/WASM y admite GSAP, Lenis, Three.js o WebGL mediante adaptadores de lifecycle.",
     },
     DocTopic {
+        slug: "dom-lifecycle",
+        group_en: "Runtime",
+        group_es: "Runtime",
+        title_en: "DOM ownership",
+        title_es: "Propiedad del DOM",
+        summary_en: "Own mounted ranges, reconcile keyed children, adopt exact SSR output, and dispose listeners, effects, adapters, and nodes deterministically.",
+        summary_es: "Controla rangos montados, reconcilia hijos keyed, adopta salida SSR exacta y elimina listeners, efectos, adapters y nodos de forma determinista.",
+    },
+    DocTopic {
         slug: "assets",
         group_en: "Delivery",
         group_es: "Entrega",
@@ -94,6 +130,15 @@ pub const TOPICS: &[DocTopic] = &[
         title_es: "Assets adaptativos",
         summary_en: "Plan reproducible images, video, fonts, and 3D variants under explicit device budgets.",
         summary_es: "Planifica variantes reproducibles de imagen, video, fuentes y 3D bajo presupuestos explícitos por dispositivo.",
+    },
+    DocTopic {
+        slug: "artifact-trust",
+        group_en: "Delivery",
+        group_es: "Entrega",
+        title_en: "Artifact trust",
+        title_es: "Confianza de artefactos",
+        summary_en: "Understand portable namespaces, exact source capture, staged publication, build receipts, causal graphs, and fail-closed verification.",
+        summary_es: "Entiende namespaces portables, captura exacta de fuentes, publicación por staging, recibos de build, grafos causales y verificación fail-closed.",
     },
     DocTopic {
         slug: "errors-and-diagnostics",
@@ -114,6 +159,15 @@ pub const TOPICS: &[DocTopic] = &[
         summary_es: "Verifica el ledger de salida, previsualiza bytes de producción, selecciona artefactos y despliega salida estática.",
     },
     DocTopic {
+        slug: "crate-reference",
+        group_en: "Reference",
+        group_es: "Referencia",
+        title_en: "Crates and API",
+        title_es: "Crates y API",
+        summary_en: "Choose the public crate that owns each contract, generate exact-version Rustdoc, and avoid depending on implementation-only internals.",
+        summary_es: "Elige el crate público que controla cada contrato, genera Rustdoc de versión exacta y evita depender de internals de implementación.",
+    },
+    DocTopic {
         slug: "licensing",
         group_en: "Project",
         group_es: "Proyecto",
@@ -129,6 +183,7 @@ pub fn index(locale: Locale) -> View {
     for (index, topic) in TOPICS.iter().enumerate() {
         let title = localized(locale, topic.title_en, topic.title_es);
         let summary = localized(locale, topic.summary_en, topic.summary_es);
+        let group = localized(locale, topic.group_en, topic.group_es);
         topics = topics.child(
             el("a")
                 .class("rs-doc-card")
@@ -137,13 +192,12 @@ pub fn index(locale: Locale) -> View {
                     locale_path(locale, &format!("/docs/{}", topic.slug)),
                 )
                 .attr("data-docs-item", "")
-                .attr("data-search", format!("{title} {summary}").to_lowercase())
+                .attr(
+                    "data-search",
+                    format!("{group} {title} {summary}").to_lowercase(),
+                )
                 .child(el("span").child(format!("{:02}", index + 1)))
-                .child(el("p").class("utility-label").child(localized(
-                    locale,
-                    topic.group_en,
-                    topic.group_es,
-                )))
+                .child(el("p").class("utility-label").child(group))
                 .child(el("h2").child(title))
                 .child(el("p").child(summary))
                 .child(el("b").attr("aria-hidden", "true").child("↗")),
@@ -222,14 +276,20 @@ pub fn article(locale: Locale, slug: &str) -> Result<View, String> {
         "getting-started" => getting_started(locale),
         "project-structure" => project_structure(locale),
         "cli" => cli_reference(locale),
+        "developer-loop" => developer_loop(locale),
         "routing-and-pages" => routing_and_pages(locale),
         "views" => views(locale),
         "events-and-folds" => events_and_folds(locale),
+        "schemas-and-snapshots" => schemas_and_snapshots(locale),
+        "hyphae-sync" => hyphae_sync(locale),
         "content" => typed_content(locale),
         "browser-runtime" => browser_runtime(locale),
+        "dom-lifecycle" => dom_lifecycle(locale),
         "assets" => adaptive_assets(locale),
+        "artifact-trust" => artifact_trust(locale),
         "errors-and-diagnostics" => errors_and_diagnostics(locale),
         "build-and-deploy" => build_and_deploy(locale),
+        "crate-reference" => crate_reference(locale),
         "licensing" => licensing(locale),
         _ => unreachable!("topic registry and renderer stay aligned"),
     };
@@ -533,6 +593,35 @@ fn cli_reference(locale: Locale) -> View {
     ].into_view()
 }
 
+fn developer_loop(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "watch", "Native events, bounded rebuilds", "Eventos nativos, rebuilds limitados", vec![
+            paragraph(locale, "pliego dev watches authored inputs through the operating system, debounces event bursts, ignores generated roots, and never follows source symlinks. A failed rebuild keeps the last verified site available while diagnostics remain live.", "pliego dev observa entradas de autoría mediante el sistema operativo, agrupa ráfagas de eventos, ignora roots generados y nunca sigue symlinks de fuentes. Un rebuild fallido mantiene disponible el último sitio verificado mientras los diagnósticos siguen activos."),
+            code_block(locale, "shell", "pliego dev 4400\npliego dev 4400 --lan\npliego dev 4400 --host 192.168.1.20"),
+        ]),
+        doc_section(locale, "hmr", "Typed HMR decisions", "Decisiones HMR tipadas", vec![
+            definition_list(locale, &[
+                ("css", "Refresh the affected stylesheet URL without replacing the document", "Actualiza la URL del stylesheet afectado sin reemplazar el documento"),
+                ("content", "Fetch the rebuilt route after its verified artifact changes", "Obtiene la ruta recompilada después de cambiar su artefacto verificado"),
+                ("adapter", "Retire the owned adapter generation before loading its replacement", "Retira la generación controlada del adapter antes de cargar su reemplazo"),
+                ("reload", "Use a full document reload when the graph cannot prove a narrower action", "Usa reload completo cuando el grafo no puede probar una acción más específica"),
+            ]),
+            paragraph(locale, "HMR is derived from verified graph differences. It is an optimization of the development loop, never a second production runtime or an authority over unverified bytes.", "HMR se deriva de diferencias verificadas del grafo. Es una optimización del bucle de desarrollo, nunca un segundo runtime de producción ni una autoridad sobre bytes no verificados."),
+        ]),
+        doc_section(locale, "explain", "Explain causality", "Explica la causalidad", vec![
+            code_block(locale, "shell", "pliego why artifact /\npliego why artifact assets/site.css\npliego why-rebuilt"),
+            paragraph(locale, "why artifact verifies the current receipt and pliego.graph.json before tracing source-to-route-to-artifact edges. why-rebuilt reads the latest bounded private development record and reports changed sources, invalidated routes, affected artifacts, byte changes, HMR choice, and receipt transition.", "why artifact verifica el recibo actual y pliego.graph.json antes de seguir edges source-to-route-to-artifact. why-rebuilt lee el último registro privado y limitado de desarrollo y reporta fuentes cambiadas, rutas invalidadas, artefactos afectados, cambios de bytes, decisión HMR y transición del recibo."),
+        ]),
+        doc_section(locale, "recover", "Failure preserves evidence", "El fallo preserva la evidencia", vec![
+            paragraph(locale, "Compiler errors, invalid content, graph mismatches, and adapter build failures produce stable diagnostics without publishing a partial site. Correct the reported source and save again; the watcher retries from the last accepted generation.", "Los errores del compilador, contenido inválido, mismatches del grafo y fallos de build de adapters producen diagnósticos estables sin publicar un sitio parcial. Corrige la fuente reportada y guarda de nuevo; el watcher reintenta desde la última generación aceptada."),
+            link_list(locale, &[
+                ("/docs/errors-and-diagnostics", "Read diagnostic recovery", "Leer recuperación de diagnósticos"),
+                ("/docs/artifact-trust", "Understand the verified graph", "Entender el grafo verificado"),
+            ]),
+        ]),
+    ].into_view()
+}
+
 fn routing_and_pages(locale: Locale) -> View {
     vec![
         doc_section(locale, "page", "Author a complete page", "Crea una página completa", vec![
@@ -597,6 +686,61 @@ fn events_and_folds(locale: Locale) -> View {
     ].into_view()
 }
 
+fn schemas_and_snapshots(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "catalog", "Seal the event catalog", "Sella el catálogo de eventos", vec![
+            paragraph(locale, "Each durable event kind has a portable name, a positive schema version, bounded canonical JSON, and a stable mapper identity. Sealing validates the complete catalog before any payload can enter a typed reducer.", "Cada tipo de evento durable tiene un nombre portable, una versión positiva de schema, JSON canónico limitado y una identidad estable de mapper. Sellar valida el catálogo completo antes de que cualquier payload pueda entrar en un reducer tipado."),
+            definition_list(locale, &[
+                ("kind", "Stable application-owned event identity", "Identidad estable de evento controlada por la aplicación"),
+                ("version", "Exact schema version carried by the envelope", "Versión exacta del schema incluida en el envelope"),
+                ("mapper", "Deterministic value-to-type admission identity", "Identidad determinista de admisión value-to-type"),
+                ("limits", "Bounded kinds, payload bytes, depth, and remembered determinism pairs", "Tipos, bytes de payload, profundidad y pares de determinismo limitados"),
+            ]),
+        ]),
+        doc_section(locale, "upcasting", "Upcast only adjacent versions", "Haz upcast sólo entre versiones adyacentes", vec![
+            paragraph(locale, "A v1 payload reaches v3 only through explicit v1-to-v2 and v2-to-v3 edges. Gaps, cross-kind edges, duplicate steps, nondeterministic output, or an upcast beyond the current schema fail while the catalog is sealed.", "Un payload v1 llega a v3 sólo mediante edges explícitos v1-a-v2 y v2-a-v3. Gaps, edges entre tipos distintos, pasos duplicados, salida no determinista o un upcast posterior al schema actual fallan al sellar el catálogo."),
+            code_block(locale, "text", "task.created/v1 --title-to-priority/1--> task.created/v2\ntask.created/v2 --priority-to-origin/1--> task.created/v3"),
+            note(locale, "No implicit migration", "Changing a Rust struct does not rewrite durable history. Register and test each adjacent semantic transition before accepting old envelopes.", "Sin migración implícita", "Cambiar un struct Rust no reescribe historia durable. Registra y prueba cada transición semántica adyacente antes de aceptar envelopes antiguos."),
+        ]),
+        doc_section(locale, "identity", "Bind snapshot identity", "Vincula la identidad del snapshot", vec![
+            paragraph(locale, "A projection snapshot binds the exact event content head, sealed schema-set digest, reducer identity, codec identity and configuration, canonical state bytes, and snapshot format. Its SHA-256 protects integrity; it does not establish remote authority.", "Un snapshot de proyección vincula el content head exacto de eventos, digest del conjunto de schemas sellado, identidad del reducer, identidad y configuración del codec, bytes canónicos del estado y formato del snapshot. Su SHA-256 protege integridad; no establece autoridad remota."),
+            link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/docs/30-event-schema-and-snapshot-contract.md", "Normative schema and snapshot contract", "Contrato normativo de schemas y snapshots")]),
+        ]),
+        doc_section(locale, "restore", "Restore fail closed", "Restaura de forma fail-closed", vec![
+            steps(locale, &[
+                ("Verify", "Decode bounded bytes and verify the snapshot digest and format", "Verificar", "Decodifica bytes limitados y verifica digest y formato del snapshot"),
+                ("Match", "Require the exact current schema, reducer, codec, and content-head contract", "Comparar", "Exige el contrato actual exacto de schemas, reducer, codec y content head"),
+                ("Replay", "Apply only the exact contiguous tail after the captured cursor", "Reproducir", "Aplica únicamente el tail contiguo exacto posterior al cursor capturado"),
+                ("Compare", "Prove snapshot-tail and genesis replay produce identical canonical state", "Comparar", "Prueba que snapshot-tail y replay desde genesis producen estado canónico idéntico"),
+            ]),
+        ]),
+    ].into_view()
+}
+
+fn hyphae_sync(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "boundary", "Hyphae is optional durability", "Hyphae es durabilidad opcional", vec![
+            paragraph(locale, "Static PliegoRS sites require no database. Applications that need shared durable history can use Hyphae through pliego-hyphae protocol v2. The crate defines and verifies the client boundary; it is not the Hyphae service implementation.", "Los sitios estáticos PliegoRS no requieren base de datos. Las aplicaciones que necesitan historia durable compartida pueden usar Hyphae mediante el protocolo v2 de pliego-hyphae. El crate define y verifica el límite cliente; no es la implementación del servicio Hyphae."),
+            link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/docs/29-hyphae-verified-sync-guide.md", "Read the normative sync guide", "Leer la guía normativa de sync")]),
+        ]),
+        doc_section(locale, "append", "Verify every append", "Verifica cada append", vec![
+            paragraph(locale, "An append request binds stream identity, ordered local events, idempotency identity, and expected cursor. The response remains untrusted until its page attestation and every receipt signature resolve through the same accepted authority policy.", "Un request de append vincula identidad del stream, eventos locales ordenados, identidad de idempotencia y cursor esperado. La respuesta sigue sin confianza hasta que su page attestation y cada firma de recibo resuelven mediante la misma política de autoridad aceptada."),
+            note(locale, "Shape is not trust", "Base64url syntax, UUIDv7 shape, timestamps, and key IDs can be validated without proving who signed the bytes. Only the configured verifier and authority policy cross that boundary.", "La forma no es confianza", "La sintaxis base64url, forma UUIDv7, timestamps y key IDs pueden validarse sin probar quién firmó los bytes. Sólo el verifier configurado y la política de autoridad cruzan ese límite."),
+        ]),
+        doc_section(locale, "pull", "Replay inside a fixed snapshot", "Reproduce dentro de un snapshot fijo", vec![
+            paragraph(locale, "The first pull discovers a terminal snapshot cursor. Every continuation is bound to that exact head; pages cannot regress, fork at the same position, advance beyond the snapshot, change completion, or omit the attestation even when no events are returned.", "El primer pull descubre un cursor terminal de snapshot. Cada continuación queda vinculada a ese head exacto; las páginas no pueden retroceder, bifurcarse en la misma posición, avanzar más allá del snapshot, cambiar completion ni omitir la attestation aunque no retornen eventos."),
+            code_block(locale, "text", "Latest(after) -> VerifiedPage(snapshot=S, next=A)\nExact(S, after=A) -> VerifiedPage(snapshot=S, next=S, complete=true)"),
+        ]),
+        doc_section(locale, "authority", "Consume verified state", "Consume estado verificado", vec![
+            paragraph(locale, "Verification returns consuming typestate: unverified responses cannot expose admitted application events, and verified pages can be applied only against the stream, cursor, snapshot, and authority that produced them. Persisted evidence must be replayed through the same checks.", "La verificación retorna typestate consumible: las respuestas no verificadas no pueden exponer eventos admitidos de la aplicación y las páginas verificadas sólo pueden aplicarse contra el stream, cursor, snapshot y autoridad que las produjeron. La evidencia persistida debe reproducirse mediante los mismos checks."),
+            link_list(locale, &[
+                ("/docs/events-and-folds", "Model local events first", "Modelar primero eventos locales"),
+                ("/docs/schemas-and-snapshots", "Bind schema and projection identity", "Vincular identidad de schema y proyección"),
+            ]),
+        ]),
+    ].into_view()
+}
+
 fn typed_content(locale: Locale) -> View {
     vec![
         doc_section(locale, "collections", "Typed collections", "Colecciones tipadas", vec![
@@ -644,6 +788,33 @@ fn browser_runtime(locale: Locale) -> View {
     ].into_view()
 }
 
+fn dom_lifecycle(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "scopes", "One owner per mounted lifetime", "Un propietario por lifetime montado", vec![
+            paragraph(locale, "A MountScope owns its exact DOM range, reactive descendants, listeners, observer handles, adapter generations, cancellation signals, and cleanup callbacks. Nested scopes form an explicit tree; disposing a parent retires the complete owned subtree.", "Un MountScope controla su rango DOM exacto, descendientes reactivos, listeners, handles de observers, generaciones de adapters, señales de cancelación y callbacks de cleanup. Los scopes anidados forman un árbol explícito; disponer un parent retira el subárbol controlado completo."),
+            definition_list(locale, &[
+                ("mount", "Claim detached authored nodes and install owned resources", "Reclama nodos de autoría detached e instala recursos controlados"),
+                ("update", "Change only resources still owned by the live generation", "Cambia únicamente recursos aún controlados por la generación viva"),
+                ("dispose", "Abort work, run LIFO cleanup, then remove exact owned nodes", "Aborta trabajo, ejecuta cleanup LIFO y luego elimina nodos controlados exactos"),
+            ]),
+        ]),
+        doc_section(locale, "keyed", "Retain keyed identity", "Retén identidad keyed", vec![
+            paragraph(locale, "Keyed reconciliation preserves existing node and listener identity, creates builders only for new keys, and minimizes browser moves. Duplicate keys, hostile topology, oversized updates, foreign gaps, unsupported parents, or moved descendants fail without claiming foreign DOM.", "La reconciliación keyed preserva identidad existente de nodos y listeners, crea builders sólo para keys nuevas y minimiza movimientos del navegador. Keys duplicadas, topología hostil, updates sobredimensionados, gaps externos, parents no soportados o descendientes movidos fallan sin reclamar DOM externo."),
+        ]),
+        doc_section(locale, "adoption", "Adopt exact SSR output", "Adopta salida SSR exacta", vec![
+            paragraph(locale, "Adoptable rendering emits a versioned pliego:ssr:v1 seed. Browser preflight validates the complete structure, text, namespaces, attributes, dynamic first reads, and keyed identities before installing any listener or effect. A mismatch is diagnostic and non-mutating.", "El render adoptable emite un seed versionado pliego:ssr:v1. El preflight del navegador valida estructura completa, texto, namespaces, atributos, primeras lecturas dinámicas e identidades keyed antes de instalar listeners o efectos. Un mismatch es diagnóstico y no muta el documento."),
+            note(locale, "Adoption is strict", "PliegoRS reuses exact authored nodes. It does not heuristically hydrate arbitrary third-party markup or silently replace a mismatched seed.", "La adopción es estricta", "PliegoRS reutiliza nodos exactos de autoría. No hidrata heurísticamente markup arbitrario de terceros ni reemplaza silenciosamente un seed incompatible."),
+        ]),
+        doc_section(locale, "cleanup", "Cleanup cannot be postponed", "El cleanup no puede posponerse", vec![
+            paragraph(locale, "Scope disposal emits pliego:scope-dispose, aborts provisional plugin work, drains registered resources in LIFO order, and removes DOM last. A plugin promise that never settles cannot keep registered cleanup alive; a late result is retired without mounting the obsolete generation.", "Disponer el scope emite pliego:scope-dispose, aborta trabajo provisional de plugins, drena recursos registrados en orden LIFO y elimina el DOM al final. Una promesa de plugin que nunca termina no puede mantener vivo el cleanup registrado; un resultado tardío se retira sin montar la generación obsoleta."),
+            link_list(locale, &[
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/31-dom-lifecycle-contract.md", "Normative DOM lifecycle contract", "Contrato normativo del lifecycle DOM"),
+                ("/docs/browser-runtime", "Adapter admission and policy", "Admisión y política de adapters"),
+            ]),
+        ]),
+    ].into_view()
+}
+
 fn adaptive_assets(locale: Locale) -> View {
     vec![
         doc_section(locale, "manifest", "Asset manifest", "Manifest de assets", vec![
@@ -663,6 +834,35 @@ fn adaptive_assets(locale: Locale) -> View {
         ]),
         doc_section(locale, "fallbacks", "Fallbacks are part of the design", "Los fallbacks son parte del diseño", vec![
             paragraph(locale, "Every optional 3D, video, or motion surface defines a meaningful static or lower-tier representation. Save-Data and reduced motion never produce a blank composition.", "Cada superficie opcional de 3D, video o motion define una representación estática o de menor tier con significado. Save-Data y movimiento reducido nunca producen una composición vacía."),
+        ]),
+    ].into_view()
+}
+
+fn artifact_trust(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "namespace", "One portable output namespace", "Un namespace portable de salida", vec![
+            paragraph(locale, "Routes, redirects, public assets, generated client files, the causal graph, and the build receipt share one collision model. Parent traversal, aliases, case-only collisions, Windows reserved names, symlinks, hardlinks, non-regular files, and output paths that overlap source are rejected before publication.", "Rutas, redirects, assets públicos, archivos generados del cliente, grafo causal y recibo del build comparten un modelo de colisiones. Parent traversal, aliases, colisiones sólo por casing, nombres reservados de Windows, symlinks, hardlinks, archivos no regulares y rutas de salida que se solapan con fuentes se rechazan antes de publicar."),
+        ]),
+        doc_section(locale, "capture", "Capture exact inputs", "Captura entradas exactas", vec![
+            paragraph(locale, "The build captures portable source identities, sizes, SHA-256 digests, project configuration, toolchain identity, source revision, and producer declarations. Inputs are revalidated before publication so a file cannot change between planning and commit without invalidating the build.", "El build captura identidades portables de fuentes, tamaños, digests SHA-256, configuración del proyecto, identidad del toolchain, revisión fuente y declaraciones del productor. Las entradas se revalidan antes de publicar para que un archivo no pueda cambiar entre planificación y commit sin invalidar el build."),
+            note(locale, "Environment is not invisible", "A reproducible producer must declare every environment value that changes output. Builder-only variables cannot leak into consumer or release identity.", "El environment no es invisible", "Un productor reproducible debe declarar cada valor de environment que cambie la salida. Variables exclusivas del builder no pueden filtrarse hacia la identidad del consumidor o del release."),
+        ]),
+        doc_section(locale, "receipt", "Verify receipt and graph together", "Verifica recibo y grafo juntos", vec![
+            definition_list(locale, &[
+                ("pliego.build.json", "Exact output file set, byte size, digest, producer, source revision, and toolchain", "Conjunto exacto de archivos, tamaño, digest, productor, revisión fuente y toolchain"),
+                ("pliego.graph.json", "Versioned source-to-route-to-artifact causal edges bound by the receipt", "Edges causales versionados source-to-route-to-artifact vinculados por el recibo"),
+                ("pliego inspect", "Recompute and verify the complete published artifact", "Recalcula y verifica el artefacto publicado completo"),
+                ("pliego why artifact", "Explain only after receipt and graph verification succeed", "Explica sólo después de verificar recibo y grafo"),
+            ]),
+        ]),
+        doc_section(locale, "publish", "Stage, seal, replace", "Stage, sella, reemplaza", vec![
+            steps(locale, &[
+                ("Preflight", "Validate budgets, namespace, inputs, and existing output without following links", "Preflight", "Valida budgets, namespace, entradas y salida existente sin seguir links"),
+                ("Stage", "Write every new file into a private sibling directory", "Stage", "Escribe cada archivo nuevo en un directorio privado adyacente"),
+                ("Seal", "Revalidate inputs and write the final receipt over the exact staged bytes", "Sellar", "Revalida entradas y escribe el recibo final sobre los bytes exactos del stage"),
+                ("Replace", "Atomically swap the verified stage while retaining recoverability on failure", "Reemplazar", "Intercambia atómicamente el stage verificado preservando recuperación ante fallo"),
+            ]),
+            link_list(locale, &[("/docs/build-and-deploy", "Build, release, and deploy", "Build, release y despliegue")]),
         ]),
     ].into_view()
 }
@@ -713,6 +913,49 @@ fn build_and_deploy(locale: Locale) -> View {
         doc_section(locale, "deploy", "Deploy the static output", "Despliega la salida estática", vec![
             paragraph(locale, "Deploy the contents of target/site to any origin that preserves paths, MIME types, immutable asset caching, the authored 404 document, and clean-route fallback. The framework does not require a PliegoRS application server.", "Despliega el contenido de target/site en cualquier origen que preserve rutas, MIME types, cache inmutable de assets, el documento 404 con autoría y fallback de rutas limpias. El framework no requiere un servidor de aplicación PliegoRS."),
             note(locale, "Verify after upload", "Compare uploaded bytes against the ledger or release manifest. A successful local build is not evidence that an origin serves the same artifact.", "Verifica después del upload", "Compara los bytes subidos contra el ledger o manifest de release. Un build local exitoso no prueba que un origen sirva el mismo artefacto."),
+        ]),
+    ].into_view()
+}
+
+fn crate_reference(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "choose", "Choose the owning crate", "Elige el crate propietario", vec![
+            definition_list(locale, &[
+                ("pliego-dom / pliego-macros", "Escaped views, authored DOM, typed components, SSR adoption, and mounted ownership", "Vistas escapadas, DOM con autoría, componentes tipados, adopción SSR y propiedad montada"),
+                ("pliego-log / pliego-fold", "Typed history, schemas, upcasting, projections, replay, effects, and snapshots", "Historia tipada, schemas, upcasting, proyecciones, replay, efectos y snapshots"),
+                ("pliego-reactive / pliego-resume", "Owned signals, memos, effects, and resumable standard browser actions", "Signals, memos y effects controlados y acciones estándar reanudables del navegador"),
+                ("pliego-content / pliego-assets", "Bounded content ingestion and reproducible adaptive media plans", "Ingesta limitada de contenido y planes reproducibles de media adaptativa"),
+                ("pliego-artifact / pliego-ssg / pliego-inspect", "Portable output, documents, routes, receipts, graphs, staged publication, and verification", "Salida portable, documentos, rutas, recibos, grafos, publicación por staging y verificación"),
+                ("pliego-adapters / pliego-hyphae", "External browser lifecycle and verified durable sync boundaries", "Lifecycle externo del navegador y límites de sync durable verificado"),
+                ("pliego-starters / pliego-cli", "Maintained first-use projects and the complete command surface", "Proyectos mantenidos de primer uso y superficie completa de comandos"),
+            ]),
+        ]),
+        doc_section(locale, "symbols", "Core public entry points", "Entradas públicas principales", vec![
+            definition_list(locale, &[
+                ("pliego_ssg::{Site, Page, Head, Asset}", "Author complete documents and publish a deterministic static site", "Crea documentos completos y publica un sitio estático determinista"),
+                ("pliego_dom::{View, Element, IntoView, el}", "Compose escaped semantic views; use MountScope for owned browser lifetimes", "Compón vistas semánticas escapadas; usa MountScope para lifetimes controlados del navegador"),
+                ("pliego_reactive::{Signal, Memo, Effect}", "Model owned reactive state with equality and disposal semantics", "Modela estado reactivo controlado con semántica de igualdad y disposición"),
+                ("pliego_log::{EventSchema, Log, EventCatalogBuilder, SealedEventCatalog}", "Encode typed durable history and seal version admission", "Codifica historia durable tipada y sella admisión de versiones"),
+                ("pliego_fold::{Reducer, Projection, ProjectionSnapshot}", "Project accepted events transactionally and restore bound state", "Proyecta eventos aceptados transaccionalmente y restaura estado vinculado"),
+                ("pliego_artifact::BuildContext", "Capture exact source identity for verified publication", "Captura identidad exacta de fuentes para publicación verificada"),
+                ("pliego_adapters::{AdapterIsland, AdapterPolicy}", "Declare external browser modules and their admission policy", "Declara módulos externos del navegador y su política de admisión"),
+                ("pliego_hyphae::{ReceiptVerifier, VerifiedAppendResponse, VerifiedPullPage}", "Cross the durable authority boundary through verified typestate", "Cruza el límite de autoridad durable mediante typestate verificado"),
+            ]),
+        ]),
+        doc_section(locale, "rustdoc", "Generate exact-version Rustdoc", "Genera Rustdoc de versión exacta", vec![
+            code_block(locale, "shell", "git checkout <accepted-revision>\ncargo doc --workspace --no-deps --locked\n# open target/doc/pliego_ssg/index.html"),
+            paragraph(locale, "The repository Rustdoc is the symbol-level reference for an exact revision. This guide explains product contracts and crate ownership; it does not replace signatures, trait bounds, feature flags, or per-item safety notes emitted from the source.", "El Rustdoc del repositorio es la referencia a nivel de símbolos para una revisión exacta. Esta guía explica contratos de producto y propiedad de crates; no reemplaza firmas, trait bounds, feature flags ni notas de seguridad por item emitidas desde la fuente."),
+        ]),
+        doc_section(locale, "stability", "Respect the pre-release boundary", "Respeta el límite pre-release", vec![
+            paragraph(locale, "Before the first public SemVer release, crate names identify intended ownership but public signatures may still change. Pin one accepted Git revision across every pliego-* dependency and never mix framework commits inside one application graph.", "Antes del primer release SemVer público, los nombres de crates identifican la propiedad prevista pero las firmas públicas aún pueden cambiar. Fija una revisión Git aceptada en todas las dependencias pliego-* y nunca mezcles commits del framework dentro del grafo de una aplicación."),
+            note(locale, "Public release changes the promise", "A published compatibility matrix and changelog will define supported toolchains, targets, features, deprecations, and upgrade paths. A private candidate is evidence, not a registry support promise.", "El release público cambia la promesa", "Una matriz de compatibilidad y changelog publicados definirán toolchains, targets, features, deprecations y rutas de upgrade soportadas. Un candidato privado es evidencia, no una promesa de soporte de registry."),
+        ]),
+        doc_section(locale, "boundaries", "Read the normative boundaries", "Lee los límites normativos", vec![
+            link_list(locale, &[
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/15-framework-api-boundaries.md", "Framework API boundaries", "Límites de API del framework"),
+                ("https://github.com/celiumsai/pliegors/blob/main/FRAMEWORK.md", "Architecture and package map", "Arquitectura y mapa de paquetes"),
+                ("https://github.com/celiumsai/pliegors/blob/main/CHANGELOG.md", "Source changelog", "Changelog fuente"),
+            ]),
         ]),
     ].into_view()
 }
@@ -781,6 +1024,16 @@ fn command_table(locale: Locale) -> View {
             "pliego inspect",
             "Report routes, files, bytes, and ledger validity",
             "Reporta rutas, archivos, bytes y validez del ledger",
+        ),
+        (
+            "pliego why artifact <path|route>",
+            "Verify and explain the causal source-to-artifact chain",
+            "Verifica y explica la cadena causal source-to-artifact",
+        ),
+        (
+            "pliego why-rebuilt",
+            "Explain the latest bounded development rebuild",
+            "Explica el último rebuild limitado de desarrollo",
         ),
         (
             "pliego version",
@@ -924,6 +1177,12 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("diagnostics", "JSON diagnostics", "Diagnósticos JSON"),
             ("exit-codes", "Exit codes", "Códigos de salida"),
         ],
+        "developer-loop" => vec![
+            ("watch", "Native watcher", "Watcher nativo"),
+            ("hmr", "Typed HMR", "HMR tipado"),
+            ("explain", "Explain causality", "Explicar causalidad"),
+            ("recover", "Failure recovery", "Recuperación de fallos"),
+        ],
         "routing-and-pages" => vec![
             ("page", "Author a page", "Crear una página"),
             ("routes", "Route normalization", "Normalización de rutas"),
@@ -942,6 +1201,18 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("replay", "Replay parity", "Paridad de replay"),
             ("effects", "Effects", "Efectos"),
         ],
+        "schemas-and-snapshots" => vec![
+            ("catalog", "Event catalog", "Catálogo de eventos"),
+            ("upcasting", "Adjacent upcasting", "Upcasting adyacente"),
+            ("identity", "Snapshot identity", "Identidad del snapshot"),
+            ("restore", "Restore", "Restaurar"),
+        ],
+        "hyphae-sync" => vec![
+            ("boundary", "Optional durability", "Durabilidad opcional"),
+            ("append", "Verified append", "Append verificado"),
+            ("pull", "Fixed snapshot", "Snapshot fijo"),
+            ("authority", "Verified state", "Estado verificado"),
+        ],
         "content" => vec![
             ("collections", "Typed collections", "Colecciones tipadas"),
             ("markdown", "Safe Markdown", "Markdown seguro"),
@@ -954,11 +1225,23 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("policy", "Admission policy", "Política de admisión"),
             ("cleanup", "Cleanup", "Cleanup"),
         ],
+        "dom-lifecycle" => vec![
+            ("scopes", "Mounted scopes", "Scopes montados"),
+            ("keyed", "Keyed identity", "Identidad keyed"),
+            ("adoption", "SSR adoption", "Adopción SSR"),
+            ("cleanup", "Deterministic cleanup", "Cleanup determinista"),
+        ],
         "assets" => vec![
             ("manifest", "Asset manifest", "Manifest de assets"),
             ("profiles", "Profiles", "Perfiles"),
             ("budgets", "Device budgets", "Presupuestos"),
             ("fallbacks", "Fallbacks", "Fallbacks"),
+        ],
+        "artifact-trust" => vec![
+            ("namespace", "Portable namespace", "Namespace portable"),
+            ("capture", "Exact inputs", "Entradas exactas"),
+            ("receipt", "Receipt and graph", "Recibo y grafo"),
+            ("publish", "Staged publication", "Publicación por staging"),
         ],
         "errors-and-diagnostics" => vec![
             ("browser", "Browser failures", "Fallos en navegador"),
@@ -971,6 +1254,13 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("ledger", "Artifact ledger", "Ledger del artefacto"),
             ("releases", "Releases", "Releases"),
             ("deploy", "Deploy", "Desplegar"),
+        ],
+        "crate-reference" => vec![
+            ("choose", "Choose a crate", "Elegir un crate"),
+            ("symbols", "Public entry points", "Entradas públicas"),
+            ("rustdoc", "Generate Rustdoc", "Generar Rustdoc"),
+            ("stability", "Stability", "Estabilidad"),
+            ("boundaries", "Normative boundaries", "Límites normativos"),
         ],
         "licensing" => vec![
             ("apache", "Apache-2.0", "Apache-2.0"),
@@ -1004,8 +1294,9 @@ mod tests {
             assert!(slugs.insert(topic.slug));
             assert!(article(Locale::En, topic.slug).is_ok());
             assert!(article(Locale::Es, topic.slug).is_ok());
+            assert!(outline(topic.slug).len() >= 4);
         }
-        assert_eq!(TOPICS.len(), 12);
+        assert_eq!(TOPICS.len(), 18);
     }
 
     #[test]

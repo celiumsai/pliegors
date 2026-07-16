@@ -1,0 +1,5 @@
+key = "docs-dom-lifecycle"
+title = { en = "DOM ownership | PliegoRS", es = "Propiedad del DOM | PliegoRS" }
+description = { en = "Own mounted DOM ranges, keyed reconciliation, exact SSR adoption, adapter generations, cancellation, and deterministic cleanup in PliegoRS.", es = "Controla rangos DOM montados, reconciliación keyed, adopción SSR exacta, generaciones de adapters, cancelación y cleanup determinista en PliegoRS." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A precision structural ledger representing PliegoRS DOM ownership", es = "Un ledger estructural de precisión que representa la propiedad del DOM en PliegoRS" }

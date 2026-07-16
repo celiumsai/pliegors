@@ -7,6 +7,8 @@ logoHeight = 512
 location = "Medellín, Colombia"
 defaultImage = "/media/pliegors/fold-hero.webp"
 contactEmail = "hello@pliegors.dev"
+repositoryUrl = "https://github.com/celiumsai/pliegors"
+licenseUrl = "https://www.apache.org/licenses/LICENSE-2.0"
 organizationDescription = { en = "Creator of PliegoRS, a Rust-native framework for verifiable, replayable, durable web software.", es = "Creador de PliegoRS, un framework nativo en Rust para software web verificable, reproducible y durable." }
 websiteDescription = { en = "Official PliegoRS documentation, architecture, evidence, security guidance, and release information.", es = "Documentación oficial, arquitectura, evidencia, seguridad e información de releases de PliegoRS." }
 

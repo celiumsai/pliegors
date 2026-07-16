@@ -152,6 +152,8 @@ pub struct SeoConfig {
     pub location: String,
     pub default_image: String,
     pub contact_email: String,
+    pub repository_url: String,
+    pub license_url: String,
     pub organization_description: Bilingual,
     pub website_description: Bilingual,
     pub critical_assets: Vec<String>,

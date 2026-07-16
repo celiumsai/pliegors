@@ -1,0 +1,5 @@
+key = "docs-artifact-trust"
+title = { en = "Artifact trust | PliegoRS", es = "Confianza de artefactos | PliegoRS" }
+description = { en = "Understand PliegoRS portable namespaces, exact input capture, build receipts, causal graphs, staged publication, and fail-closed verification.", es = "Entiende namespaces portables, captura exacta de entradas, recibos de build, grafos causales, publicación por staging y verificación fail-closed en PliegoRS." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A precision build ledger representing trusted PliegoRS artifacts", es = "Un ledger de build de precisión que representa artefactos confiables de PliegoRS" }

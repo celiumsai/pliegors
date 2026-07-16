@@ -18,7 +18,7 @@
 
 | ID | Requirement | Evidence | Result |
 | --- | --- | --- | --- |
-| R7-A01 | Build outside the PliegoRS monorepo | Cairn is an independent Git repository under `C:\Users\Mario\Documents\Cairn`; no application source is copied into this repository | PASS |
+| R7-A01 | Build outside the PliegoRS monorepo | Cairn is an independent private Git repository outside the PliegoRS checkout; no application source or machine-local path is copied into this repository | PASS |
 | R7-A02 | Consume only the accepted candidate | The signed R6 bundle was verified before extraction; the candidate CLI scaffolded the project without `--framework-path`; all seven resolved `pliego-*` crates use the exact accepted Git revision | PASS |
 | R7-A03 | Prove a real durable application | Cairn is an operational human-agent decision dossier with append-only journals, proposals, decisions, effect requests, receipts, branches, audit, and selective sync | PASS |
 | R7-A04 | Make live and replayed state agree | Full replay, cursor replay, explicit fork, branch comparison, and post-write persisted replay are covered by tests and CLI verification | PASS |
