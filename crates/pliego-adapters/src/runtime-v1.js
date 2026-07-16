@@ -2,7 +2,7 @@
 // Copyright 2026 Celiums Solutions LLC
 
 export const API_VERSION = 1;
-export const RUNTIME_VERSION = '1.0.0';
+export const RUNTIME_VERSION = '1.1.0';
 
 const ROOT_SELECTOR = 'pliego-adapter';
 const TIERS = Object.freeze(['universal', 'lite', 'balanced', 'signature']);
@@ -256,26 +256,47 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
   }
 
   function cleanupLifecycle(root, lifecycle, prefix = '') {
-    const phase = (name) => prefix ? `${prefix}-${name}` : name;
-    let barrier = null;
-    const enqueue = (callback, cleanupPhase) => {
-      if (typeof callback !== 'function') return;
-      if (barrier) {
-        barrier = barrier.then(() => runCleanup(env, root, callback, cleanupPhase));
-        return;
-      }
-      const result = runCleanup(env, root, callback, cleanupPhase);
-      if (result && typeof result.then === 'function') barrier = result;
-    };
-    enqueue(
-      () => lifecycle.plugin?.unmount?.(root, lifecycle.context),
-      phase('unmount-hook'),
-    );
-    enqueue(lifecycle.returnedCleanup, phase('mount-return'));
-    for (let index = lifecycle.cleanups.length - 1; index >= 0; index -= 1) {
-      enqueue(lifecycle.cleanups[index], phase('registered'));
+    const state = lifecycle.cleanupState;
+    if (!state.prefix && prefix) state.prefix = prefix;
+    const phase = (name) => state.prefix ? `${state.prefix}-${name}` : name;
+    const callbacks = [];
+    if (!state.unmountTaken) {
+      state.unmountTaken = true;
+      callbacks.push([
+        () => lifecycle.plugin?.unmount?.(root, lifecycle.context),
+        phase('unmount-hook'),
+      ]);
     }
-    return barrier || Promise.resolve();
+    if (!state.returnedTaken && typeof lifecycle.returnedCleanup === 'function') {
+      state.returnedTaken = true;
+      callbacks.push([lifecycle.returnedCleanup, phase('mount-return')]);
+    }
+    while (lifecycle.cleanups.length > 0) {
+      callbacks.push([lifecycle.cleanups.pop(), phase('registered')]);
+    }
+    if (callbacks.length === 0) return state.barrier || Promise.resolve();
+
+    const drain = () => {
+      let index = 0;
+      const resume = () => {
+        while (index < callbacks.length) {
+          const [callback, cleanupPhase] = callbacks[index];
+          index += 1;
+          const result = runCleanup(env, root, callback, cleanupPhase);
+          if (result && typeof result.then === 'function') return result.then(resume);
+        }
+        return undefined;
+      };
+      return resume();
+    };
+    const previous = state.barrier;
+    const result = previous ? previous.then(drain) : drain();
+    const barrier = Promise.resolve(result);
+    state.barrier = barrier;
+    barrier.then(() => {
+      if (state.barrier === barrier) state.barrier = null;
+    });
+    return barrier;
   }
 
   function contextFor(root, controller, policy, cleanups) {
@@ -304,6 +325,7 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
     const cleanups = [];
     let plugin = null;
     let context = null;
+    let lifecycle = null;
     let returnedCleanup;
     try {
       if ((root.dataset.pliegoApi || String(API_VERSION)) !== String(API_VERSION)) {
@@ -327,51 +349,40 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
       if (!isCurrent(root, record) || !root.isConnected) return false;
       plugin = pluginFrom(module);
       context = contextFor(root, controller, policy, cleanups);
-      returnedCleanup = await plugin.mount(root, props, context);
-      if (!isCurrent(root, record) || !root.isConnected) {
-        await cleanupLifecycle(root, {
-          controller,
-          plugin,
-          context,
-          cleanups,
-          returnedCleanup,
-          props,
-        }, 'abandoned');
-        return false;
-      }
-      lifecycles.set(root, {
+      lifecycle = {
         controller,
         plugin,
         context,
         cleanups,
-        returnedCleanup,
+        returnedCleanup: undefined,
         props,
         policy,
-      });
+        cleanupState: {
+          prefix: '',
+          unmountTaken: false,
+          returnedTaken: false,
+          barrier: null,
+        },
+      };
+      record.lifecycle = lifecycle;
+      returnedCleanup = await plugin.mount(root, props, context);
+      lifecycle.returnedCleanup = returnedCleanup;
+      if (!isCurrent(root, record) || !root.isConnected) {
+        await cleanupLifecycle(root, lifecycle, 'abandoned');
+        return false;
+      }
+      lifecycles.set(root, lifecycle);
+      record.lifecycle = null;
       root.dataset.pliegoStatus = 'mounted';
       emit(env, root, 'pliego:mount', { apiVersion: API_VERSION });
       return true;
     } catch (error) {
       if (controller.signal.aborted || generation(root) !== record.generation) {
-        if (plugin && context) await cleanupLifecycle(root, {
-          controller,
-          plugin,
-          context,
-          cleanups,
-          returnedCleanup,
-          props: null,
-        }, 'aborted');
+        if (lifecycle) await cleanupLifecycle(root, lifecycle, 'aborted');
         return false;
       }
       controller.abort(error);
-      if (plugin && context) await cleanupLifecycle(root, {
-        controller,
-        plugin,
-        context,
-        cleanups,
-        returnedCleanup,
-        props: null,
-      }, 'failed');
+      if (lifecycle) await cleanupLifecycle(root, lifecycle, 'failed');
       report(env, root, 'mount', error);
       return false;
     }
@@ -386,6 +397,7 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
     const record = {
       controller: new Controller(),
       generation: advanceGeneration(root),
+      lifecycle: null,
     };
     pending.set(root, record);
     const priorTeardown = teardowns.get(root);
@@ -475,6 +487,7 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
     if (invalidateUpdateQueue) invalidateUpdates(root);
 
     const record = pending.get(root);
+    const provisional = record?.lifecycle || null;
     if (record) {
       record.controller.abort(reason);
       clearPending(root, record);
@@ -488,24 +501,17 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
       lifecycle.controller.abort(reason);
     }
 
-    const activeUpdate = invalidateUpdateQueue ? updateQueues.get(root) : null;
-    if (lifecycle) {
-      const work = (async () => {
-        if (activeUpdate) await activeUpdate.catch(() => false);
-        await cleanupLifecycle(root, lifecycle);
-      })();
-      trackTeardown(root, work);
-    } else if (activeMount || activeUpdate) {
-      const work = (async () => {
-        if (activeMount) await activeMount.catch(() => false);
-        if (activeUpdate) await activeUpdate.catch(() => false);
-      })();
-      trackTeardown(root, work);
+    if (invalidateUpdateQueue) updateQueues.delete(root);
+    const cleanupTargets = new Set();
+    if (lifecycle) cleanupTargets.add(lifecycle);
+    if (provisional) cleanupTargets.add(provisional);
+    for (const target of cleanupTargets) {
+      trackTeardown(root, cleanupLifecycle(root, target, provisional === target ? 'aborted' : ''));
     }
 
     if (root?.dataset) root.dataset.pliegoStatus = 'disposed';
     if (lifecycle) emit(env, root, 'pliego:unmount', { reason });
-    return Boolean(lifecycle);
+    return Boolean(lifecycle || provisional);
   }
 
   function unmount(root, reason = 'manual') {
@@ -582,9 +588,9 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
     for (const root of roots) refresh(root);
   }
 
-  function listen(target, name, callback) {
-    target?.addEventListener?.(name, callback);
-    runtimeCleanups.push(() => target?.removeEventListener?.(name, callback));
+  function listen(target, name, callback, options) {
+    target?.addEventListener?.(name, callback, options);
+    runtimeCleanups.push(() => target?.removeEventListener?.(name, callback, options));
   }
 
   function install() {
@@ -613,7 +619,8 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
       observer.observe(env.document.documentElement, { childList: true, subtree: true });
     }
     const onPageHide = () => {
-      for (const root of rootsWithin(env.document)) unmount(root, 'pagehide');
+      const roots = new Set([...knownRoots, ...rootsWithin(env.document)]);
+      for (const root of roots) unmount(root, 'pagehide');
     };
     const onPageShow = (event) => {
       if (event.persisted) scan();
@@ -622,9 +629,13 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
       const root = event.target?.closest?.(ROOT_SELECTOR);
       if (root) void update(root, event.detail?.props);
     };
+    const onScopeDispose = (event) => {
+      for (const root of rootsWithin(event.target)) unmount(root, 'scope-dispose');
+    };
     listen(env, 'pagehide', onPageHide);
     listen(env, 'pageshow', onPageShow);
     listen(env.document, 'pliego:adapter-update', onAdapterUpdate);
+    listen(env.document, 'pliego:scope-dispose', onScopeDispose, { capture: true });
 
     const motionQuery = env.matchMedia?.('(prefers-reduced-motion: reduce)');
     if (motionQuery?.addEventListener) listen(motionQuery, 'change', reconcilePolicies);

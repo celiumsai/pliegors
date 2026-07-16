@@ -86,6 +86,9 @@ jobs:
           --locked
           -- -D warnings
 
+      - name: Reject unowned WASM lifetime escapes
+        run: npm run check:wasm-lifetimes
+
       - name: Check documentation links
         run: npm run check:docs
 
@@ -182,6 +185,21 @@ jobs:
             --locked \
             --offline \
             -- --nocapture
+
+      - name: Test adapter lifecycle in real Chromium
+        shell: bash
+        run: |
+          if test -n "${CHROMEWEBDRIVER:-}"; then
+            if test -d "$CHROMEWEBDRIVER"; then
+              export CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver"
+            else
+              export CHROMEDRIVER="$CHROMEWEBDRIVER"
+            fi
+          else
+            export CHROMEDRIVER="$(command -v chromedriver)"
+          fi
+          test -x "$CHROMEDRIVER"
+          npm run test:adapters:browser
 
       - name: Validate the official PliegoRS site
         shell: bash

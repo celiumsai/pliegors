@@ -8,6 +8,7 @@ class FakeEvent {
   constructor(type, options = {}) {
     this.type = type;
     this.detail = options.detail;
+    this.target = options.target;
   }
 }
 
@@ -26,9 +27,9 @@ class FakeTarget {
     this.listeners.get(name)?.delete(callback);
   }
 
-  emit(name, detail = {}) {
+  emit(name, detail = {}, target = this) {
     for (const callback of [...(this.listeners.get(name) || [])]) {
-      callback(new FakeEvent(name, { detail }));
+      callback(new FakeEvent(name, { detail, target }));
     }
   }
 }
@@ -90,7 +91,17 @@ class FakeRoot {
   }
 
   fire(name) {
-    for (const callback of [...(this.listeners.get(name) || [])]) callback(new FakeEvent(name));
+    for (const callback of [...(this.listeners.get(name) || [])]) {
+      callback(new FakeEvent(name, { target: this }));
+    }
+  }
+
+  matches(selector) {
+    return selector === 'pliego-adapter';
+  }
+
+  querySelectorAll() {
+    return [];
   }
 }
 
@@ -116,12 +127,14 @@ function environment({ saveData = false, reduced = false, tier = 'balanced' } = 
       querySelectorAll: () => roots,
       addEventListener: documentEvents.addEventListener.bind(documentEvents),
       removeEventListener: documentEvents.removeEventListener.bind(documentEvents),
+      emit: documentEvents.emit.bind(documentEvents),
     },
     setTimeout,
     clearTimeout,
     queueMicrotask,
     addEventListener: windowEvents.addEventListener.bind(windowEvents),
     removeEventListener: windowEvents.removeEventListener.bind(windowEvents),
+    emit: windowEvents.emit.bind(windowEvents),
   };
 }
 
@@ -518,5 +531,111 @@ test('installed runtime reacts to reduced-motion and Save-Data changes', async (
   env.connection.setSaveData(false);
   await nextTurn();
   assert.equal(mounts, 3);
+  runtime.destroy();
+});
+
+test('scope disposal aborts and cleans a mounted adapter synchronously', async () => {
+  const env = environment();
+  const root = new FakeRoot();
+  env.roots.push(root);
+  const calls = [];
+  let signal;
+  const runtime = createAdapterRuntime(env, async () => ({
+    mount(_root, _props, context) {
+      signal = context.signal;
+      context.onCleanup(() => calls.push('registered'));
+      return () => calls.push('returned');
+    },
+    unmount() {
+      calls.push('unmount');
+    },
+  }));
+
+  runtime.install();
+  await nextTurn();
+  env.document.emit('pliego:scope-dispose', {}, root);
+
+  assert.equal(signal.aborted, true);
+  assert.deepEqual(calls, ['unmount', 'returned', 'registered']);
+  assert.equal(root.dataset.pliegoStatus, 'disposed');
+  runtime.destroy();
+});
+
+test('a mount that never settles cannot postpone registered cleanup', async () => {
+  const env = environment();
+  const root = new FakeRoot();
+  const calls = [];
+  let signal;
+  let release;
+  const runtime = createAdapterRuntime(env, async () => ({
+    mount(_root, _props, context) {
+      signal = context.signal;
+      context.onCleanup(() => calls.push('registered'));
+      return new Promise((resolve) => { release = resolve; });
+    },
+    unmount() {
+      calls.push('unmount');
+    },
+  }));
+
+  const mounting = runtime.mount(root);
+  await nextTurn();
+  assert.equal(runtime.unmount(root, 'scope-dispose'), true);
+  assert.equal(signal.aborted, true);
+  assert.deepEqual(calls, ['unmount', 'registered']);
+
+  release(() => calls.push('returned'));
+  assert.equal(await mounting, false);
+  assert.deepEqual(calls, ['unmount', 'registered', 'returned']);
+});
+
+test('an update that never settles cannot postpone lifecycle cleanup', async () => {
+  const env = environment();
+  const root = new FakeRoot();
+  const calls = [];
+  let signal;
+  const runtime = createAdapterRuntime(env, async () => ({
+    mount(_root, _props, context) {
+      signal = context.signal;
+      context.onCleanup(() => calls.push('registered'));
+    },
+    update() {
+      calls.push('update');
+      return new Promise(() => {});
+    },
+    unmount() {
+      calls.push('unmount');
+    },
+  }));
+
+  await runtime.mount(root);
+  void runtime.update(root, { pending: true });
+  await nextTurn();
+  assert.equal(runtime.unmount(root, 'scope-dispose'), true);
+
+  assert.equal(signal.aborted, true);
+  assert.deepEqual(calls, ['update', 'unmount', 'registered']);
+  assert.equal(root.dataset.pliegoStatus, 'disposed');
+});
+
+test('pagehide disposes known roots even after they leave the document query', async () => {
+  const env = environment();
+  const root = new FakeRoot();
+  env.roots.push(root);
+  let cleanups = 0;
+  const runtime = createAdapterRuntime(env, async () => ({
+    mount() {
+      return () => { cleanups += 1; };
+    },
+  }));
+
+  runtime.install();
+  await nextTurn();
+  env.roots.splice(0);
+  root.isConnected = false;
+  env.emit('pagehide');
+
+  assert.equal(cleanups, 1);
+  assert.equal(root.dataset.pliegoStatus, 'disposed');
   runtime.destroy();
 });
