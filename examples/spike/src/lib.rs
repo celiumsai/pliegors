@@ -358,18 +358,22 @@ mod web {
     use super::{
         TaskList, TaskRemovedV1, TaskToggledV1, append_task, replay_prefix, task_projection,
     };
-    use pliego_dom::{IntoView, View, dyn_text, dyn_view, el, mount_to};
+    use pliego_dom::{IntoView, MountedRoot, View, dyn_text, dyn_view, el, mount_to};
     use pliego_fold::ReactiveLog;
     use pliego_hyphae::Ack;
     use pliego_log::hex;
     use pliego_reactive::Signal;
-    use std::cell::Cell;
+    use std::cell::{Cell, RefCell};
     use std::collections::HashMap;
     use std::rc::Rc;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::prelude::*;
 
     const HYPHAE_BASE: &str = "http://127.0.0.1:18091";
+
+    thread_local! {
+        static APP_ROOT: RefCell<Option<MountedRoot>> = const { RefCell::new(None) };
+    }
 
     /// Experimental compatibility transport. Its ACK is a UI preview only: it
     /// is neither a verified R2 receipt nor authority-bound durable evidence.
@@ -583,7 +587,12 @@ mod web {
             .child(slider)
             .child(status)
             .into_view();
-        mount_to("app", &app);
+        let root = mount_to("app", &app).expect("mount spike application");
+        APP_ROOT.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            assert!(slot.is_none(), "spike application mounted more than once");
+            *slot = Some(root);
+        });
 
         append_task(log, "estudiar Leptos (se observa, no se copia)")
             .expect("seed task schema is valid");
