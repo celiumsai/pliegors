@@ -2,7 +2,8 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash, createPublicKey } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
@@ -58,6 +59,11 @@ assert.ok(
   ci.includes('064948d58e2d6c0a745216477a639ba696216d6309aaa902939d1b865b1d869d'),
   'CI lacks the pinned wasm-bindgen-cli 0.2.126 digest',
 );
+assert.ok(
+  ci.includes('8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'),
+  'CI lacks the pinned actionlint 1.7.12 Linux digest',
+);
+assert.ok(ci.includes('actionlint" .github/workflows/*.yml'), 'CI does not validate workflows');
 assert.ok(!ci.includes('.sha256sum'), 'CI must not trust a checksum sidecar from the asset release');
 const releaseTargets = [
   'x86_64-unknown-linux-gnu',
@@ -66,28 +72,30 @@ const releaseTargets = [
   'aarch64-apple-darwin',
   'x86_64-pc-windows-msvc',
 ].sort();
-const matrixTargets = [...release.matchAll(/^\s+target:\s+([^\s]+)$/gm)]
+const matrixTargets = [...release.matchAll(/^\s+-\s+((?:aarch64|x86_64)-[^\s]+)$/gm)]
   .map((match) => match[1])
   .sort();
 assert.deepEqual(matrixTargets, releaseTargets, 'release matrix must contain exactly five targets');
 
 for (const contract of [
-  'workflow_dispatch', "format('draft:{0}', inputs.tag)", 'PLIEGORS_SOURCE_REV',
+  'workflow_dispatch', "format('candidate:{0}', inputs.tag)", "format('draft:{0}', inputs.tag)",
+  'PLIEGORS_SOURCE_REV', 'replica: [1, 2]',
   'ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15-intel', 'macos-15', 'windows-2025',
-  '$archive = "pliego-${{ matrix.target }}.zip"', 'support: production',
-  'support: development', 'retention-days: 7', 'SHA256SUMS', 'install.sh', 'install.ps1',
+  'pliego-$env:RELEASE_TARGET.zip', 'retention-days: 7', 'retention-days: 14',
+  'CANDIDATE-METADATA.json',
+  'PLIEGORS_CANDIDATE_SIGNING_KEY', 'create-release-manifest.mjs',
+  'verify-release-bundle.mjs', 'install.sh', 'install.ps1', 'golden_path',
   'gh release create', '--target "$GITHUB_SHA"', '--draft', '--latest=false',
 ]) assert.ok(release.includes(contract), `release candidate contract lacks ${contract}`);
-assert.ok(release.includes("github.ref == 'refs/heads/main'"), 'draft dispatch must be restricted to main');
+assert.ok(release.includes("github.ref == 'refs/heads/main'"), 'draft mode must be restricted to main');
 assert.equal(
   (release.match(/ref: \$\{\{ github\.sha \}\}/g) ?? []).length,
   2,
-  'build and draft assembler must checkout the validated SHA',
+  'build and seal assembler must checkout the validated SHA',
 );
 assert.ok(release.includes('$expectedTag = "v$version"'), 'release tag must derive from Cargo version');
 assert.ok(release.includes('$env:RELEASE_TAG -cne $expectedTag'), 'release tag must equal Cargo version');
-assert.equal((release.match(/support: development/g) ?? []).length, 3, 'macOS and Windows must be development builds');
-assert.ok(!release.includes('support: supported'), 'release matrix contains an undefined support tier');
+assert.ok(release.includes("unknown-linux-gnu$') { 'production' } else { 'development' }"), 'support tier mapping drift');
 
 assert.doesNotMatch(release, /^\s*push\s*:/m, 'release workflow must remain manual-only');
 assert.doesNotMatch(release, /gh release (?:edit|upload)/, 'workflow must not mutate an existing release');
@@ -105,16 +113,9 @@ assert.doesNotMatch(
   /\blatest\b/i,
   'release workflow must not use mutable latest aliases',
 );
-assert.ok(release.includes('test "$(find . -maxdepth 1 -name \'*.zip.sha256\' | wc -l)" -eq 5'), 'release must contain five sidecars');
-assert.ok(release.includes('test "$(wc -l < SHA256SUMS)" -eq 7'), 'manifest must cover seven primary assets');
+assert.ok(release.includes('sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250'), 'release key fingerprint drift');
 const createRelease = release.slice(release.indexOf('gh release create'));
-for (const asset of [
-  'release-assets/*.zip',
-  'release-assets/*.zip.sha256',
-  'release-assets/install.sh',
-  'release-assets/install.ps1',
-  'release-assets/SHA256SUMS',
-]) assert.ok(createRelease.includes(asset), `draft release lacks ${asset}`);
+assert.ok(createRelease.includes('release-assets/*'), 'draft release must upload the exact sealed bundle');
 for (const forbidden of ['refs/tags/', 'crates.io', 'cloudflare', 'wrangler']) {
   assert.ok(!release.toLowerCase().includes(forbidden), `release workflow contains ${forbidden}`);
 }
@@ -145,6 +146,11 @@ const publicProjectFiles = [
   'brand/pliegors-app-icon.svg',
   'brand/pliegors-symbol.svg',
   'brand/pliegors-symbol-reversed.svg',
+  'keys/pliegors-candidate-release.pub.pem',
+  'scripts/assemble-release-candidate.mjs',
+  'scripts/create-release-manifest.mjs',
+  'scripts/release-bundle-lib.mjs',
+  'scripts/verify-release-bundle.mjs',
   'crates/pliego-starters/LICENSE',
   'workers/pliegors-email/package-lock.json',
   'workers/pliegors-email/README.md',
@@ -156,6 +162,41 @@ for (const file of publicProjectFiles) {
   const absolute = path.join(root, file);
   assert.ok(existsSync(absolute), `public project contract lacks ${file}`);
   assert.ok(readFileSync(absolute).length > 0, `public project file is empty: ${file}`);
+}
+
+const candidateKeyPath = path.join(root, 'keys/pliegors-candidate-release.pub.pem');
+assert.deepEqual(
+  readdirSync(path.join(root, 'keys')).sort(),
+  ['pliegors-candidate-release.pub.pem'],
+  'keys directory must contain only the candidate public key',
+);
+const candidateKey = createPublicKey(readFileSync(candidateKeyPath));
+const candidateFingerprint = `sha256:${createHash('sha256')
+  .update(candidateKey.export({ type: 'spki', format: 'der' }))
+  .digest('hex')}`;
+assert.equal(
+  candidateFingerprint,
+  'sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250',
+  'candidate public key fingerprint drift',
+);
+const releaseBundleSources = [
+  'scripts/assemble-release-candidate.mjs',
+  'scripts/create-release-manifest.mjs',
+  'scripts/release-bundle-lib.mjs',
+  'scripts/verify-release-bundle.mjs',
+].map((file) => readFileSync(path.join(root, file), 'utf8'));
+for (const token of [
+  'dev.pliegors.candidate-build/v1',
+  'dev.pliegors.release-manifest/v1',
+  'dev.pliegors.release-reproducibility/v1',
+  'Ed25519',
+  'replicasPerTarget',
+  'expected-key-fingerprint',
+]) {
+  assert.ok(
+    releaseBundleSources.some((source) => source.includes(token)),
+    `release bundle sources lack ${token}`,
+  );
 }
 
 const brandIcon = readFileSync(path.join(root, 'brand/pliegors-app-icon.svg'), 'utf8');
@@ -226,5 +267,5 @@ assert.ok(cliBuild.includes('cargo:rerun-if-env-changed'), 'CLI build must track
 
 console.log(
   `Distribution contract PASS: ${crates.length} source-only crates @ ${workspaceVersion}, ` +
-  '5 private candidates and a manual GitHub draft release',
+  '5 targets x 2 replicas, signed private candidate, and gated manual draft',
 );

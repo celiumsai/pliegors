@@ -1,4 +1,4 @@
-name: Prepare private CLI draft release
+name: Build and seal private CLI candidate
 
 on:
   workflow_dispatch:
@@ -7,8 +7,16 @@ on:
         description: Exact Cargo version tag to prepare, for example v0.0.1
         required: true
         type: string
+      mode:
+        description: Build a private candidate or create a private draft from main
+        required: true
+        default: candidate
+        type: choice
+        options:
+          - candidate
+          - draft
       confirmation:
-        description: Type draft:<tag>, for example draft:v0.0.1
+        description: Type candidate:<tag> or draft:<tag>
         required: true
         type: string
 
@@ -16,50 +24,44 @@ permissions:
   contents: read
 
 concurrency:
-  group: pliegors-draft-${{ inputs.tag }}
+  group: pliegors-${{ inputs.mode }}-${{ inputs.tag }}-${{ github.ref }}
   cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
   PLIEGORS_SOURCE_REV: ${{ github.sha }}
 
 jobs:
   build:
-    if: ${{ github.ref == 'refs/heads/main' && inputs.confirmation == format('draft:{0}', inputs.tag) }}
-    name: Build ${{ matrix.platform }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 25
+    if: >-
+      ${{
+        (inputs.mode == 'candidate' && inputs.confirmation == format('candidate:{0}', inputs.tag)) ||
+        (github.ref == 'refs/heads/main' && inputs.mode == 'draft' &&
+          inputs.confirmation == format('draft:{0}', inputs.tag))
+      }}
+    name: Build ${{ matrix.target }} replica ${{ matrix.replica }}
+    runs-on: >-
+      ${{
+        matrix.target == 'x86_64-unknown-linux-gnu' && 'ubuntu-24.04' ||
+        matrix.target == 'aarch64-unknown-linux-gnu' && 'ubuntu-24.04-arm' ||
+        matrix.target == 'x86_64-apple-darwin' && 'macos-15-intel' ||
+        matrix.target == 'aarch64-apple-darwin' && 'macos-15' ||
+        'windows-2025'
+      }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: Linux x64 (production)
-            runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            binary: pliego
-            support: production
-          - platform: Linux ARM64 (production)
-            runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            binary: pliego
-            support: production
-          - platform: macOS x64
-            runner: macos-15-intel
-            target: x86_64-apple-darwin
-            binary: pliego
-            support: development
-          - platform: macOS ARM64
-            runner: macos-15
-            target: aarch64-apple-darwin
-            binary: pliego
-            support: development
-          - platform: Windows x64 (development)
-            runner: windows-2025
-            target: x86_64-pc-windows-msvc
-            binary: pliego.exe
-            support: development
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+          - x86_64-pc-windows-msvc
+        replica: [1, 2]
     steps:
-      - name: Check out the requested source revision
+      - name: Check out the exact candidate source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
@@ -73,11 +75,12 @@ jobs:
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.85.0 --profile minimal --target ${{ matrix.target }}
 
-      - name: Verify release request and distribution contract
+      - name: Verify request and distribution source contract
         shell: pwsh
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+          RELEASE_MODE: ${{ inputs.mode }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           npm run check:distribution
           $version = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json |
@@ -88,148 +91,277 @@ jobs:
           if ($env:RELEASE_TAG -cne $expectedTag) {
             throw "release tag $env:RELEASE_TAG does not match Cargo version $expectedTag"
           }
-          if ($env:RELEASE_CONFIRMATION -cne "draft:$expectedTag") {
-            throw "confirmation must be draft:$expectedTag"
+          if ($env:RELEASE_CONFIRMATION -cne "$env:RELEASE_MODE`:$expectedTag") {
+            throw "confirmation must be $env:RELEASE_MODE`:$expectedTag"
           }
 
-      - name: Build release binary
-        run: cargo build --locked --release -p pliego-cli --target ${{ matrix.target }}
+      - name: Build reproducible release binary
+        shell: pwsh
+        run: |
+          $env:RUSTFLAGS = "-C strip=symbols -C debuginfo=0 --remap-path-prefix=$env:GITHUB_WORKSPACE=/workspace/pliegors"
+          cargo build --locked --release -p pliego-cli --target '${{ matrix.target }}'
 
       - name: Smoke test built CLI
         shell: pwsh
-        run: '& "target/${{ matrix.target }}/release/${{ matrix.binary }}" version'
+        run: |
+          $binary = if ('${{ matrix.target }}' -eq 'x86_64-pc-windows-msvc') { 'pliego.exe' } else { 'pliego' }
+          & "target/${{ matrix.target }}/release/$binary" version
 
-      - name: Package immutable candidate and checksum
+      - name: Package immutable build replica
         id: package
         shell: pwsh
+        env:
+          REPLICA: ${{ matrix.replica }}
+          RELEASE_TARGET: ${{ matrix.target }}
         run: |
           $version = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json |
             Select-Object -ExpandProperty packages |
             Where-Object name -eq 'pliego-cli' |
             Select-Object -ExpandProperty version
-          $stem = "pliego-$version-${{ matrix.target }}"
-          $archive = "pliego-${{ matrix.target }}.zip"
-          New-Item -ItemType Directory -Force "dist/$stem" | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary }}" "dist/$stem/"
-          Copy-Item LICENSE, README.md "dist/$stem/"
+          $binary = if ($env:RELEASE_TARGET -eq 'x86_64-pc-windows-msvc') { 'pliego.exe' } else { 'pliego' }
+          $support = if ($env:RELEASE_TARGET -match 'unknown-linux-gnu$') { 'production' } else { 'development' }
+          $stem = "pliego-$version-$env:RELEASE_TARGET"
+          $archive = "pliego-$env:RELEASE_TARGET.zip"
+          $directory = "dist/$env:RELEASE_TARGET-$env:REPLICA"
+          New-Item -ItemType Directory -Force "$directory/$stem" | Out-Null
+          Copy-Item "target/$env:RELEASE_TARGET/release/$binary" "$directory/$stem/"
+          Copy-Item LICENSE, README.md "$directory/$stem/"
           @(
             "version=$version"
             "commit=$env:GITHUB_SHA"
-            "target=${{ matrix.target }}"
-            "support=${{ matrix.support }}"
-          ) | Set-Content -Encoding utf8NoBOM "dist/$stem/RELEASE-METADATA.txt"
-          Compress-Archive -Path "dist/$stem/*" -DestinationPath "dist/$archive"
-          $hash = (Get-FileHash "dist/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $archive" | Set-Content -Encoding utf8NoBOM -NoNewline "dist/$archive.sha256"
-          "archive=dist/$archive" >> $env:GITHUB_OUTPUT
+            "target=$env:RELEASE_TARGET"
+            "support=$support"
+          ) | Set-Content -Encoding utf8NoBOM "$directory/$stem/RELEASE-METADATA.txt"
+          Compress-Archive -Path "$directory/$stem/*" -DestinationPath "$directory/$archive"
+          $archiveHash = (Get-FileHash "$directory/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $binaryHash = (Get-FileHash "target/$env:RELEASE_TARGET/release/$binary" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $archiveBytes = (Get-Item "$directory/$archive").Length
+          "$archiveHash  $archive" | Set-Content -Encoding utf8NoBOM -NoNewline "$directory/$archive.sha256"
+          $env:CANDIDATE_VERSION = $version
+          $env:CANDIDATE_SUPPORT = $support
+          $env:CANDIDATE_ARCHIVE = $archive
+          $env:CANDIDATE_ARCHIVE_HASH = $archiveHash
+          $env:CANDIDATE_ARCHIVE_BYTES = $archiveBytes
+          $env:CANDIDATE_BINARY_HASH = $binaryHash
+          $env:CANDIDATE_METADATA_PATH = "$directory/CANDIDATE-METADATA.json"
+          node -e @'
+          const fs = require('node:fs');
+          const value = {
+            schema: 'dev.pliegors.candidate-build/v1',
+            version: process.env.CANDIDATE_VERSION,
+            commit: process.env.GITHUB_SHA,
+            target: process.env.RELEASE_TARGET,
+            support: process.env.CANDIDATE_SUPPORT,
+            replica: Number(process.env.REPLICA),
+            archive: process.env.CANDIDATE_ARCHIVE,
+            archiveSha256: process.env.CANDIDATE_ARCHIVE_HASH,
+            archiveBytes: Number(process.env.CANDIDATE_ARCHIVE_BYTES),
+            binarySha256: process.env.CANDIDATE_BINARY_HASH,
+          };
+          fs.writeFileSync(process.env.CANDIDATE_METADATA_PATH, `${JSON.stringify(value, null, 2)}\n`);
+          '@
+          "directory=$directory" >> $env:GITHUB_OUTPUT
 
-      - name: Verify candidate checksum
+      - name: Verify packaged replica
         shell: pwsh
         run: |
-          $archive = '${{ steps.package.outputs.archive }}'
-          $expected = ((Get-Content -Raw "$archive.sha256") -split '\s+')[0]
-          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -cne $expected) { throw "candidate checksum mismatch" }
+          $directory = '${{ steps.package.outputs.directory }}'
+          $metadata = Get-Content -Raw "$directory/CANDIDATE-METADATA.json" | ConvertFrom-Json
+          $expected = ((Get-Content -Raw "$directory/$($metadata.archive).sha256") -split '\s+')[0]
+          $actual = (Get-FileHash "$directory/$($metadata.archive)" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne $expected -or $actual -cne $metadata.archiveSha256) {
+            throw 'candidate archive checksum mismatch'
+          }
 
       - name: Smoke test Unix installer lifecycle
-        if: runner.os != 'Windows'
+        if: matrix.replica == 1 && runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/install.sh --archive "${{ steps.package.outputs.archive }}" --install-dir target/installer-smoke
+          directory='${{ steps.package.outputs.directory }}'
+          archive="$directory/pliego-${{ matrix.target }}.zip"
+          bash scripts/install.sh --archive "$archive" --install-dir target/installer-smoke
           target/installer-smoke/bin/pliego version
-          bash scripts/install.sh --archive "${{ steps.package.outputs.archive }}" --install-dir target/installer-smoke
+          bash scripts/install.sh --archive "$archive" --install-dir target/installer-smoke
           bash scripts/install.sh --rollback --install-dir target/installer-smoke
           target/installer-smoke/bin/pliego version
           bash scripts/install.sh --uninstall --install-dir target/installer-smoke
           test ! -e target/installer-smoke/bin/pliego
 
       - name: Smoke test Windows installer lifecycle
-        if: runner.os == 'Windows'
+        if: matrix.replica == 1 && runner.os == 'Windows'
         shell: pwsh
         run: |
+          $directory = '${{ steps.package.outputs.directory }}'
           $installRoot = 'target/installer-smoke'
-          ./scripts/install.ps1 -ArchivePath '${{ steps.package.outputs.archive }}' -InstallDir $installRoot
+          ./scripts/install.ps1 -ArchivePath "$directory/pliego-${{ matrix.target }}.zip" -InstallDir $installRoot
           & "$installRoot/bin/pliego.exe" version
-          ./scripts/install.ps1 -ArchivePath '${{ steps.package.outputs.archive }}' -InstallDir $installRoot
+          ./scripts/install.ps1 -ArchivePath "$directory/pliego-${{ matrix.target }}.zip" -InstallDir $installRoot
           ./scripts/install.ps1 -Rollback -InstallDir $installRoot
           & "$installRoot/bin/pliego.exe" version
           ./scripts/install.ps1 -Uninstall -InstallDir $installRoot
           if (Test-Path "$installRoot/bin/pliego.exe") { throw 'uninstall left the active binary behind' }
 
-      - name: Store private candidate
+      - name: Upload private build replica
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: pliegors-candidate-${{ matrix.target }}-${{ github.sha }}
-          path: |
-            dist/*.zip
-            dist/*.zip.sha256
+          name: pliegors-build-${{ matrix.target }}-${{ matrix.replica }}-${{ github.sha }}
+          path: ${{ steps.package.outputs.directory }}/*
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
 
-  draft:
-    if: ${{ github.ref == 'refs/heads/main' && needs.build.result == 'success' && inputs.confirmation == format('draft:{0}', inputs.tag) }}
-    name: Assemble private GitHub draft
+  seal:
+    if: >-
+      ${{
+        needs.build.result == 'success' &&
+        ((inputs.mode == 'candidate' && inputs.confirmation == format('candidate:{0}', inputs.tag)) ||
+        (github.ref == 'refs/heads/main' && inputs.mode == 'draft' &&
+          inputs.confirmation == format('draft:{0}', inputs.tag)))
+      }}
+    name: Assemble and sign exact uploaded assets
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    permissions:
-      contents: write
     steps:
-      - name: Check out installer sources
+      - name: Check out immutable assembly sources
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
           path: source
 
-      - name: Download private candidates
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Download all uploaded build replicas
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: pliegors-candidate-*-${{ github.sha }}
-          path: release-assets
-          merge-multiple: true
+          pattern: pliegors-build-*-${{ github.sha }}
+          path: build-assets
 
-      - name: Verify complete candidate set
-        shell: bash
+      - name: Assemble, sign, and independently verify candidate
+        env:
+          PLIEGORS_CANDIDATE_SIGNING_KEY: ${{ secrets.PLIEGORS_CANDIDATE_SIGNING_KEY }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          cd release-assets
-          test "$(find . -maxdepth 1 -name '*.zip' | wc -l)" -eq 5
-          test "$(find . -maxdepth 1 -name '*.zip.sha256' | wc -l)" -eq 5
-          for checksum in *.zip.sha256; do
-            sha256sum --check --strict "$checksum"
-          done
-          cp ../source/scripts/install.sh ./install.sh
-          cp ../source/scripts/install.ps1 ./install.ps1
-          primary=(
-            install.ps1
-            install.sh
-            pliego-aarch64-apple-darwin.zip
-            pliego-aarch64-unknown-linux-gnu.zip
-            pliego-x86_64-apple-darwin.zip
-            pliego-x86_64-pc-windows-msvc.zip
-            pliego-x86_64-unknown-linux-gnu.zip
-          )
-          expected=(
-            "${primary[@]}"
-            pliego-aarch64-apple-darwin.zip.sha256
-            pliego-aarch64-unknown-linux-gnu.zip.sha256
-            pliego-x86_64-apple-darwin.zip.sha256
-            pliego-x86_64-pc-windows-msvc.zip.sha256
-            pliego-x86_64-unknown-linux-gnu.zip.sha256
-          )
-          printf '%s\n' "${expected[@]}" | sort > expected-assets.txt
-          find . -maxdepth 1 -type f \( -name '*.zip' -o -name '*.zip.sha256' -o -name 'install.sh' -o -name 'install.ps1' \) \
-            -printf '%f\n' | sort > actual-assets.txt
-          cmp expected-assets.txt actual-assets.txt
-          sha256sum "${primary[@]}" | sort -k2 > SHA256SUMS
-          test "$(wc -l < SHA256SUMS)" -eq 7
-          rm expected-assets.txt actual-assets.txt
+          version="${RELEASE_TAG#v}"
+          source_date_epoch="$(git -C source show -s --format=%ct "$GITHUB_SHA")"
+          node source/scripts/assemble-release-candidate.mjs \
+            --input build-assets \
+            --output release-assets \
+            --source source \
+            --public-key source/keys/pliegors-candidate-release.pub.pem \
+            --version "$version" \
+            --commit "$GITHUB_SHA"
+          node source/scripts/create-release-manifest.mjs \
+            --dir release-assets \
+            --version "$version" \
+            --commit "$GITHUB_SHA" \
+            --source-date-epoch "$source_date_epoch"
+          node source/scripts/verify-release-bundle.mjs \
+            --dir release-assets \
+            --public-key source/keys/pliegors-candidate-release.pub.pem \
+            --expected-key-fingerprint sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
 
-      - name: Create manual draft release
-        shell: bash
+      - name: Upload sealed private candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pliegors-sealed-${{ inputs.tag }}-${{ github.sha }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  golden_path:
+    if: ${{ needs.seal.result == 'success' }}
+    name: Prove distribution-only first application
+    needs: seal
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.85.0 --profile minimal
+
+      - name: Download sealed candidate only
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pliegors-sealed-${{ inputs.tag }}-${{ github.sha }}
+          path: release-assets
+
+      - name: Verify, install, and build without a framework checkout
+        env:
+          GH_READ_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test ! -d .git
+          node release-assets/verify-release-bundle.mjs \
+            --dir release-assets \
+            --expected-key-fingerprint sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
+          bash release-assets/install.sh \
+            --archive release-assets/pliego-x86_64-unknown-linux-gnu.zip \
+            --install-dir "$RUNNER_TEMP/pliego-home"
+          cli="$RUNNER_TEMP/pliego-home/bin/pliego"
+          "$cli" version
+          git config --global url."https://x-access-token:${GH_READ_TOKEN}@github.com/".insteadOf https://github.com/
+          trap 'git config --global --unset-all url."https://x-access-token:${GH_READ_TOKEN}@github.com/".insteadOf || true' EXIT
+          export CARGO_NET_GIT_FETCH_WITH_CLI=true
+          "$cli" new "$RUNNER_TEMP/distribution-app"
+          cd "$RUNNER_TEMP/distribution-app"
+          grep -F 'git = "https://github.com/celiumsai/pliegors"' Cargo.toml
+          grep -F "rev = \"$GITHUB_SHA\"" Cargo.toml
+          if grep -F 'path = ' Cargo.toml; then
+            echo 'distribution scaffold unexpectedly contains path dependencies' >&2
+            exit 1
+          fi
+          "$cli" check
+          cargo test --locked
+          "$cli" build
+          "$cli" inspect
+          "$cli" why artifact /
+          cd -
+          bash release-assets/install.sh --uninstall --install-dir "$RUNNER_TEMP/pliego-home"
+          test ! -e "$RUNNER_TEMP/pliego-home/bin/pliego"
+
+  draft:
+    if: >-
+      ${{
+        github.ref == 'refs/heads/main' && needs.golden_path.result == 'success' &&
+        inputs.mode == 'draft' && inputs.confirmation == format('draft:{0}', inputs.tag)
+      }}
+    name: Create private GitHub draft
+    needs: golden_path
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Download sealed candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pliegors-sealed-${{ inputs.tag }}-${{ github.sha }}
+          path: release-assets
+
+      - name: Verify exact release bytes again
+        run: |
+          node release-assets/verify-release-bundle.mjs \
+            --dir release-assets \
+            --expected-key-fingerprint sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
+
+      - name: Create immutable manual draft
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
@@ -246,9 +378,7 @@ jobs:
           fi
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
             >/dev/null 2>tag-query-error.txt; then
-            existing_tag_commit="$(
-              gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha
-            )"
+            existing_tag_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
             if [ "$existing_tag_commit" != "$GITHUB_SHA" ]; then
               echo "Tag $RELEASE_TAG points to $existing_tag_commit, not $GITHUB_SHA." >&2
               exit 1
@@ -257,24 +387,19 @@ jobs:
             cat tag-query-error.txt >&2
             exit 1
           fi
-          cat > release-assets/RELEASE-NOTES.md <<EOF
-          PliegoRS CLI candidate built from commit \`$GITHUB_SHA\`.
+          cat > RELEASE-NOTES.md <<EOF
+          PliegoRS CLI candidate built and reproduced from commit \`$GITHUB_SHA\`.
 
-          - Linux x64 and ARM64: production
-          - macOS x64 and ARM64: development
-          - Windows x64: development
+          The detached Ed25519 manifest covers every downloadable installer,
+          verifier, reproducibility record, checksum, and CLI archive.
 
           This release remains a private draft until it is reviewed and published manually.
           EOF
           gh release create "$RELEASE_TAG" \
-            release-assets/*.zip \
-            release-assets/*.zip.sha256 \
-            release-assets/install.sh \
-            release-assets/install.ps1 \
-            release-assets/SHA256SUMS \
+            release-assets/* \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "PliegoRS $RELEASE_TAG" \
-            --notes-file release-assets/RELEASE-NOTES.md \
+            --notes-file RELEASE-NOTES.md \
             --draft \
             --latest=false

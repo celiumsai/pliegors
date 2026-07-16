@@ -15,6 +15,7 @@ Cargo.lock.bak
 .wrangler/
 .mf/
 *.pem
+!keys/pliegors-candidate-release.pub.pem
 *.key
 *.p12
 *.pfx

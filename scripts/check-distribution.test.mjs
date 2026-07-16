@@ -17,8 +17,9 @@ test('private GitHub draft release contract is self-verifying', () => {
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /5 private candidates/u);
-  assert.match(result.stdout, /manual GitHub draft release/u);
+  assert.match(result.stdout, /5 targets x 2 replicas/u);
+  assert.match(result.stdout, /signed private candidate/u);
+  assert.match(result.stdout, /gated manual draft/u);
 });
 
 test('installers require an explicit GitHub release selector', async () => {
