@@ -36,6 +36,8 @@
 - `f25c75ab2bbe696498890ffa4c8459e02fbb9d1a` - official client lifetime ownership
 - `e5e7076750f779c130756c7aef285a76d59ad2bf` - adapter cancellation and browser gates
 - `f31f8913c53c139c106f7407ce17d720357d5753` - explicit scope LIFO proof
+- `786fd7fab49065cd9df10901954517568c0986f7` - normative contract and initial R4 record
+- `37a9d90dc4d9729327e20131a5e69b11c52b6632` - retained spike root found by the strict WASM replay
 
 ## Verified behavior
 
@@ -94,8 +96,9 @@ live reduced-motion changes. CI rejects `Closure::forget`, `.forget()`, and
 
 ## Gate results
 
-The final replay is recorded after the documentation commit. Expected gate
-families and current focused counts are:
+The accepted replay used
+`PLIEGORS_SOURCE_REV=37a9d90dc4d9729327e20131a5e69b11c52b6632`.
+Its gate families and focused counts are:
 
 - Debian `pliego-dom` native: `27` passed, `0` failed.
 - Chrome `pliego-dom` lifecycle: `54` passed, `0` failed, including the 10,000
@@ -104,9 +107,7 @@ families and current focused counts are:
 - Adapter real-browser gate: scope, pending update, and DOM removal PASS.
 - WASM lifetime source gate: `9` Rust source files, no ownership escape.
 - Official site: `47` routes and `78` files built through `pliego build`.
-
-The final workspace, documentation, distribution-policy, rustdoc, clippy, and
-site validation results are appended in the final replay section below.
+- Phase 1 tooling: `86` Node tests passed, `0` failed.
 
 ## Environment
 
@@ -134,4 +135,36 @@ No unresolved R4 P0 or P1 finding remains within these boundaries.
 
 ## Final replay
 
-Pending the documentation-bound replay on the final R4 commit.
+| Gate | Result |
+|---|---|
+| `cargo fmt --all -- --check` | PASS |
+| Debian `cargo test --workspace --all-targets --locked` | PASS |
+| Debian `cargo clippy --workspace --all-targets --locked -- -D warnings` | PASS |
+| Debian `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked` | PASS, 20 workspace documentation roots |
+| Debian `cargo test -p pliego-dom --lib --locked` | PASS, 27/27 |
+| Debian `cargo test -p pliego-adapters --all-targets --locked` | PASS, 8/8 |
+| WASM Clippy for `pliego-dom`, official client, and spike | PASS |
+| Real Chrome `browser_lifecycle` | PASS, 54/54 |
+| Adapter Node adversarial suite | PASS, 21/21 |
+| Adapter real-Chrome gate | PASS, scope, pending update, DOM removal |
+| WASM lifetime source audit | PASS, 9 Rust source files |
+| Documentation links | PASS, 48 Markdown files |
+| Distribution policy | PASS, 15 source crates and five private targets |
+| Official site contract | PASS, canonical SEO and bilingual alternates |
+| Two exact official-site builds | PASS, 47 routes, 78 files, identical ledger |
+| Phase 1 test suite | PASS, 86/86 |
+| Phase 1 deterministic gate | PASS |
+| Site deployment package | PASS, Wrangler dry-run only |
+| `git diff --check` | PASS |
+
+The two official-site builds produced ledger SHA-256
+`9d854fb2321cc729e5d44fdf8ac918d14ef597011f45651d464d1f94087b723e`.
+No deploy or release was performed.
+
+The first strict WASM replay rejected `examples/spike` because it discarded the
+`MountedRoot` result. Under the R4 ownership contract that would immediately
+drop and dispose the application. Commit `37a9d90` stores the root in an explicit
+page owner; the complete accepted replay above ran after that fix. A later focal
+Linux retry initially exhausted the temporary target filesystem after multiple
+fresh builds. Only verified `/tmp/pliegors-r4-*` targets were removed, and the
+same focal suites then passed without changing code or relaxing a gate.
