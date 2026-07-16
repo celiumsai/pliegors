@@ -672,14 +672,13 @@ fn create_project(options: NewOptions, template: &templates::Template) -> Result
                 format!("local framework {}", cargo_path(&root.to_string_lossy())),
             )
         } else {
-            let dependency = source_dependency()?;
-            let revision = source_revision()?;
+            let dependency = registry_dependency();
             (
                 dependency.clone(),
                 dependency.clone(),
                 dependency.clone(),
                 dependency,
-                format!("PliegoRS source revision {revision}"),
+                format!("crates.io PliegoRS ={}", env!("CARGO_PKG_VERSION")),
             )
         };
 
@@ -1042,32 +1041,8 @@ fn local_dependency(path: &Path) -> Result<String, String> {
     Ok(format!("{{ path = \"{}\" }}", toml_escape(&path)))
 }
 
-const PLIEGORS_SOURCE_REPOSITORY: &str = "https://github.com/celiumsai/pliegors";
-const PLIEGORS_BUILD_SOURCE_REV: &str = env!("PLIEGORS_BUILD_SOURCE_REV");
-
-fn source_revision() -> Result<&'static str, String> {
-    validated_source_revision(PLIEGORS_BUILD_SOURCE_REV)
-}
-
-fn validated_source_revision(revision: &'static str) -> Result<&'static str, String> {
-    if revision.is_empty() {
-        return Err(
-            "PliegoRS source revision is unavailable; rebuild from the repository or set \
-             PLIEGORS_SOURCE_REV to a verified 40-character Git commit SHA"
-                .to_owned(),
-        );
-    }
-    if revision.len() != 40 || !revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err("embedded PliegoRS source revision is not a full Git commit SHA".to_owned());
-    }
-    Ok(revision)
-}
-
-fn source_dependency() -> Result<String, String> {
-    Ok(format!(
-        "{{ git = \"{PLIEGORS_SOURCE_REPOSITORY}\", rev = \"{}\" }}",
-        source_revision()?
-    ))
+fn registry_dependency() -> String {
+    format!("{{ version = \"={}\" }}", env!("CARGO_PKG_VERSION"))
 }
 
 fn cargo_path(path: &str) -> String {
@@ -3758,20 +3733,14 @@ mod tests {
     }
 
     #[test]
-    fn released_starters_pin_the_first_party_source_revision() {
-        let revision = source_revision().unwrap();
-        let dependency = source_dependency().unwrap();
-        assert_eq!(revision.len(), 40);
-        assert!(revision.bytes().all(|byte| byte.is_ascii_hexdigit()));
-        assert!(dependency.contains(PLIEGORS_SOURCE_REPOSITORY));
-        assert!(dependency.contains(&format!("rev = \"{revision}\"")));
-        assert!(!dependency.contains("version ="));
-    }
-
-    #[test]
-    fn unverified_source_revisions_fail_closed() {
-        assert!(validated_source_revision("").is_err());
-        assert!(validated_source_revision("not-a-commit").is_err());
+    fn released_starters_pin_the_exact_registry_version() {
+        let dependency = registry_dependency();
+        assert_eq!(
+            dependency,
+            format!("{{ version = \"={}\" }}", env!("CARGO_PKG_VERSION"))
+        );
+        assert!(!dependency.contains("git ="));
+        assert!(!dependency.contains("path ="));
     }
 
     #[test]

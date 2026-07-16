@@ -9,15 +9,20 @@ machine-readable disclosure contact is published at
 ## Supported versions
 
 Before the first stable release, security fixes are made on the latest
-published pre-release, when one exists, and the default branch. There is no
-public PliegoRS release yet; the accepted `0.0.1` candidate remains private.
-After 1.0, the supported version table will be maintained here for every
-release line.
+published pre-release and the default branch.
+
+| Version | Supported |
+| --- | --- |
+| `0.0.1` | Yes |
+| Earlier versions | No |
+
+After 1.0, this table will identify every supported release line.
 
 ## Report a vulnerability
 
-Do not open a public issue for a suspected vulnerability. Email
-`hello@pliegors.dev` with the subject `SECURITY: short description` and include:
+Do not open a public issue for a suspected vulnerability. Use GitHub's private
+vulnerability reporting flow or email `hello@pliegors.dev` with the subject
+`SECURITY: short description` and include:
 
 - the affected PliegoRS version or commit;
 - the affected crate, CLI command, generated artifact, or browser runtime;
@@ -49,12 +54,13 @@ test.
 
 ## Published advisories
 
-There are no published PliegoRS security advisories because no public release
-exists yet. This is a disclosure status, not a claim that undiscovered
-vulnerabilities do not exist. Published advisories will appear in the GitHub
-Security Advisories section and be linked from the online trust center.
+There are no published PliegoRS security advisories as of 2026-07-16. This is a
+disclosure status, not a claim that undiscovered vulnerabilities do not exist.
+Published advisories appear in the GitHub Security Advisories section and are
+linked from the online trust center.
 
 The current lockfile has no known vulnerability advisories. `cargo audit`
 reports one allowed maintenance warning, `RUSTSEC-2026-0173`, for the
 build-time transitive `proc-macro-error2` dependency introduced by `rstml`.
-PliegoRS tracks its replacement before a public release.
+It is not a reported vulnerability and is excluded only as a documented
+maintenance exception. PliegoRS tracks removal in a maintenance release.

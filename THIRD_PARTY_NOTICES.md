@@ -13,6 +13,12 @@ license texts inside the generated project. In particular, the `editorial` and
 `cinematic` starters include `THIRD_PARTY_NOTICES.md` plus font license files
 beside the bundled fonts. Crate tests fail when those files are absent.
 
+The official documentation site bundles Instrument Serif, Instrument Sans,
+and Fragment Mono under the SIL Open Font License 1.1. Their complete license
+texts are stored beside the font files in `examples/pliegors-site/public/fonts`.
+The original PliegoRS brand images under `examples/pliegors-site/public/media`
+are Celiums Solutions LLC project assets and are not third-party stock media.
+
 The official `default` starter contains no third-party media or fonts. Its
 PliegoRS source is Apache-2.0 and includes a copy of `LICENSE`.
 

@@ -23,11 +23,10 @@ The dependency order is explicit and reproducible:
 
 1. `--framework-path <checkout>`;
 2. `PLIEGO_FRAMEWORK_PATH`;
-3. the canonical PliegoRS Git repository at the exact source revision embedded
-   in the CLI.
+3. the exact PliegoRS version from crates.io embedded in the CLI.
 
 The CLI does not silently switch to local path dependencies because it happens
-to run inside a PliegoRS checkout.
+to run inside a PliegoRS checkout, and it never mixes first-party versions.
 
 ## Catalog
 

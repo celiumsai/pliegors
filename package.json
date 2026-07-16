@@ -6,6 +6,7 @@
   "scripts": {
     "bundle:phase-1-evidence": "node scripts/bundle-phase-1-evidence.mjs",
     "check:docs": "node scripts/check-doc-links.mjs",
+    "check:crates": "node scripts/publish-crates.mjs --check",
     "check:distribution": "node scripts/check-distribution.mjs",
     "check:email-worker": "npm --prefix workers/pliegors-email run check",
     "check:site": "node scripts/check-pliegors-site.mjs examples/pliegors-site/target/site",
@@ -16,7 +17,8 @@
     "test:phase-1": "node --test tools/route-lab/*.test.mjs scripts/*.test.mjs crates/pliego-adapters/tests/*.test.mjs",
     "test:adapters": "node --test crates/pliego-adapters/tests/*.test.mjs",
     "test:adapters:browser": "node scripts/test-adapters-browser.mjs",
-    "test:route-lab": "node --test tools/route-lab/*.test.mjs"
+    "test:route-lab": "node --test tools/route-lab/*.test.mjs",
+    "publish:crates": "node scripts/publish-crates.mjs --publish"
   },
   "devDependencies": {
     "ajv": "8.20.0",

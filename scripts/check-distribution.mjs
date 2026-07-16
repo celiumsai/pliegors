@@ -27,27 +27,34 @@ for (const pkg of crates) {
   assert.equal(pkg.version, workspaceVersion, `${pkg.name} version drift`);
   assert.equal(pkg.license, 'Apache-2.0', `${pkg.name} license`);
   assert.equal(pkg.repository, 'https://github.com/celiumsai/pliegors', `${pkg.name} repository`);
+  assert.equal(pkg.homepage, 'https://pliegors.dev', `${pkg.name} homepage`);
   assert.equal(pkg.rust_version, '1.85', `${pkg.name} rust-version`);
   assert.ok(pkg.description?.trim(), `${pkg.name} description`);
-  assert.deepEqual(pkg.publish, [], `${pkg.name} must reject registry publication`);
+  assert.deepEqual(pkg.publish, ['crates-io'], `${pkg.name} registry allowlist`);
+  assert.ok(pkg.readme?.replaceAll('\\', '/').endsWith('/README.md'), `${pkg.name} readme`);
   for (const dependency of pkg.dependencies.filter((item) => item.name.startsWith('pliego-'))) {
     assert.ok(dependency.path, `${pkg.name} -> ${dependency.name} workspace path`);
     assert.equal(dependency.source, null, `${pkg.name} -> ${dependency.name} registry source`);
+    assert.equal(dependency.req, `=${workspaceVersion}`, `${pkg.name} -> ${dependency.name} version`);
   }
 }
 
 const releasePath = path.join(root, '.github/workflows/release.yml');
 const release = readFileSync(releasePath, 'utf8');
 const ci = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+const codeql = readFileSync(path.join(root, '.github/workflows/codeql.yml'), 'utf8');
 const checkoutAction = 'actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0';
 const setupNodeAction = 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020';
 const uploadArtifactAction = 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
 const downloadArtifactAction = 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c';
-for (const [workflow, source] of [['ci.yml', ci], ['release.yml', release]]) {
+for (const [workflow, source] of [['ci.yml', ci], ['release.yml', release], ['codeql.yml', codeql]]) {
   assert.ok(source.includes(checkoutAction), `${workflow} checkout action is not SHA-pinned`);
-  assert.ok(source.includes(setupNodeAction), `${workflow} setup-node action is not SHA-pinned`);
   assert.ok(source.includes('persist-credentials: false'), `${workflow} persists checkout credentials`);
-  assert.ok(!/actions\/(?:checkout|setup-node)@v\d/.test(source), `${workflow} uses a mutable action tag`);
+  assert.ok(!/actions\/checkout@v\d/.test(source), `${workflow} uses a mutable checkout tag`);
+}
+for (const [workflow, source] of [['ci.yml', ci], ['release.yml', release]]) {
+  assert.ok(source.includes(setupNodeAction), `${workflow} setup-node action is not SHA-pinned`);
+  assert.ok(!/actions\/setup-node@v\d/.test(source), `${workflow} uses a mutable setup-node tag`);
 }
 for (const action of [uploadArtifactAction, downloadArtifactAction]) {
   assert.ok(release.includes(action), `release workflow lacks ${action}`);
@@ -79,7 +86,7 @@ assert.deepEqual(matrixTargets, releaseTargets, 'release matrix must contain exa
 
 for (const contract of [
   'workflow_dispatch', "format('candidate:{0}', inputs.tag)", "format('draft:{0}', inputs.tag)",
-  'PLIEGORS_SOURCE_REV', 'replica: [1, 2]',
+  'replica: [1, 2]',
   'ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15-intel', 'macos-15', 'windows-2025',
   'link-arg=/Brepro',
   'pliego-$env:RELEASE_TARGET.zip', 'retention-days: 7', 'retention-days: 14',
@@ -117,15 +124,22 @@ assert.doesNotMatch(
 assert.ok(release.includes('sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250'), 'release key fingerprint drift');
 const createRelease = release.slice(release.indexOf('gh release create'));
 assert.ok(createRelease.includes('release-assets/*'), 'draft release must upload the exact sealed bundle');
-for (const forbidden of ['refs/tags/', 'crates.io', 'cloudflare', 'wrangler']) {
+for (const forbidden of ['refs/tags/', 'cargo publish', 'cloudflare', 'wrangler']) {
   assert.ok(!release.toLowerCase().includes(forbidden), `release workflow contains ${forbidden}`);
 }
 
 assert.equal(
   existsSync(path.join(root, '.github/workflows/publish-crates.yml')),
   false,
-  'crates registry publication workflow must not exist',
+  'first crates.io publication must remain a guarded local operation',
 );
+
+const cratePublisher = readFileSync(path.join(root, 'scripts/publish-crates.mjs'), 'utf8');
+for (const token of [
+  'CARGO_REGISTRY_TOKEN', 'PLIEGORS_PUBLISH_CONFIRMATION', 'publish:v${version}',
+  'origin/main', 'publish', '--locked', 'https://crates.io/api/v1/crates/',
+]) assert.ok(cratePublisher.includes(token), `crate publisher lacks ${token}`);
+assert.ok(!cratePublisher.includes('--token'), 'crate publisher must not expose the token on the command line');
 
 const publicProjectFiles = [
   'CHANGELOG.md',
@@ -139,6 +153,7 @@ const publicProjectFiles = [
   'THIRD_PARTY_NOTICES.md',
   'TRADEMARKS.md',
   '.github/PULL_REQUEST_TEMPLATE.md',
+  '.github/workflows/codeql.yml',
   '.github/dependabot.yml',
   '.github/ISSUE_TEMPLATE/bug_report.yml',
   '.github/ISSUE_TEMPLATE/feature_request.yml',
@@ -152,7 +167,11 @@ const publicProjectFiles = [
   'scripts/create-release-manifest.mjs',
   'scripts/release-bundle-lib.mjs',
   'scripts/verify-release-bundle.mjs',
+  'scripts/publish-crates.mjs',
   'crates/pliego-starters/LICENSE',
+  'examples/pliegors-site/public/fonts/LICENSE-fragment-mono.txt',
+  'examples/pliegors-site/public/fonts/LICENSE-instrument-sans.txt',
+  'examples/pliegors-site/public/fonts/LICENSE-instrument-serif.txt',
   'workers/pliegors-email/package-lock.json',
   'workers/pliegors-email/README.md',
   'workers/pliegors-email/src/handler.ts',
@@ -164,6 +183,12 @@ for (const file of publicProjectFiles) {
   assert.ok(existsSync(absolute), `public project contract lacks ${file}`);
   assert.ok(readFileSync(absolute).length > 0, `public project file is empty: ${file}`);
 }
+assert.ok(codeql.includes('github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a'), 'CodeQL init action is not SHA-pinned');
+assert.ok(codeql.includes('github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a'), 'CodeQL analyze action is not SHA-pinned');
+for (const language of ['rust', 'javascript-typescript', 'actions']) {
+  assert.ok(codeql.includes(`- ${language}`), `CodeQL lacks ${language}`);
+}
+assert.ok(codeql.includes("repository.visibility == 'public'"), 'CodeQL must remain inert before public visibility');
 
 const candidateKeyPath = path.join(root, 'keys/pliegors-candidate-release.pub.pem');
 assert.deepEqual(
@@ -306,17 +331,13 @@ assert.ok(
 );
 
 const cli = readFileSync(path.join(root, 'crates/pliego-cli/src/main.rs'), 'utf8');
-const cliBuild = readFileSync(path.join(root, 'crates/pliego-cli/build.rs'), 'utf8');
-assert.ok(cli.includes('https://github.com/celiumsai/pliegors'), 'starter source repository');
-assert.ok(cli.includes('PLIEGORS_SOURCE_REV'), 'starter build revision override');
-assert.match(cli, /rev = \\\"\{\}\\\"/, 'starter dependency must use an exact Git revision');
-assert.ok(!cli.includes('registry version'), 'starter dependency must not use a registry');
-assert.ok(!cli.includes('FALLBACK_PLIEGORS_SOURCE_REV'), 'starter revision must not be hard-coded');
-assert.ok(cliBuild.includes('rev-parse'), 'CLI build must resolve the source checkout revision');
-assert.ok(cliBuild.includes('HEAD^{commit}'), 'CLI build must verify the source revision as a commit');
-assert.ok(cliBuild.includes('cargo:rerun-if-env-changed'), 'CLI build must track the release override');
+assert.ok(cli.includes('fn registry_dependency()'), 'starter registry dependency builder');
+assert.ok(cli.includes('version = \\\"={}\\\"'), 'starter dependency must use an exact registry version');
+assert.ok(cli.includes('crates.io PliegoRS'), 'starter source label must name crates.io');
+assert.ok(!cli.includes('git = \\\"{PLIEGORS_SOURCE_REPOSITORY}'), 'released starter must not depend on Git');
+assert.equal(existsSync(path.join(root, 'crates/pliego-cli/build.rs')), false, 'CLI must build from crates.io without Git metadata');
 
 console.log(
-  `Distribution contract PASS: ${crates.length} source-only crates @ ${workspaceVersion}, ` +
-  '5 targets x 2 replicas, signed private candidate, and gated manual draft',
+  `Distribution contract PASS: ${crates.length} crates.io packages @ ${workspaceVersion}, ` +
+  '5 targets x 2 replicas, signed release candidate, and gated manual draft',
 );

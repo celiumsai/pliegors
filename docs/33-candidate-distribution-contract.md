@@ -2,8 +2,8 @@
 
 **Status:** R6 accepted on 2026-07-16
 
-R6 produces a private, signed, reproducible candidate before any GitHub Release
-is created. Candidate construction and release promotion are different modes;
+R6 produces a signed, reproducible candidate before any GitHub Release is
+created. Candidate construction and release promotion are different modes;
 passing one never silently performs the other.
 
 ## Modes and authority
@@ -95,8 +95,8 @@ The distribution-only golden job checks out no framework source. It downloads
 only the sealed artifact, verifies the signed complete bundle against the fixed
 fingerprint, installs the Linux x64 archive, and confirms `pliego 0.0.1`. The
 installed CLI then scaffolds without `--framework-path`; all first-party Cargo
-dependencies must use the canonical private Git URL and the candidate commit.
-With read-only authentication to that private source, the job completes:
+dependencies must use the exact public crates.io version, with no Git or path
+dependency. The job completes:
 
 ```text
 pliego check
@@ -112,15 +112,15 @@ that application path.
 
 ## Candidate versus public release
 
-The current network installers still validate archive SHA-256 sidecars; they do
-not independently verify the Ed25519 bundle. R6 therefore verifies the whole
-downloaded bundle before executing an installer and makes no public network
-installation claim.
+The network installers validate archive SHA-256 sidecars; they do not
+independently verify the Ed25519 bundle. The high-assurance path therefore
+downloads and verifies the whole release before executing an installer.
 
-Before a public release, PliegoRS still needs a separately published trusted
-fingerprint/bootstrap path, a promotion review over the exact sealed bytes, and
-platform signing or notarization where required. A compromise of the candidate
-private key requires immediate secret removal, key rotation, a new key ID, and
+For `0.0.1`, `pliegors.dev/security/` is the independent fingerprint bootstrap
+surface and the final draft is reviewed over the exact sealed bytes. Linux is
+the production target. macOS notarization and Windows Authenticode signing are
+not claimed for the development artifacts in this release. A compromise of the
+release key requires immediate secret removal, key rotation, a new key ID, and
 rebuilding every candidate; an old manifest must never be re-signed in place.
 
 The exact accepted results are recorded in

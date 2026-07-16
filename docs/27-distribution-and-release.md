@@ -1,77 +1,71 @@
 # Distribution and release
 
-**Status:** R6 private candidate distribution is accepted. GitHub Releases is
-the approved future canonical release channel, but the accepted R6 workflow did
-not create or mutate a release. The repository remains private, releases remain
-private or draft, and the `pliegors.dev` documentation site remains a protected
-preview.
+**Status:** `0.0.1` is the first public PliegoRS release. The repository,
+crates.io packages, signed GitHub Release, and `pliegors.dev` documentation are
+the public surfaces for the same version.
 
 ## Canonical ownership boundary
 
-PliegoRS has one canonical GitHub origin:
+PliegoRS uses two official distribution systems:
 
-- `https://github.com/celiumsai/pliegors` owns the source history, tags, release
-  records, checksums, manifests, and downloadable CLI archives.
-- GitHub Releases in that repository is the only official distribution channel.
-  A version does not exist as a PliegoRS release unless it has a matching tag and
-  release record there.
-- No secondary download domain redirects, mirrors, caches, or originates
-  releases.
+- `https://github.com/celiumsai/pliegors` owns source history, tags, release
+  records, checksums, manifests, installers, and prebuilt CLI archives.
+- `https://crates.io` distributes the 15 `pliego-*` Rust packages. Every
+  first-party dependency in one release uses an exact `=VERSION` requirement.
+- `https://pliegors.dev` publishes documentation and the independently visible
+  release-key fingerprint. It does not mirror binaries.
 
-PliegoRS crates keep `publish = false`; crates.io is not a distribution path.
-There is no third-party mirror with authority to create or rename a release.
+No secondary download domain, package registry, redirect, or cache has release
+authority. A GitHub release exists only when its tag and non-draft release
+record agree. A Rust package exists only when crates.io reports that exact
+package version with this repository as its source.
 
-## Private preview gate
+## Install from crates.io
 
-The approved `pliegors.dev` deployment is active as a private preview, not a
-public launch. It sits behind Cloudflare Access with a deny-by-default policy.
-Admission requires Mario's approved identity together with enrolled iOS WARP
-and Gateway device posture; email identity alone is not the access boundary.
-The Worker exposes only the `pliegors.dev` Custom Domain: its `workers.dev`
-route and version preview URLs are disabled, and no `www` origin route exists.
+The normal developer installation is:
 
-During the preview:
+```sh
+cargo install pliego-cli --version 0.0.1 --locked
+pliego version
+pliego new my-site
+cd my-site
+pliego check
+pliego dev
+```
 
-- the GitHub repository remains private;
-- candidate GitHub Releases remain private or draft;
-- no release asset is promoted to public visibility; and
-- no secondary download origin exists.
+Generated projects use exact registry dependencies such as
+`pliego-ssg = { version = "=0.0.1" }`. Every first-party crate in a project must
+remain on one version. Local framework development is explicit:
+`pliego new my-site --framework-path <checkout>` or `PLIEGO_FRAMEWORK_PATH`
+replaces registry requirements with local path dependencies.
 
-Opening the repository or publishing a non-draft release requires a separate,
-explicit decision after quality, security, documentation, and installation
-gates pass.
-
-## Source dependencies
-
-The CLI embeds official starters, but generated projects obtain framework crates
-directly from the canonical PliegoRS Git repository. `pliego-dom`, `pliego-ssg`,
-and every other framework crate receive the same full 40-character `rev` pin.
-Release candidate builds inject `${GITHUB_SHA}` as `PLIEGORS_SOURCE_REV`, so a
-CLI generates projects against the exact source revision that produced it.
-
-Development remains explicit: `--framework-path <checkout>` or
-`PLIEGO_FRAMEWORK_PATH` replaces the Git pin with local path dependencies.
+The crates.io publication order follows the dependency graph. Independent
+crates publish first; `pliego-cli` publishes last. The guarded
+`scripts/publish-crates.mjs` command checks package contents, the 10 MB registry
+limit, exact internal requirements, repository state, and registry convergence.
+Authentication comes from the ephemeral `CARGO_REGISTRY_TOKEN` environment
+variable or Cargo's local credential store after an explicit `cargo login`. The
+token is never passed on the command line or stored in the repository; a local
+login used for a release is removed with `cargo logout` after publication.
 
 ## Support matrix
 
-The release policy distinguishes production support from development
-availability:
-
 | Tier | Target | Status |
 | --- | --- | --- |
-| Production | `x86_64-unknown-linux-gnu` | Required and configured in the candidate matrix. |
-| Production | `aarch64-unknown-linux-gnu` | Required and configured on a native Linux ARM64 runner. |
-| Development | `x86_64-apple-darwin` | Configured contributor build and test surface; no production support commitment yet. |
-| Development | `aarch64-apple-darwin` | Configured contributor build and test surface; no production support commitment yet. |
-| Development | `x86_64-pc-windows-msvc` | Configured contributor build and test surface; no production support commitment yet. |
+| Production | `x86_64-unknown-linux-gnu` | Reproduced on two native runners and release-blocking. |
+| Production | `aarch64-unknown-linux-gnu` | Reproduced on two native ARM64 runners and release-blocking. |
+| Development | `x86_64-apple-darwin` | Built and smoke-tested; not a production deployment commitment. |
+| Development | `aarch64-apple-darwin` | Built and smoke-tested; not a production deployment commitment. |
+| Development | `x86_64-pc-windows-msvc` | Built and smoke-tested; not a production deployment commitment. |
 
-Development artifacts may be attached to a private or draft GitHub Release for
-testing, but they must be labeled as development builds. Passing their smoke
-tests does not expand the production support matrix.
+macOS artifacts are not notarized and Windows artifacts are not Authenticode
+signed in `0.0.1`. Those platforms are development surfaces; their archive
+hashes and release-manifest entries remain verified. Linux is the production
+server target for this release.
 
 ## GitHub Release contract
 
-Every candidate is bound to one immutable version and commit:
+Every release is bound to one immutable version and source commit:
 
 ```text
 tag: v<VERSION>
@@ -86,81 +80,74 @@ shell installer: https://github.com/celiumsai/pliegors/releases/download/v<VERSI
 PowerShell installer: https://github.com/celiumsai/pliegors/releases/download/v<VERSION>/install.ps1
 ```
 
-Asset names are stable across releases: `pliego-<TARGET>.zip`, its `.sha256`
-sidecar, `SHA256SUMS`, `install.sh`, and `install.ps1`. The release tag and URL,
-not a version embedded in the filename, select the version. The release title,
-tag, embedded source revision, manifest entry, and checksum must agree.
-Candidate assets stay in a private or draft release until the release gate is
-explicitly approved. Rebuilding replacement bytes after validation is not
-allowed; promotion must use the exact validated bytes or rerun the complete
-matrix against the final assets.
+Asset names are stable; the tag selects the version. A release title, tag,
+manifest, source commit, archive metadata, and checksums must agree. Validated
+bytes are never rebuilt in place. Any byte change requires the complete matrix
+to run again.
 
-`.github/workflows/release.yml` is manual-only. Candidate mode builds two native
-replicas for each of five targets, runs the installer lifecycle on replica 1,
-downloads the ten private artifacts, rejects binary disagreement, selects exact
-archives, signs the final 15-asset manifest, and runs a distribution-only golden
-path. Candidate mode is read-only and creates only expiring private Actions
-artifacts. Draft mode is separate, restricted to `main`, requires its own exact
-confirmation and the complete green path, and is the only job with
-`contents: write`. It never publishes, edits, replaces, or marks a release as
-latest.
+`.github/workflows/release.yml` is manual-only. It builds two native replicas
+for each target, runs installer lifecycle tests, compares binary hashes,
+assembles the exact release set, signs the Ed25519 manifest, and proves a first
+application using only public distribution surfaces. Candidate mode writes only
+expiring Actions artifacts. Draft mode is restricted to `main`; it is the only
+job with `contents: write`, and it can create but never publish or mutate a
+release.
 
-The native reference products under `examples/` are validation fixtures, not
-framework distribution assets. Before the repository can become public, their
-source, copy, and media must be separated from the public framework package or
-covered by an explicit redistribution license. This is a release gate, not an
-assumption granted by repository visibility.
+## Verify the complete bundle
 
-## Integrity and authenticity gate
-
-SHA-256 sidecars detect corruption and accidental mismatch. They do not by
-themselves establish authenticity. R6 adds a canonical Ed25519 manifest only
-after all ten uploaded builder artifacts have been downloaded and compared. The
-manifest binds the final installers, verifiers, reproducibility record,
-sidecars, archives, roles, sizes, version, and source commit. Its accepted key
-fingerprint is:
+SHA-256 sidecars detect corruption but do not independently establish who
+published a file. The detached Ed25519 manifest binds installers, verifier,
+reproducibility record, sidecars, archives, roles, sizes, version, and source
+commit. The `0.0.1` accepted key fingerprint is published here and at
+`https://pliegors.dev/security/`:
 
 ```text
 sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
 ```
 
-Public promotion remains blocked until this fingerprint has an independent
-trusted publication/bootstrap surface, the exact sealed bytes receive final
-review, and platform signing or notarization is applied where required. The R6
-candidate key is an online private-CI key, not an offline public-release root.
-GitHub release identity and an independent signature remain complementary.
+With GitHub CLI and Node.js installed:
 
-Bootstrap documentation downloads an installer or archive to disk, verifies it,
-and executes it as a separate step. It never pipes a network response directly
-into a shell.
+```sh
+mkdir pliegors-v0.0.1
+cd pliegors-v0.0.1
+gh release download v0.0.1 --repo celiumsai/pliegors
+node verify-release-bundle.mjs \
+  --dir . \
+  --expected-key-fingerprint sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
+```
 
-## Install, upgrade, and rollback
+The verifier rejects an unknown key, invalid signature, missing asset, extra
+asset, role mismatch, size mismatch, hash mismatch, version mismatch, or source
+commit mismatch.
 
-No unauthenticated network installation is available while releases remain
-private or draft. Authorized R6 testing downloads the sealed private Actions
-artifact, verifies the complete signature and exact set, then uses an explicit
-local archive to exercise install, second install, rollback, execution, and
-uninstall.
+## Install, upgrade, rollback
 
-Before public launch, `install.sh` and `install.ps1` must themselves ship as
-GitHub Release assets. Installation never selects latest implicitly:
+After full-bundle verification, install the matching local archive:
 
-- `--version <semver>` / `-Version <semver>` resolves the matching
-  `releases/download/v<VERSION>/...` assets;
-- `--channel latest` / `-Channel latest` is the explicit opt-in to
-  `releases/latest/download/...`; and
-- omitting both selectors fails with an actionable usage message.
+```sh
+sh ./install.sh \
+  --archive ./pliego-x86_64-unknown-linux-gnu.zip \
+  --version 0.0.1
+```
 
-The installers validate semantic-version input, target selection, and checksums
-before installing into `$PLIEGO_HOME/bin`, defaulting to `~/.pliego/bin`. They
-do not yet verify the detached bundle signature internally; R6 verifies the
-whole bundle before invoking them. Every future network download resolves
-directly to the canonical GitHub Release.
+```powershell
+.\install.ps1 `
+  -ArchivePath .\pliego-x86_64-pc-windows-msvc.zip `
+  -Version 0.0.1
+```
 
-There is no alternate release registry or authoritative download-base override.
-Offline validation continues to use an explicit local archive.
+Network selection is always explicit: `--version <semver>` / `-Version`, or
+the deliberate mutable opt-in `--channel latest` / `-Channel latest`. Omitting
+both fails. Installers validate the selected target and archive checksum before
+writing to `$PLIEGO_HOME/bin`, defaulting to `~/.pliego/bin`. They retain one
+rollback binary and support `--rollback` / `-Rollback` and `--uninstall` /
+`-Uninstall`.
 
-The complete normative R6 behavior is in the
+Installers do not yet verify the detached Ed25519 signature internally. The
+full-bundle procedure above is the high-assurance path. Documentation never
+pipes a network response directly into a shell.
+
+The normative build behavior remains in the
 [candidate distribution contract](33-candidate-distribution-contract.md), with
-the exact accepted hashes in
+accepted pre-release evidence in
 [R6 evidence](evidence/r6-candidate-distribution.md).

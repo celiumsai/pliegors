@@ -101,8 +101,8 @@ fn hero(locale: Locale) -> View {
                 .child(el("span").child("RUST-NATIVE WEB FRAMEWORK"))
                 .child(el("span").child(l(
                     locale,
-                    "PRIVATE PRE-RELEASE / MEDELLÍN / 2026",
-                    "PRE-RELEASE PRIVADO / MEDELLÍN / 2026",
+                    "PUBLIC RELEASE / MEDELLÍN / 2026",
+                    "RELEASE PÚBLICO / MEDELLÍN / 2026",
                 ))),
         )
         .child(
@@ -117,7 +117,7 @@ fn hero(locale: Locale) -> View {
                 .child(
                     el("p")
                         .class("utility-label")
-                        .child("PLIEGORS / 0.0.1 / CANDIDATE"),
+                        .child("PLIEGORS / 0.0.1 / PUBLIC"),
                 )
                 .child(el("h1").child("Pliego").child(el("em").child("RS")))
                 .child(el("p").class("rs-hero__lead").child(l(
@@ -663,15 +663,15 @@ fn distribution(locale: Locale) -> View {
                 .child(el("h2").child(l(locale, "Built once. Verified per target.", "Compilado una vez. Verificado por target.")))
                 .child(el("p").child(l(
                     locale,
-                    "GitHub Releases is the canonical channel. Linux artifacts are production targets; macOS and Windows builds support local development. The accepted private candidate has complete R0-R7 evidence; public availability begins only when an explicit release is published.",
-                    "GitHub Releases es el canal canónico. Los artefactos Linux son targets de producción; los builds de macOS y Windows sirven al desarrollo local. El candidato privado aceptado tiene evidencia completa de R0-R7; la disponibilidad pública comienza únicamente cuando se publique un release explícito.",
+                    "PliegoRS 0.0.1 is public on crates.io and GitHub Releases. Linux artifacts are production targets; macOS and Windows builds support local development. The release carries complete R0-R7 evidence.",
+                    "PliegoRS 0.0.1 está disponible en crates.io y GitHub Releases. Los artefactos Linux son targets de producción; los builds de macOS y Windows sirven al desarrollo local. El release contiene la evidencia R0-R7 completa.",
                 ))),
         )
         .child(
             el("pre")
                 .class("rs-terminal")
                 .attr("aria-label", l(locale, "PliegoRS installation example", "Ejemplo de instalación de PliegoRS"))
-                .child(el("code").child("$ pliego new field-notes\n$ cd field-notes\n$ pliego dev --lan\n\nPLIEGORS  local  http://127.0.0.1:4300\n          network http://0.0.0.0:4300")),
+                .child(el("code").child("$ cargo install pliego-cli --version 0.0.1 --locked\n$ pliego new field-notes\n$ cd field-notes\n$ pliego dev\n\nPLIEGORS  local  http://127.0.0.1:4400")),
         )
         .into_view()
 }
@@ -684,8 +684,8 @@ fn closing(locale: Locale) -> View {
         .child(el("h2").child(l(locale, "The authored web, with a memory.", "La web con autoría, y con memoria.")))
         .child(el("p").child(l(
             locale,
-            "The private candidate has completed R0-R7 hardening: documented, inspectable, independently exercised, and owned from source to output.",
-            "El candidato privado completó el fortalecimiento R0-R7: documentado, inspeccionable, ejercitado de forma independiente y controlado de fuente a salida.",
+            "The public release completed R0-R7 hardening: documented, inspectable, independently exercised, and owned from source to output.",
+            "El release público completó el fortalecimiento R0-R7: documentado, inspeccionable, ejercitado de forma independiente y controlado de fuente a salida.",
         )))
         .child(action("mailto:hello@pliegors.dev", "hello@pliegors.dev", true))
         .into_view()
@@ -901,7 +901,7 @@ fn about_release(locale: Locale) -> View {
             "04",
             l(locale, "Current state", "Estado actual"),
         ))
-        .child(el("p").class("utility-label").child("0.0.1 / CANDIDATE"))
+        .child(el("p").class("utility-label").child("0.0.1 / PUBLIC"))
         .child(el("h2").child(l(
             locale,
             "The first release is evidence, not a countdown.",
@@ -909,8 +909,8 @@ fn about_release(locale: Locale) -> View {
         )))
         .child(el("p").child(l(
             locale,
-            "Source, documentation, security posture, platform builds, checksums, and R0-R7 evidence now agree on the accepted private candidate. Publication remains a separate product decision; no public install channel or support promise exists until a release is explicitly published.",
-            "El código, la documentación, la postura de seguridad, los builds por plataforma, los checksums y la evidencia R0-R7 ya coinciden en el candidato privado aceptado. La publicación sigue siendo una decisión de producto separada; no existe canal público de instalación ni promesa de soporte hasta publicar un release de forma explícita.",
+            "Source, documentation, crates.io packages, platform builds, checksums, security posture, and R0-R7 evidence agree on the public 0.0.1 release. Support is intentionally bounded to the published matrix and pre-1.0 policy.",
+            "El código, la documentación, los paquetes de crates.io, los builds por plataforma, los checksums, la postura de seguridad y la evidencia R0-R7 coinciden en el release público 0.0.1. El soporte se limita deliberadamente a la matriz publicada y a la política pre-1.0.",
         )))
         .child(
             el("div")
@@ -934,11 +934,7 @@ pub fn changelog(locale: Locale) -> View {
         (
             "0.0.1",
             "2026-07-16",
-            l(
-                locale,
-                "Accepted private candidate",
-                "Candidato privado aceptado",
-            ),
+            l(locale, "First public release", "Primer release público"),
             l(
                 locale,
                 "Native SSG, typed content, Rust/WASM runtime, adapters, adaptive assets, verified Hyphae boundary, signed five-target distribution, and an independently exercised external application.",
@@ -1101,8 +1097,8 @@ fn security_hero(locale: Locale) -> View {
                 )
                 .child(
                     el("span")
-                        .child("PRIVATE")
-                        .child(el("small").child(l(locale, "no public release", "sin release público"))),
+                        .child("PUBLIC")
+                        .child(el("small").child(l(locale, "0.0.1 supported", "0.0.1 soportado"))),
                 ),
         )
         .into_view()
@@ -1176,8 +1172,8 @@ fn security_posture(locale: Locale) -> View {
                 )))
                 .child(el("p").child(l(
                     locale,
-                    "These numbers describe the accepted private candidate and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
-                    "Estas cifras describen el candidato privado aceptado y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
+                    "These numbers describe the public 0.0.1 release and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
+                    "Estas cifras describen el release público 0.0.1 y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
                 ))),
         )
         .child(grid)
@@ -1346,8 +1342,8 @@ fn security_evidence(locale: Locale) -> View {
             l(locale, "Distribution mutation", "Mutación de distribución"),
             l(
                 locale,
-                "Changed bytes, extras, missing files, key drift, sidecar drift, and replica disagreement reject the candidate.",
-                "Bytes alterados, extras, archivos faltantes, drift de key, sidecars o réplicas rechazan el candidato.",
+                "Changed bytes, extras, missing files, key drift, sidecar drift, and replica disagreement reject the release candidate.",
+                "Bytes alterados, extras, archivos faltantes, drift de key, sidecars o réplicas rechazan el candidato de release.",
             ),
             "R6 / DISTRIBUTION",
         ),
@@ -1455,8 +1451,8 @@ fn security_supply_chain(locale: Locale) -> View {
                 )))
                 .child(el("p").child(l(
                     locale,
-                    "The accepted candidate binds 15 primary assets, five ordered targets, two binary replicas per target, source commit, sizes, hashes, roles, and a detached Ed25519 signature.",
-                    "El candidato aceptado vincula 15 assets primarios, cinco targets ordenados, dos réplicas binarias por target, commit fuente, tamaños, hashes, roles y una firma Ed25519 separada.",
+                    "The accepted release binds 15 primary assets, five ordered targets, two binary replicas per target, source commit, sizes, hashes, roles, and a detached Ed25519 signature.",
+                    "El release aceptado vincula 15 assets primarios, cinco targets ordenados, dos réplicas binarias por target, commit fuente, tamaños, hashes, roles y una firma Ed25519 separada.",
                 )))
                 .child(
                     el("dl")
@@ -1479,14 +1475,14 @@ fn security_supply_chain(locale: Locale) -> View {
                 )
                 .child(el("p").class("rs-security-supply__boundary").child(l(
                     locale,
-                    "Boundary: there is no public install claim until a GitHub Release publishes the exact sealed bytes and an independent fingerprint bootstrap.",
-                    "Límite: no existe una afirmación pública de instalación hasta que un GitHub Release publique los bytes sellados exactos y un bootstrap independiente del fingerprint.",
+                    "Boundary: direct installers verify checksum sidecars. Verify the complete signed bundle against this independently published fingerprint for the high-assurance path.",
+                    "Límite: los instaladores directos verifican sidecars de checksum. Para la ruta de mayor garantía, verifica el bundle firmado completo contra este fingerprint publicado de forma independiente.",
                 ))),
         )
         .child(
             el("div")
                 .class("rs-security-supply__verification")
-                .child(el("span").class("utility-label").child("CANDIDATE / TRUST ROOT"))
+                .child(el("span").class("utility-label").child("RELEASE / TRUST ROOT"))
                 .child(el("code").class("rs-security-fingerprint").child(
                     "sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250",
                 ))
@@ -1496,7 +1492,7 @@ fn security_supply_chain(locale: Locale) -> View {
                             "aria-label",
                             l(locale, "Release verification command", "Comando de verificación de release"),
                         )
-                        .child(el("code").child("node scripts/verify-release-bundle.mjs \\\n  --dir release-assets \\\n  --expected-key-fingerprint \\\n  sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250")),
+                        .child(el("code").child("node verify-release-bundle.mjs \\\n  --dir . \\\n  --expected-key-fingerprint \\\n  sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250")),
                 )
                 .child(action(
                     "https://github.com/celiumsai/pliegors/blob/main/docs/33-candidate-distribution-contract.md",
@@ -1552,13 +1548,13 @@ fn security_limitations(locale: Locale) -> View {
             "04",
             l(
                 locale,
-                "Candidate is not a public release",
-                "El candidato no es un release público",
+                "Installer signature verification is external",
+                "La verificación de firma del instalador es externa",
             ),
             l(
                 locale,
-                "The accepted R6 bundle is private. Network installers still verify archive sidecars and do not independently verify the full signed bundle.",
-                "El bundle R6 aceptado es privado. Los instaladores de red aún verifican sidecars del archivo y no verifican independientemente el bundle firmado completo.",
+                "Network installers verify archive sidecars but do not independently verify the detached Ed25519 signature. The complete bundle verifier is the high-assurance path.",
+                "Los instaladores de red verifican sidecars del archivo, pero no validan por sí mismos la firma Ed25519 separada. El verificador del bundle completo es la ruta de mayor garantía.",
             ),
         ),
         (
@@ -1570,8 +1566,8 @@ fn security_limitations(locale: Locale) -> View {
             ),
             l(
                 locale,
-                "RustSec RUSTSEC-2026-0173 flags the build-time proc-macro-error2 dependency through rstml. No vulnerability is reported; replacement is tracked before a public release.",
-                "RustSec RUSTSEC-2026-0173 señala la dependencia de build proc-macro-error2 a través de rstml. No reporta una vulnerabilidad; su reemplazo queda rastreado antes de un release público.",
+                "RustSec RUSTSEC-2026-0173 flags the build-time proc-macro-error2 dependency through rstml. No vulnerability is reported; removal remains tracked as a maintenance item.",
+                "RustSec RUSTSEC-2026-0173 señala la dependencia de build proc-macro-error2 a través de rstml. No reporta una vulnerabilidad; su eliminación sigue rastreada como mantenimiento.",
             ),
         ),
     ];
@@ -1637,9 +1633,9 @@ fn security_support(locale: Locale) -> View {
                         .child(
                             el("tbody").child(
                                 el("tr")
-                                    .child(el("th").attr("scope", "row").child("0.0.1 candidate"))
-                                    .child(el("td").child(l(locale, "Private pre-release", "Pre-release privado")))
-                                    .child(el("td").child(l(locale, "Latest accepted candidate and main", "Último candidato aceptado y main"))),
+                                    .child(el("th").attr("scope", "row").child("0.0.1"))
+                                    .child(el("td").child(l(locale, "Public pre-release", "Pre-release público")))
+                                    .child(el("td").child(l(locale, "0.0.1 and main", "0.0.1 y main"))),
                             ),
                         ),
                 )
@@ -1661,8 +1657,8 @@ fn security_support(locale: Locale) -> View {
                 )))
                 .child(el("p").child(l(
                     locale,
-                    "There is no public release yet. This is a disclosure status, not a claim that undiscovered vulnerabilities do not exist.",
-                    "Aún no existe un release público. Este es un estado de divulgación, no una afirmación de que no existan vulnerabilidades desconocidas.",
+                    "No advisories are published as of 2026-07-16. This is a disclosure status, not a claim that undiscovered vulnerabilities do not exist.",
+                    "No hay advisories publicados al 2026-07-16. Este es un estado de divulgación, no una afirmación de que no existan vulnerabilidades desconocidas.",
                 )))
                 .child(action(
                     "https://github.com/celiumsai/pliegors/security/advisories",
@@ -1822,8 +1818,8 @@ pub fn legal_hub(locale: Locale) -> View {
             l(locale, "Terms", "Términos"),
             l(
                 locale,
-                "Rules for using the website and pre-release software.",
-                "Reglas de uso del sitio y del software previo al release.",
+                "Rules for using the website and public pre-1.0 software.",
+                "Reglas de uso del sitio y del software público pre-1.0.",
             ),
         ),
         (
@@ -1874,8 +1870,8 @@ pub fn legal_hub(locale: Locale) -> View {
             ),
             l(
                 locale,
-                "These documents cover the PliegoRS website and private pre-release program.",
-                "Estos documentos cubren el sitio de PliegoRS y el programa privado previo al release.",
+                "These documents cover the public PliegoRS website, source, packages, and release materials.",
+                "Estos documentos cubren el sitio público, el código, los paquetes y los materiales de release de PliegoRS.",
             ),
         ),
         grid.into_view(),
@@ -1887,29 +1883,29 @@ pub fn legal_document(locale: Locale, slug: &str) -> Result<View, String> {
         "terms" => (
             "Terms",
             "Términos",
-            "These terms govern access to the PliegoRS website and private pre-release materials.",
-            "Estos términos rigen el acceso al sitio de PliegoRS y a materiales privados previos al release.",
+            "These terms govern access to the PliegoRS website and public release materials.",
+            "Estos términos rigen el acceso al sitio de PliegoRS y a los materiales públicos de release.",
             vec![
                 (
                     "01",
                     "Current status",
                     "Estado actual",
-                    "PliegoRS is pre-release software. Documentation and interfaces may change until a public version is explicitly published.",
-                    "PliegoRS es software previo al release. La documentación y las interfaces pueden cambiar hasta que se publique explícitamente una versión pública.",
+                    "PliegoRS 0.0.1 is public pre-1.0 software. Documented APIs may change between minor releases and changes are recorded in the changelog.",
+                    "PliegoRS 0.0.1 es software público pre-1.0. Las APIs documentadas pueden cambiar entre releases menores y los cambios se registran en el changelog.",
                 ),
                 (
                     "02",
                     "License",
                     "Licencia",
-                    "Repository access does not grant rights beyond the license files and written permissions attached to the material you receive.",
-                    "El acceso al repositorio no concede derechos más allá de las licencias y permisos escritos adjuntos al material recibido.",
+                    "Framework source and packages are licensed under Apache-2.0. Brand assets and third-party files remain subject to their accompanying notices and policies.",
+                    "El código y los paquetes del framework usan Apache-2.0. Los assets de marca y archivos de terceros conservan sus avisos y políticas aplicables.",
                 ),
                 (
                     "03",
                     "No warranty",
                     "Sin garantía",
-                    "Pre-release software is provided for evaluation without warranties to the extent permitted by law.",
-                    "El software previo al release se entrega para evaluación sin garantías en la medida permitida por la ley.",
+                    "The software is provided without warranties to the extent permitted by law, as stated in the Apache-2.0 license.",
+                    "El software se entrega sin garantías en la medida permitida por la ley, según la licencia Apache-2.0.",
                 ),
             ],
         ),

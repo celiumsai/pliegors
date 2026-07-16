@@ -7,7 +7,11 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "The append-only, hash-chained event log PliegoRS folds into UI. Wire-compatible in spirit with Hyphae's journal."
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Typed, versioned, hash-chained event logs and schema admission for PliegoRS."
 publish.workspace = true
 
 [dependencies]

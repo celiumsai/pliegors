@@ -1,8 +1,9 @@
 # Framework readiness review
 
 **Reviewed:** 2026-07-16
-**Verdict:** accepted private candidate with an external durable flagship;
-not ready for a public compatibility, distribution, or production-sync claim.
+**Verdict:** ready for a public `0.0.1` pre-release with an external durable
+flagship. Production Hyphae synchronization and 1.0 API stability remain out of
+scope.
 
 ## Implemented foundation
 
@@ -24,7 +25,7 @@ not ready for a public compatibility, distribution, or production-sync claim.
 - A replayable default application, receipt-bound causal build graph, native
   event watcher, typed CSS/content/adapter HMR, structured diagnostics, and
   measured install-to-first-replayable-app path.
-- A private five-target candidate with two matching native binary builds per
+- A five-target release candidate with two matching native binary builds per
   target, a final signed exact-set manifest, native installer lifecycles, and a
   distribution-only first-application gate.
 - Cairn, an independent human-agent decision dossier built only from that
@@ -46,9 +47,10 @@ The static review at commit `934a5cf` identified five P0 areas:
 All five are now closed within their documented boundaries by the committed R0,
 R1, R2, R3, and R4 evidence. The historical findings and acceptance sequence
 remain in the [hardening roadmap](28-hardening-roadmap.md) as regression targets.
-Production Hyphae service operation and public distribution remain separate
-gates. External product acceptance is closed only within the bounded Cairn R7
-evidence.
+Production Hyphae service operation remains a separate gate. Public framework
+distribution is closed for `0.0.1` within the signed release, crates.io, legal,
+documentation, and support boundaries. External product acceptance is closed
+only within the bounded Cairn R7 evidence.
 
 ## Claims PliegoRS can make now
 
@@ -66,8 +68,7 @@ evidence.
 
 - forge-resistant provenance from a content hash alone;
 - production-verified Hyphae synchronization;
-- public binary bootstrap with an independently published trust root and
-  platform signing/notarization;
+- production support for unsigned macOS or Windows artifacts;
 - broad server-framework parity;
 - 1.0 API stability or public support commitments.
 
@@ -77,6 +78,5 @@ R6 is closed by the [candidate distribution contract](33-candidate-distribution-
 and its [committed acceptance evidence](evidence/r6-candidate-distribution.md).
 R7 is closed by the [external flagship evidence](evidence/r7-external-flagship.md).
 Client-side verified sync remains separate from production sync readiness.
-Repeat this review only after a production Hyphae conformance gate or an
-explicit public-launch decision. Public launch remains a distinct trust-root,
-platform-signing, legal, and support decision.
+Repeat this review for the next release line, a production Hyphae conformance
+gate, or a change to platform signing and support commitments.

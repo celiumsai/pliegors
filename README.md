@@ -11,14 +11,25 @@
 
 <p align="center"><strong>A Rust-native web framework for verifiable, replayable, durable interfaces.</strong></p>
 
+<p align="center">
+  <a href="https://github.com/celiumsai/pliegors/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/celiumsai/pliegors/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/celiumsai/pliegors/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/celiumsai/pliegors/actions/workflows/codeql.yml/badge.svg"></a>
+  <a href="https://crates.io/crates/pliego-cli"><img alt="crates.io" src="https://img.shields.io/crates/v/pliego-cli.svg"></a>
+  <a href="https://docs.rs/pliego-cli"><img alt="docs.rs" src="https://img.shields.io/docsrs/pliego-cli"></a>
+  <a href="https://github.com/celiumsai/pliegors/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/celiumsai/pliegors"></a>
+  <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/crates/l/pliego-cli.svg"></a>
+  <a href="https://doc.rust-lang.org/stable/releases.html"><img alt="rustc 1.85+" src="https://img.shields.io/badge/rustc-1.85%2B-b7410e.svg"></a>
+</p>
+
 PliegoRS folds append-only event logs into interfaces. State is projected from
 typed events, the projection advances as events arrive, and replay must produce
 the same result. Useful HTML is emitted first; Rust/WASM resumes only the
 behavior the document needs. Mature browser libraries such as GSAP, Lenis, and
 Three.js remain JavaScript behind explicit lifecycle adapters.
 
-The repository is private pre-release software. No public version or install
-channel is available yet.
+The current public release is `0.0.1`. PliegoRS is pre-1.0 software: the
+documented contracts are deliberate, while APIs may still evolve between minor
+releases.
 
 ## What exists
 
@@ -37,7 +48,7 @@ channel is available yet.
 - `pliego new`, `check`, `build`, native-event `dev`, `preview`, `inspect`,
   `why artifact`, `why-rebuilt`, causal graphs, typed HMR, and maintained
   replayable default, minimal, editorial, and cinematic starters;
-- a five-target, two-replica private candidate pipeline with a signed exact-set
+- a five-target, two-replica release pipeline with a signed exact-set
   manifest and a distribution-only golden path;
 - an independently committed external flagship that exercises durable events,
   replay, forks, effects, receipts, provenance, audit, and selective sync;
@@ -50,12 +61,12 @@ the trust model across events, folds, effects, artifacts, and lifecycles.
 Hyphae is the first-class durable data plane when a project needs it, but static
 projects do not require Hyphae.
 
-The private R0-R7 hardening sequence is complete: reactive safety, artifact
+The R0-R7 hardening sequence is complete: reactive safety, artifact
 trust, verified sync, snapshots and schemas, DOM lifecycle, developer golden
-path, candidate distribution, and an external flagship. See the
+path, reproducible distribution, and an external flagship. See the
 [hardening roadmap](docs/28-hardening-roadmap.md) and the bounded
-[R7 evidence](docs/evidence/r7-external-flagship.md). Public release and
-production Hyphae operation remain separate decisions.
+[R7 evidence](docs/evidence/r7-external-flagship.md). Production Hyphae
+operation remains a separate system boundary.
 
 ## Packages
 
@@ -76,6 +87,24 @@ production Hyphae operation remain separate decisions.
 | `pliego-hyphae` | Protocol v2 attestations, authority policy, and type-gated verified replay |
 | `pliego-starters` | Maintained embedded starter projects |
 | `pliego-cli` | Project creation, build, dev server, preview, and inspection |
+
+## Install
+
+Install the CLI from crates.io:
+
+```sh
+cargo install pliego-cli --version 0.0.1 --locked
+pliego new my-site
+cd my-site
+pliego check
+pliego dev
+```
+
+Linux production binaries and macOS/Windows development binaries are also
+published in the [GitHub Release](https://github.com/celiumsai/pliegors/releases/tag/v0.0.1).
+Download installers to disk and verify the signed release bundle before running
+them; never pipe a network response directly into a shell. See the
+[distribution guide](docs/27-distribution-and-release.md).
 
 ## Local development
 

@@ -1,4 +1,4 @@
-name: Build and seal private CLI candidate
+name: Build and seal PliegoRS release
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       mode:
-        description: Build a private candidate or create a private draft from main
+        description: Build a sealed candidate or create a reviewable draft from main
         required: true
         default: candidate
         type: choice
@@ -29,7 +29,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  PLIEGORS_SOURCE_REV: ${{ github.sha }}
 
 jobs:
   build:
@@ -207,7 +206,7 @@ jobs:
           ./scripts/install.ps1 -Uninstall -InstallDir $installRoot
           if (Test-Path "$installRoot/bin/pliego.exe") { throw 'uninstall left the active binary behind' }
 
-      - name: Upload private build replica
+      - name: Upload build replica
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pliegors-build-${{ matrix.target }}-${{ matrix.replica }}-${{ github.sha }}
@@ -272,7 +271,7 @@ jobs:
             --public-key source/keys/pliegors-candidate-release.pub.pem \
             --expected-key-fingerprint sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
 
-      - name: Upload sealed private candidate
+      - name: Upload sealed candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pliegors-sealed-${{ inputs.tag }}-${{ github.sha }}
@@ -304,7 +303,7 @@ jobs:
 
       - name: Verify, install, and build without a framework checkout
         env:
-          GH_READ_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           test ! -d .git
@@ -316,15 +315,12 @@ jobs:
             --install-dir "$RUNNER_TEMP/pliego-home"
           cli="$RUNNER_TEMP/pliego-home/bin/pliego"
           "$cli" version
-          git config --global url."https://x-access-token:${GH_READ_TOKEN}@github.com/".insteadOf https://github.com/
-          trap 'git config --global --unset-all url."https://x-access-token:${GH_READ_TOKEN}@github.com/".insteadOf || true' EXIT
-          export CARGO_NET_GIT_FETCH_WITH_CLI=true
           "$cli" new "$RUNNER_TEMP/distribution-app"
           cd "$RUNNER_TEMP/distribution-app"
-          grep -F 'git = "https://github.com/celiumsai/pliegors"' Cargo.toml
-          grep -F "rev = \"$GITHUB_SHA\"" Cargo.toml
-          if grep -F 'path = ' Cargo.toml; then
-            echo 'distribution scaffold unexpectedly contains path dependencies' >&2
+          version="${RELEASE_TAG#v}"
+          test "$(grep -F -c "version = \"=$version\"" Cargo.toml)" -eq 4
+          if grep -E 'git =|path =' Cargo.toml; then
+            echo 'distribution scaffold unexpectedly contains Git or path dependencies' >&2
             exit 1
           fi
           "$cli" check
@@ -342,7 +338,7 @@ jobs:
         github.ref == 'refs/heads/main' && needs.golden_path.result == 'success' &&
         inputs.mode == 'draft' && inputs.confirmation == format('draft:{0}', inputs.tag)
       }}
-    name: Create private GitHub draft
+    name: Create GitHub release draft
     needs: golden_path
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -393,12 +389,27 @@ jobs:
             exit 1
           fi
           cat > RELEASE-NOTES.md <<EOF
-          PliegoRS CLI candidate built and reproduced from commit \`$GITHUB_SHA\`.
+          PliegoRS v0.0.1 is the first public release of the Rust-native framework
+          for verifiable, replayable, durable web interfaces.
+
+          Highlights:
+
+          - deterministic static generation, typed views, event logs, folds, and snapshots;
+          - Rust/WASM browser clients with explicit lifecycle adapters;
+          - maintained default, minimal, editorial, and cinematic starters;
+          - Linux x86_64 and ARM64 production artifacts;
+          - macOS and Windows development artifacts;
+          - reproducible two-replica builds and a signed exact-set release manifest.
+
+          Install the Rust CLI from the registry with
+          \`cargo install pliego-cli --version 0.0.1 --locked\`, or download the
+          installer and platform archive attached to this release.
 
           The detached Ed25519 manifest covers every downloadable installer,
           verifier, reproducibility record, checksum, and CLI archive.
 
-          This release remains a private draft until it is reviewed and published manually.
+          PliegoRS is pre-1.0 software. Review the changelog, supported targets,
+          and security policy before production use.
           EOF
           gh release create "$RELEASE_TAG" \
             release-assets/* \
