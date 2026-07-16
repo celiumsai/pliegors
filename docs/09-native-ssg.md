@@ -7,6 +7,11 @@ documents and deterministic static routes. It owns head metadata, canonical
 links, stylesheets, assets, route validation, output hashes, guarded publication,
 and the `pliego.build.json` ledger.
 
+`Head::preload_stylesheet(...)` is an explicit delivery primitive for a stylesheet already linked
+with `Head::stylesheet(...)`. PliegoRS emits the preload before inline scripts and stylesheet links,
+rejects orphaned or duplicate preloads, and does not choose assets automatically. Applications must
+base selection on their own route/asset evidence; the API alone is not a performance claim.
+
 The smallest executable reference is `examples/minimal-pliego`. Build the CLI
 once, then use the verified project entry point from inside the example:
 
@@ -30,6 +35,7 @@ route declares resumable behavior.
 - Static pages ship zero framework runtime.
 - Text, attributes, title, and metadata escape by default.
 - Routes and assets reject absolute paths, traversal, and unsafe destinations.
+- Stylesheet preloads are opt-in, unique, URL-validated, and must match an applied stylesheet.
 - Every emitted file has a stable SHA-256 and byte count.
 - Repeated builds from identical inputs produce identical page and asset hashes.
 - Staged publication preserves the last valid output when a build fails.

@@ -73,6 +73,7 @@ pub struct Head {
     manifest: Option<String>,
     apple_touch_icon: Option<String>,
     alternates: Vec<(String, String)>,
+    stylesheet_preloads: Vec<String>,
     stylesheets: Vec<String>,
     inline_scripts: Vec<String>,
     module_scripts: Vec<String>,
@@ -92,6 +93,7 @@ impl Head {
             manifest: None,
             apple_touch_icon: None,
             alternates: Vec::new(),
+            stylesheet_preloads: Vec::new(),
             stylesheets: Vec::new(),
             inline_scripts: Vec::new(),
             module_scripts: Vec::new(),
@@ -141,6 +143,16 @@ impl Head {
     #[must_use]
     pub fn stylesheet(mut self, href: impl Into<String>) -> Self {
         self.stylesheets.push(href.into());
+        self
+    }
+
+    /// Preload a stylesheet that is also applied by this [`Head`].
+    ///
+    /// Preload selection remains an explicit application delivery decision. Rendering fails when
+    /// the same URL was not added with [`Head::stylesheet`] or when a preload is duplicated.
+    #[must_use]
+    pub fn preload_stylesheet(mut self, href: impl Into<String>) -> Self {
+        self.stylesheet_preloads.push(href.into());
         self
     }
 
@@ -254,6 +266,11 @@ impl Page {
             output.push_str(&escape_attribute(language));
             output.push_str("\" href=\"");
             output.push_str(&escape_attribute(href));
+            output.push_str("\">");
+        }
+        for stylesheet in &self.head.stylesheet_preloads {
+            output.push_str("<link rel=\"preload\" as=\"style\" href=\"");
+            output.push_str(&escape_attribute(stylesheet));
             output.push_str("\">");
         }
         for script in &self.head.inline_scripts {
@@ -1397,6 +1414,11 @@ fn validate_head_urls(head: &Head) -> Result<(), BuildError> {
                 .iter()
                 .map(|(_, value)| ("alternate", value)),
         )
+        .chain(
+            head.stylesheet_preloads
+                .iter()
+                .map(|value| ("stylesheet-preload", value)),
+        )
         .chain(head.stylesheets.iter().map(|value| ("stylesheet", value)))
         .chain(
             head.module_scripts
@@ -1408,6 +1430,20 @@ fn validate_head_urls(head: &Head) -> Result<(), BuildError> {
         if !safe_document_url(value) {
             return Err(BuildError::InvalidPath(format!(
                 "unsafe {field} URL: {value}"
+            )));
+        }
+    }
+    let linked_stylesheets = head.stylesheets.iter().collect::<BTreeSet<_>>();
+    let mut seen_preloads = BTreeSet::new();
+    for preload in &head.stylesheet_preloads {
+        if !linked_stylesheets.contains(preload) {
+            return Err(BuildError::InvalidPath(format!(
+                "stylesheet preload has no matching stylesheet: {preload}"
+            )));
+        }
+        if !seen_preloads.insert(preload) {
+            return Err(BuildError::InvalidPath(format!(
+                "duplicate stylesheet preload: {preload}"
             )));
         }
     }
@@ -1583,6 +1619,48 @@ mod tests {
         assert!(!html.contains("</ScRiPt><p>bad"));
         assert!(html.contains("<\\/ScRiPt><p>bad</p>"));
         assert!(html.find("dataset.theme").unwrap() < html.find("/theme.css").unwrap());
+    }
+
+    #[test]
+    fn stylesheet_preloads_are_explicit_unique_and_early() {
+        let page = Page::new(
+            "/preload",
+            Head::new("Preload")
+                .inline_script("document.documentElement.dataset.theme='dark'")
+                .stylesheet("/theme.css")
+                .preload_stylesheet("/theme.css"),
+            el("main").into_view(),
+        );
+        let html = page.render().unwrap();
+        let preload = r#"<link rel="preload" as="style" href="/theme.css">"#;
+        let stylesheet = r#"<link rel="stylesheet" href="/theme.css">"#;
+        assert_eq!(html.matches(preload).count(), 1);
+        assert_eq!(html.matches(stylesheet).count(), 1);
+        assert!(html.find(preload).unwrap() < html.find("dataset.theme").unwrap());
+        assert!(html.find(preload).unwrap() < html.find(stylesheet).unwrap());
+    }
+
+    #[test]
+    fn stylesheet_preloads_require_one_matching_stylesheet() {
+        let orphan = Page::new(
+            "/orphan",
+            Head::new("Orphan").preload_stylesheet("/theme.css"),
+            el("main").into_view(),
+        );
+        assert!(matches!(orphan.render(), Err(BuildError::InvalidPath(_))));
+
+        let duplicate = Page::new(
+            "/duplicate",
+            Head::new("Duplicate")
+                .stylesheet("/theme.css")
+                .preload_stylesheet("/theme.css")
+                .preload_stylesheet("/theme.css"),
+            el("main").into_view(),
+        );
+        assert!(matches!(
+            duplicate.render(),
+            Err(BuildError::InvalidPath(_))
+        ));
     }
 
     #[test]
