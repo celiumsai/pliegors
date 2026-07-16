@@ -1,8 +1,8 @@
 # Framework readiness review
 
 **Reviewed:** 2026-07-16
-**Verdict:** credible pre-release foundation for native static and focused
-Rust/WASM sites; not ready for a public compatibility or trust claim.
+**Verdict:** accepted private candidate with an external durable flagship;
+not ready for a public compatibility, distribution, or production-sync claim.
 
 ## Implemented foundation
 
@@ -27,6 +27,9 @@ Rust/WASM sites; not ready for a public compatibility or trust claim.
 - A private five-target candidate with two matching native binary builds per
   target, a final signed exact-set manifest, native installer lifecycles, and a
   distribution-only first-application gate.
+- Cairn, an independent human-agent decision dossier built only from that
+  candidate, with exact replay, explicit forks, effect receipts, provenance,
+  actor-scoped audit, selective verified sync, and tamper rejection.
 - The official PliegoRS site and neutral references as native framework evidence.
 - Manual five-target GitHub Actions candidate workflow and installer lifecycle.
 
@@ -43,8 +46,9 @@ The static review at commit `934a5cf` identified five P0 areas:
 All five are now closed within their documented boundaries by the committed R0,
 R1, R2, R3, and R4 evidence. The historical findings and acceptance sequence
 remain in the [hardening roadmap](28-hardening-roadmap.md) as regression targets.
-Production Hyphae service operation, public distribution, and external product
-acceptance remain separate gates.
+Production Hyphae service operation and public distribution remain separate
+gates. External product acceptance is closed only within the bounded Cairn R7
+evidence.
 
 ## Claims PliegoRS can make now
 
@@ -58,7 +62,7 @@ acceptance remain separate gates.
   production gateway, key distribution system, durable browser outbox, or
   deployed conforming Hyphae service.
 
-## Claims blocked after R6
+## Claims blocked after R7
 
 - forge-resistant provenance from a content hash alone;
 - production-verified Hyphae synchronization;
@@ -71,7 +75,8 @@ acceptance remain separate gates.
 
 R6 is closed by the [candidate distribution contract](33-candidate-distribution-contract.md)
 and its [committed acceptance evidence](evidence/r6-candidate-distribution.md).
-Repeat this review after R7 proves a real auditable human-agent workspace built
-outside the monorepo from the accepted candidate. Client-side R2 closure remains
-separate from production sync readiness. Public launch also remains a distinct
-trust-root, platform-signing, legal, and support decision.
+R7 is closed by the [external flagship evidence](evidence/r7-external-flagship.md).
+Client-side verified sync remains separate from production sync readiness.
+Repeat this review only after a production Hyphae conformance gate or an
+explicit public-launch decision. Public launch remains a distinct trust-root,
+platform-signing, legal, and support decision.

@@ -142,6 +142,11 @@ public promotion remain separate decisions.
 Build an auditable human-agent workspace outside the framework repository. The
 flagship must exercise events, effects, history, replay, provenance, and
 selective sync; another marketing site is not sufficient evidence.
+Status: complete. [R7 external flagship evidence](evidence/r7-external-flagship.md)
+records Cairn, an independent decision dossier built from the accepted private
+candidate with exact dependency provenance, replay/fork parity, effect receipts,
+selective verified sync, tamper rejection, and responsive browser acceptance.
+Production Hyphae operation and public distribution remain separate decisions.
 
 ## Metrics
 

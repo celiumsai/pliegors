@@ -39,6 +39,8 @@ channel is available yet.
   replayable default, minimal, editorial, and cinematic starters;
 - a five-target, two-replica private candidate pipeline with a signed exact-set
   manifest and a distribution-only golden path;
+- an independently committed external flagship that exercises durable events,
+  replay, forks, effects, receipts, provenance, audit, and selective sync;
 - an official bilingual site authored by PliegoRS itself.
 
 ## Direction
@@ -48,10 +50,12 @@ the trust model across events, folds, effects, artifacts, and lifecycles.
 Hyphae is the first-class durable data plane when a project needs it, but static
 projects do not require Hyphae.
 
-The current release order is R0 reactive safety, R1 artifact trust, R2 verified
-sync, R3 snapshots and schemas, R4 DOM lifecycle, R5 developer golden path, R6
-candidate distribution, and R7 an external flagship. See the
-[hardening roadmap](docs/28-hardening-roadmap.md).
+The private R0-R7 hardening sequence is complete: reactive safety, artifact
+trust, verified sync, snapshots and schemas, DOM lifecycle, developer golden
+path, candidate distribution, and an external flagship. See the
+[hardening roadmap](docs/28-hardening-roadmap.md) and the bounded
+[R7 evidence](docs/evidence/r7-external-flagship.md). Public release and
+production Hyphae operation remain separate decisions.
 
 ## Packages
 

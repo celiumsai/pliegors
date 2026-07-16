@@ -20,7 +20,7 @@ candidate.
 | 5 | R4 DOM lifecycle | Complete | [Contract](31-dom-lifecycle-contract.md) and [committed evidence](evidence/r4-dom-lifecycle.md) cover exact ownership, LIFO cleanup, keyed identity, SSR adoption, adapters, reduced motion, and the 10,000-cycle plateau. |
 | 6 | R5 Golden developer experience | Complete | [Contract](32-golden-developer-experience.md) and [committed evidence](evidence/r5-golden-developer-experience.md) cover replayable scaffolding, receipt-bound causal graphs, native watching, typed HMR, why commands, structured diagnostics, and measured first-app p50/p95. |
 | 7 | R6 Candidate distribution | Complete | [Contract](33-candidate-distribution-contract.md) and [committed evidence](evidence/r6-candidate-distribution.md) cover five targets, two native replicas, exact binary hashes, a final Ed25519 manifest, installer lifecycles, and a distribution-only golden path. |
-| 8 | R7 External flagship | Pending | An auditable human-agent workspace is built outside the monorepo using only the candidate distribution. |
+| 8 | R7 External flagship | Complete | [Committed R7 evidence](evidence/r7-external-flagship.md) covers Cairn, an independent durable human-agent decision dossier built only from the accepted candidate, with replay, forks, effects, receipts, provenance, audit, selective sync, tamper rejection, and browser acceptance. |
 
 ## Already implemented foundations
 
@@ -37,7 +37,7 @@ candidate.
 
 These foundations are not substitutes for the R0-R7 evidence gates.
 
-## Explicit non-goals after R6
+## Explicit non-goals after R7
 
 - No generic JavaScript bundler, identity system, database, SQL layer, or CRDT.
 - No event logging for ephemeral pointer frames, hover states, or animation ticks.

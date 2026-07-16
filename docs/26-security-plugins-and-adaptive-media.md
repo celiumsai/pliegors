@@ -117,9 +117,9 @@ cargo install cargo-audit --version 0.22.1 --locked
 cargo audit
 ```
 
-## Remaining release fronts
+## Release boundary after hardening
 
-The current order is the R0-R7 sequence in the
+The completed private hardening order is the R0-R7 sequence in the
 [hardening roadmap](28-hardening-roadmap.md): reactive safety, artifact trust,
 verified sync, snapshot identity, DOM lifecycle, golden developer experience,
 candidate distribution, and an external auditable flagship.

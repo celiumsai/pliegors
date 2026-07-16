@@ -206,7 +206,8 @@ M7  THE FULL-SITE PATH (the general-purpose goal): static-site generation,
     everything a content site needs, so PliegoRS replaces Astro/Next outright.
     GATE: rebuild a production-grade site in PliegoRS with equal-or-better
     Lighthouse scores and no JavaScript-framework dependency. The official
-    PliegoRS site proves the public framework path; external acceptance remains.
+    PliegoRS site proves the framework path, while Cairn closes the separate R7
+    durable-workspace gate. The independent Lighthouse comparison remains.
 M8  `pliego` umbrella + CLI owns the complete developer experience while
     composing Cargo, rustc, wasm-bindgen, and mature asset/build primitives.
 ```
