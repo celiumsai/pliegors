@@ -549,28 +549,35 @@ fn create_project(options: NewOptions, template: &templates::Template) -> Result
     let framework_path = options
         .framework_path
         .or_else(|| std::env::var_os("PLIEGO_FRAMEWORK_PATH").map(PathBuf::from));
-    let (dom_dependency, ssg_dependency, source_label) = if let Some(root) = framework_path {
-        let root = validate_framework_root(&root)?;
-        (
-            local_dependency(&root.join("crates/pliego-dom"))?,
-            local_dependency(&root.join("crates/pliego-ssg"))?,
-            format!("local framework {}", cargo_path(&root.to_string_lossy())),
-        )
-    } else {
-        let dependency = source_dependency()?;
-        let revision = source_revision()?;
-        (
-            dependency.clone(),
-            dependency,
-            format!("PliegoRS source revision {revision}"),
-        )
-    };
+    let (dom_dependency, ssg_dependency, fold_dependency, log_dependency, source_label) =
+        if let Some(root) = framework_path {
+            let root = validate_framework_root(&root)?;
+            (
+                local_dependency(&root.join("crates/pliego-dom"))?,
+                local_dependency(&root.join("crates/pliego-ssg"))?,
+                local_dependency(&root.join("crates/pliego-fold"))?,
+                local_dependency(&root.join("crates/pliego-log"))?,
+                format!("local framework {}", cargo_path(&root.to_string_lossy())),
+            )
+        } else {
+            let dependency = source_dependency()?;
+            let revision = source_revision()?;
+            (
+                dependency.clone(),
+                dependency.clone(),
+                dependency.clone(),
+                dependency,
+                format!("PliegoRS source revision {revision}"),
+            )
+        };
 
     let cargo = template
         .cargo_toml
         .replace("__PACKAGE__", &package_name)
         .replace("__DOM_DEPENDENCY__", &dom_dependency)
-        .replace("__SSG_DEPENDENCY__", &ssg_dependency);
+        .replace("__SSG_DEPENDENCY__", &ssg_dependency)
+        .replace("__FOLD_DEPENDENCY__", &fold_dependency)
+        .replace("__LOG_DEPENDENCY__", &log_dependency);
     let manifest = template
         .project_toml
         .replace("__NAME__", &toml_escape(&display_name))
@@ -837,6 +844,8 @@ fn reject_unresolved_tokens(path: &Path, bytes: &[u8]) -> Result<(), String> {
         "__PACKAGE__",
         "__DOM_DEPENDENCY__",
         "__SSG_DEPENDENCY__",
+        "__FOLD_DEPENDENCY__",
+        "__LOG_DEPENDENCY__",
     ];
     if let Some(token) = TOKENS.iter().find(|token| source.contains(**token)) {
         Err(format!(
@@ -909,6 +918,8 @@ fn validate_framework_root(path: &Path) -> Result<PathBuf, String> {
 fn is_framework_root(path: &Path) -> bool {
     path.join("crates/pliego-dom/Cargo.toml").is_file()
         && path.join("crates/pliego-ssg/Cargo.toml").is_file()
+        && path.join("crates/pliego-fold/Cargo.toml").is_file()
+        && path.join("crates/pliego-log/Cargo.toml").is_file()
 }
 
 fn local_dependency(path: &Path) -> Result<String, String> {

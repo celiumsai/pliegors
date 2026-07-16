@@ -60,6 +60,7 @@ pub const DEFAULT_TEMPLATE_ID: &str = "default";
 
 const DEFAULT_FILES: &[TemplateFile] = &[
     text_file!("default", "src/main.rs", TemplateFileMode::PlainText),
+    copy_file!("default", "src/domain.rs"),
     copy_file!("default", "assets/site.css"),
     copy_file!("default", "assets/favicon.svg"),
     text_file!(
@@ -134,9 +135,15 @@ const CINEMATIC_FILES: &[TemplateFile] = &[
 pub const TEMPLATES: &[Template] = &[
     Template {
         id: DEFAULT_TEMPLATE_ID,
-        revision: 1,
-        description: "Official first-use project with local guide and diagnostics",
-        capabilities: &["ssg", "seo", "onboarding", "branded-errors"],
+        revision: 2,
+        description: "Replayable first-use project with a typed event vertical",
+        capabilities: &[
+            "ssg",
+            "events",
+            "projection",
+            "replay-tests",
+            "branded-errors",
+        ],
         cargo_toml: include_str!("../templates/default/Cargo.toml.tmpl"),
         project_toml: include_str!("../templates/default/pliego.toml.tmpl"),
         gitignore: include_bytes!("../templates/default/gitignore.tmpl"),
@@ -227,6 +234,15 @@ mod tests {
         assert_eq!(
             find(DEFAULT_TEMPLATE_ID).map(|template| template.id),
             Some("default")
+        );
+        let default = find(DEFAULT_TEMPLATE_ID).unwrap();
+        assert!(default.cargo_toml.contains("__FOLD_DEPENDENCY__"));
+        assert!(default.cargo_toml.contains("__LOG_DEPENDENCY__"));
+        assert!(
+            default
+                .files
+                .iter()
+                .any(|file| file.path == "src/domain.rs")
         );
     }
 

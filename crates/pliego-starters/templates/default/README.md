@@ -1,23 +1,25 @@
 # __NAME__
 
-The official PliegoRS starter: three routes, complete metadata, a branded 404,
-local assets, and a deterministic build ledger. The first screen is deliberately
-an onboarding surface so the project explains itself before you replace it.
+The official replayable PliegoRS starter: typed actions and events, a
+transactional projection, replay tests, three routes, local assets, a causal
+build graph, and a deterministic build ledger.
 
 ## First run
 
 ```powershell
 pliego check
+cargo test --locked
 pliego dev
 ```
 
-Open `http://127.0.0.1:4400`. PliegoRS watches the project, rebuilds it, and
-reloads the browser after each successful change. Build failures are rendered as
-diagnostic pages in development.
+Open `http://127.0.0.1:4400`. PliegoRS watches native filesystem events and
+applies CSS, content, or adapter HMR after a successful causal rebuild. Build
+failures are rendered as diagnostic pages while the watcher remains alive.
 
 ## Project map
 
 - `src/main.rs`: routes, document metadata, and views written in Rust.
+- `src/domain.rs`: action, versioned event, reducer, projection, and replay tests.
 - `assets/site.css`: design tokens, layout, and responsive behavior.
 - `assets/favicon.svg`: the PliegoRS starter identity. Replace it before launch.
 - `assets/site.webmanifest`: install metadata and theme colors.
@@ -26,8 +28,9 @@ diagnostic pages in development.
 
 ## Make the first change
 
-Edit the `home()` view in `src/main.rs`, save it, and watch the browser reload.
-Then add a `Page::new(...)` entry in `main()` to create another route.
+Add an `Action` and its typed event in `src/domain.rs`, extend the reducer, and
+keep live state equal to replay in the included tests. For a new route, add a
+`Page::new(...)` entry and declare each causal `.source(...)` edge.
 
 ## Production
 
@@ -35,11 +38,15 @@ Then add a `Page::new(...)` entry in `main()` to create another route.
 pliego check
 pliego build
 pliego inspect
+pliego why artifact /
+pliego why-rebuilt
 pliego preview
 ```
 
-The deployable site is written to `target/site`. Replace `https://example.com`
-in `src/main.rs` before launch so canonical and social URLs are correct.
+The deployable site is written to `target/site`. `pliego.graph.json` explains
+source to route to artifact causality and is covered by the build receipt.
+Replace `https://example.com` in `src/main.rs` before launch so canonical and
+social URLs are correct.
 
 Documentation: https://pliegors.dev/docs/getting-started
 

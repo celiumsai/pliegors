@@ -95,12 +95,41 @@ fn new_without_template_builds_the_official_first_use_contract() {
     for path in [
         "README.md",
         "LICENSE",
+        "src/domain.rs",
         "assets/favicon.svg",
         "assets/site.webmanifest",
         "assets/robots.txt",
     ] {
         assert!(destination.join(path).is_file(), "missing {path}");
     }
+    let check = pliego(&["check"], &destination);
+    assert!(
+        check.status.success(),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let replay = Command::new("cargo")
+        .args(["test", "--locked"])
+        .current_dir(&destination)
+        .output()
+        .expect("run starter replay tests");
+    assert!(
+        replay.status.success(),
+        "{}",
+        String::from_utf8_lossy(&replay.stderr)
+    );
+    let build = pliego(&["build"], &destination);
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    assert!(destination.join("target/site/pliego.graph.json").is_file());
+    let why = pliego(&["why", "artifact", "/"], &destination);
+    assert!(why.status.success());
+    let why = String::from_utf8(why.stdout).unwrap();
+    assert!(why.contains("src/domain.rs"));
+    assert!(why.contains("src/main.rs"));
     fs::remove_dir_all(&destination).expect("remove owned temporary scaffold");
 }
 

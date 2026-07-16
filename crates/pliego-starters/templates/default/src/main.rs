@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod domain;
+
 use pliego_dom::{IntoView, View, el};
 use pliego_ssg::{Asset, Head, Page, Site};
 use std::path::PathBuf;
@@ -71,7 +73,7 @@ fn command(label: &str, value: &str) -> View {
         .into_view()
 }
 
-fn home() -> View {
+fn home(event_count: usize) -> View {
     vec![
         navigation(),
         el("main")
@@ -104,7 +106,7 @@ fn home() -> View {
                                     .class("panel-head")
                                     .child(el("span").class("signal").attr("aria-hidden", "true"))
                                     .child(el("span").child("Development session"))
-                                    .child(el("strong").child("01")),
+                                    .child(el("strong").child(format!("{event_count:02}"))),
                             )
                             .child(command("CHECK", "pliego check"))
                             .child(command("DEVELOP", "pliego dev"))
@@ -225,7 +227,11 @@ fn footer() -> View {
     el("footer")
         .class("footer shell")
         .child(el("span").child("Built with PliegoRS"))
-        .child(el("a").attr("href", "https://pliegors.dev").child("pliegors.dev"))
+        .child(
+            el("a")
+                .attr("href", "https://pliegors.dev")
+                .child("pliegors.dev"),
+        )
         .into_view()
 }
 
@@ -234,38 +240,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("target/site"));
+    let state = domain::first_replayable_state()?;
     Site::new()
-        .page(Page::new(
-            "/",
-            head(
-                "__NAME__ / Built with PliegoRS",
-                "A new Rust-native website built with PliegoRS.",
+        .page(
+            Page::new(
                 "/",
-            ),
-            home(),
-        ))
-        .page(Page::new(
-            "/guide/",
-            head(
-                "Project guide / __NAME__",
-                "The local first-use guide for this PliegoRS project.",
+                head(
+                    "__NAME__ / Built with PliegoRS",
+                    "A new Rust-native website built with PliegoRS.",
+                    "/",
+                ),
+                home(state.notes.len()),
+            )
+            .source("src/domain.rs")
+            .source("src/main.rs"),
+        )
+        .page(
+            Page::new(
                 "/guide/",
-            ),
-            guide(),
-        ))
-        .page(Page::new(
-            "/404.html",
-            head(
-                "Route not found / __NAME__",
-                "The requested route does not exist.",
+                head(
+                    "Project guide / __NAME__",
+                    "The local first-use guide for this PliegoRS project.",
+                    "/guide/",
+                ),
+                guide(),
+            )
+            .source("src/main.rs"),
+        )
+        .page(
+            Page::new(
                 "/404.html",
-            ),
-            not_found(),
-        ))
-        .asset(Asset::new("assets/site.css", CSS.to_vec()))
-        .asset(Asset::new("assets/favicon.svg", FAVICON.to_vec()))
-        .asset(Asset::new("site.webmanifest", MANIFEST.to_vec()))
-        .asset(Asset::new("robots.txt", ROBOTS.to_vec()))
+                head(
+                    "Route not found / __NAME__",
+                    "The requested route does not exist.",
+                    "/404.html",
+                ),
+                not_found(),
+            )
+            .source("src/main.rs"),
+        )
+        .asset(Asset::new("assets/site.css", CSS.to_vec()).source("assets/site.css"))
+        .asset(Asset::new("assets/favicon.svg", FAVICON.to_vec()).source("assets/favicon.svg"))
+        .asset(Asset::new("site.webmanifest", MANIFEST.to_vec()).source("assets/site.webmanifest"))
+        .asset(Asset::new("robots.txt", ROBOTS.to_vec()).source("assets/robots.txt"))
         .build(output)?;
     Ok(())
 }
