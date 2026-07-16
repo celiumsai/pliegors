@@ -496,7 +496,7 @@ fn getting_started(locale: Locale) -> View {
                 definition_list(locale, &[
                     ("Rust", "1.85 or the release toolchain declared by the project", "1.85 o el toolchain de release declarado por el proyecto"),
                     ("Targets", "Linux x64/ARM64 for production; macOS and Windows for development", "Linux x64/ARM64 para producción; macOS y Windows para desarrollo"),
-                    ("Source", "GitHub Releases and the canonical celiumsai/pliegors repository", "GitHub Releases y el repositorio canónico celiumsai/pliegors"),
+                    ("Source", "crates.io packages, GitHub Releases, and the canonical celiumsai/pliegors repository", "Paquetes de crates.io, GitHub Releases y el repositorio canónico celiumsai/pliegors"),
                 ]),
             ],
         ),
@@ -506,9 +506,10 @@ fn getting_started(locale: Locale) -> View {
             "Install the CLI",
             "Instalar el CLI",
             vec![
-                note(locale, "Release gate", "Public installers become available with the first non-draft GitHub Release. Until then, authorized contributors build the CLI from the repository with --locked.", "Gate de release", "Los instaladores públicos estarán disponibles con el primer GitHub Release no draft. Hasta entonces, los contribuidores autorizados compilan el CLI desde el repositorio con --locked."),
-                code_block(locale, "shell", "git clone https://github.com/celiumsai/pliegors.git\ncd pliegors\ncargo build --locked --release -p pliego-cli\n./target/release/pliego version"),
+                note(locale, "Current release", "Install the exact 0.0.1 CLI from crates.io. The generated project pins every PliegoRS crate to that same exact version.", "Release actual", "Instala el CLI 0.0.1 exacto desde crates.io. El proyecto generado fija cada crate de PliegoRS a esa misma versión exacta."),
+                code_block(locale, "shell", "cargo install pliego-cli --version 0.0.1 --locked\npliego version"),
                 paragraph(locale, "Release installers are downloaded to disk, verified, and then executed. PliegoRS never documents piping an unverified network response directly into a shell.", "Los instaladores de release se descargan a disco, se verifican y después se ejecutan. PliegoRS nunca documenta enviar una respuesta de red sin verificar directamente a un shell."),
+                link_list(locale, &[("https://github.com/celiumsai/pliegors/releases/tag/v0.0.1", "Download and verify the signed release bundle", "Descargar y verificar el bundle firmado"), ("https://github.com/celiumsai/pliegors/blob/main/docs/27-distribution-and-release.md", "Read the distribution contract", "Leer el contrato de distribución")]),
             ],
         ),
         doc_section(
@@ -610,7 +611,7 @@ fn developer_loop(locale: Locale) -> View {
         ]),
         doc_section(locale, "explain", "Explain causality", "Explica la causalidad", vec![
             code_block(locale, "shell", "pliego why artifact /\npliego why artifact assets/site.css\npliego why-rebuilt"),
-            paragraph(locale, "why artifact verifies the current receipt and pliego.graph.json before tracing source-to-route-to-artifact edges. why-rebuilt reads the latest bounded private development record and reports changed sources, invalidated routes, affected artifacts, byte changes, HMR choice, and receipt transition.", "why artifact verifica el recibo actual y pliego.graph.json antes de seguir edges source-to-route-to-artifact. why-rebuilt lee el último registro privado y limitado de desarrollo y reporta fuentes cambiadas, rutas invalidadas, artefactos afectados, cambios de bytes, decisión HMR y transición del recibo."),
+            paragraph(locale, "why artifact verifies the current receipt and pliego.graph.json before tracing source-to-route-to-artifact edges. why-rebuilt reads the latest bounded local development record and reports changed sources, invalidated routes, affected artifacts, byte changes, HMR choice, and receipt transition.", "why artifact verifica el recibo actual y pliego.graph.json antes de seguir edges source-to-route-to-artifact. why-rebuilt lee el último registro local y limitado de desarrollo y reporta fuentes cambiadas, rutas invalidadas, artefactos afectados, cambios de bytes, decisión HMR y transición del recibo."),
         ]),
         doc_section(locale, "recover", "Failure preserves evidence", "El fallo preserva la evidencia", vec![
             paragraph(locale, "Compiler errors, invalid content, graph mismatches, and adapter build failures produce stable diagnostics without publishing a partial site. Correct the reported source and save again; the watcher retries from the last accepted generation.", "Los errores del compilador, contenido inválido, mismatches del grafo y fallos de build de adapters producen diagnósticos estables sin publicar un sitio parcial. Corrige la fuente reportada y guarda de nuevo; el watcher reintenta desde la última generación aceptada."),
@@ -908,7 +909,7 @@ fn build_and_deploy(locale: Locale) -> View {
         ]),
         doc_section(locale, "releases", "Release selection", "Selección de releases", vec![
             paragraph(locale, "GitHub Releases is the canonical distribution channel. Production targets are Linux x86_64 and ARM64; macOS and Windows artifacts support development. Versioned archives, sidecars, SHA256SUMS, and the signed release manifest must agree.", "GitHub Releases es el canal canónico de distribución. Los targets de producción son Linux x86_64 y ARM64; los artefactos macOS y Windows soportan desarrollo. Archives versionados, sidecars, SHA256SUMS y el manifest firmado deben coincidir."),
-            code_block(locale, "shell", "# Explicit version selection\n./install.sh --version 0.1.0\n\n# Explicit latest-channel opt-in\n./install.sh --channel latest"),
+            code_block(locale, "shell", "# Run only after downloading the installer to disk\n./install.sh --version 0.0.1\n\n# Explicit mutable-channel opt-in\n./install.sh --channel latest"),
         ]),
         doc_section(locale, "deploy", "Deploy the static output", "Despliega la salida estática", vec![
             paragraph(locale, "Deploy the contents of target/site to any origin that preserves paths, MIME types, immutable asset caching, the authored 404 document, and clean-route fallback. The framework does not require a PliegoRS application server.", "Despliega el contenido de target/site en cualquier origen que preserve rutas, MIME types, cache inmutable de assets, el documento 404 con autoría y fallback de rutas limpias. El framework no requiere un servidor de aplicación PliegoRS."),
@@ -946,9 +947,9 @@ fn crate_reference(locale: Locale) -> View {
             code_block(locale, "shell", "git checkout <accepted-revision>\ncargo doc --workspace --no-deps --locked\n# open target/doc/pliego_ssg/index.html"),
             paragraph(locale, "The repository Rustdoc is the symbol-level reference for an exact revision. This guide explains product contracts and crate ownership; it does not replace signatures, trait bounds, feature flags, or per-item safety notes emitted from the source.", "El Rustdoc del repositorio es la referencia a nivel de símbolos para una revisión exacta. Esta guía explica contratos de producto y propiedad de crates; no reemplaza firmas, trait bounds, feature flags ni notas de seguridad por item emitidas desde la fuente."),
         ]),
-        doc_section(locale, "stability", "Respect the pre-release boundary", "Respeta el límite pre-release", vec![
-            paragraph(locale, "Before the first public SemVer release, crate names identify intended ownership but public signatures may still change. Pin one accepted Git revision across every pliego-* dependency and never mix framework commits inside one application graph.", "Antes del primer release SemVer público, los nombres de crates identifican la propiedad prevista pero las firmas públicas aún pueden cambiar. Fija una revisión Git aceptada en todas las dependencias pliego-* y nunca mezcles commits del framework dentro del grafo de una aplicación."),
-            note(locale, "Public release changes the promise", "A published compatibility matrix and changelog will define supported toolchains, targets, features, deprecations, and upgrade paths. A private candidate is evidence, not a registry support promise.", "El release público cambia la promesa", "Una matriz de compatibilidad y changelog publicados definirán toolchains, targets, features, deprecations y rutas de upgrade soportadas. Un candidato privado es evidencia, no una promesa de soporte de registry."),
+        doc_section(locale, "stability", "Respect the pre-1.0 boundary", "Respeta el límite pre-1.0", vec![
+            paragraph(locale, "PliegoRS 0.0.1 is a public SemVer pre-release. Crate names identify stable ownership boundaries, but public signatures may change between minor releases. Pin one exact version across every pliego-* dependency and never mix framework versions inside one application graph.", "PliegoRS 0.0.1 es un pre-release SemVer público. Los nombres de crates identifican límites estables de propiedad, pero las firmas públicas pueden cambiar entre releases menores. Fija una versión exacta en todas las dependencias pliego-* y nunca mezcles versiones del framework dentro del grafo de una aplicación."),
+            note(locale, "Published support contract", "The compatibility matrix and changelog define supported toolchains, targets, features, deprecations, and upgrade paths for each release. Linux x64 and ARM64 are the production targets for 0.0.1.", "Contrato de soporte publicado", "La matriz de compatibilidad y el changelog definen toolchains, targets, features, deprecaciones y rutas de upgrade para cada release. Linux x64 y ARM64 son los targets de producción para 0.0.1."),
         ]),
         doc_section(locale, "boundaries", "Read the normative boundaries", "Lee los límites normativos", vec![
             link_list(locale, &[

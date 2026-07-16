@@ -7,9 +7,12 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Unified PliegoRS build, dev, and inspect workflow."
 publish.workspace = true
-build = "build.rs"
 
 [[bin]]
 name = "pliego"

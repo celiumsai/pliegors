@@ -75,10 +75,8 @@ jobs:
       - name: Check Rust documentation
         run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 
-      - name: Verify source crate packages
-        run: |
-          cargo package -p pliego-content --locked
-          cargo package -p pliego-starters --locked
+      - name: Verify crates.io packages
+        run: npm run check:crates
 
       - name: Lint WASM target
         run: >-

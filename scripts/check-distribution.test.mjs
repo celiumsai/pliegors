@@ -11,14 +11,14 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const githubReleaseBase = 'https://github.com/celiumsai/pliegors/releases/download';
 
-test('private GitHub draft release contract is self-verifying', () => {
+test('GitHub draft release contract is self-verifying', () => {
   const result = spawnSync(process.execPath, ['scripts/check-distribution.mjs'], {
     cwd: root,
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /5 targets x 2 replicas/u);
-  assert.match(result.stdout, /signed private candidate/u);
+  assert.match(result.stdout, /signed release candidate/u);
   assert.match(result.stdout, /gated manual draft/u);
 });
 

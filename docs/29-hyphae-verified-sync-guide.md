@@ -233,8 +233,7 @@ spike must opt in explicitly:
 
 ```toml
 [dependencies.pliego-hyphae]
-git = "https://github.com/celiumsai/pliegors"
-rev = "<exact-commit>"
+version = "=0.0.1"
 features = ["experimental-legacy"]
 ```
 

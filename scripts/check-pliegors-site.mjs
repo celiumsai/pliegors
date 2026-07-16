@@ -130,6 +130,9 @@ for (const asset of [
   "sitemap-0.xml",
   "media/pliegors/security-trust.avif",
   "media/pliegors/security-trust.webp",
+  "fonts/LICENSE-fragment-mono.txt",
+  "fonts/LICENSE-instrument-sans.txt",
+  "fonts/LICENSE-instrument-serif.txt",
 ]) {
   try {
     if ((await stat(path.join(root, asset))).size === 0) failures.push(`${asset}: empty`);
@@ -171,8 +174,8 @@ for (const hook of ["data-engine-lab", "data-pipeline", "data-hero-carousel"]) {
 for (const asset of ["/media/pliegors/fold-hero.webp", "/media/pliegors/ledger-wide.webp"]) {
   if (!homeHtml.includes(asset)) failures.push(`home: missing authored brand asset ${asset}`);
 }
-for (const statement of ["R0-R7", "accepted private candidate"]) {
-  if (!homeHtml.toLowerCase().includes(statement.toLowerCase())) failures.push(`home: missing current candidate statement ${statement}`);
+for (const statement of ["R0-R7", "public release"]) {
+  if (!homeHtml.toLowerCase().includes(statement.toLowerCase())) failures.push(`home: missing current release statement ${statement}`);
 }
 
 const docsHtml = await readFile(path.join(root, "docs/index.html"), "utf8").catch(() => "");
@@ -239,8 +242,8 @@ for (const [route, file, language] of securityPages) {
     "R0–R7",
     "Ed25519",
     "pliegors-candidate-2026-01",
-    "node scripts/verify-release-bundle.mjs",
-    "--dir release-assets",
+    "node verify-release-bundle.mjs",
+    "--dir .",
     "sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250",
     "/.well-known/security.txt",
     "hello@pliegors.dev",
@@ -386,4 +389,4 @@ if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join("\n"));
   process.exit(1);
 }
-console.log(`PliegoRS site contract passed: ${expected.length} routes, canonical SEO, bilingual alternates, private examples absent.`);
+console.log(`PliegoRS site contract passed: ${expected.length} routes, canonical SEO, bilingual alternates, product examples absent.`);

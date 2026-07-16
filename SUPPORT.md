@@ -11,8 +11,8 @@ shown.
 
 ## Public support
 
-Once the repository is public, use GitHub Issues for reproducible framework
-bugs and documentation defects. Search existing issues first. Include:
+Use GitHub Issues for reproducible framework bugs and documentation defects.
+Search existing issues first. Include:
 
 - PliegoRS version or commit and the selected starter;
 - operating system, architecture, Rust version, and browser when relevant;

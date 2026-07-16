@@ -34,8 +34,8 @@ pub fn footer(locale: Locale, shell: &ShellCopy) -> View {
                 .child(el("span").child("Medellín · Worldwide"))
                 .child(el("span").child(localize(
                     locale,
-                    "Private development",
-                    "Desarrollo privado",
+                    "Open source · Apache-2.0",
+                    "Código abierto · Apache-2.0",
                 ))),
         )
         .into_view()
@@ -97,6 +97,11 @@ fn footer_directory(locale: Locale) -> View {
                     el("a")
                         .attr("href", "https://github.com/celiumsai/pliegors")
                         .child("GitHub ↗"),
+                )
+                .child(
+                    el("a")
+                        .attr("href", "https://crates.io/crates/pliego-cli")
+                        .child("crates.io ↗"),
                 )
                 .child(
                     el("a")

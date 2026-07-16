@@ -7,7 +7,11 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "THE PliegoRS primitive: the incremental fold as a first-class reactive node — a memo with an accumulator and a cursor into the append-only log."
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Transactional event-log projections, replay, and contract-bound snapshots for PliegoRS."
 publish.workspace = true
 
 [dependencies]

@@ -78,32 +78,29 @@ The frozen lockfiles were checked on 2026-07-14:
 - RustSec database: zero vulnerable packages;
 - informational warning: `proc-macro-error2 2.0.1` is unmaintained through
   `rstml -> syn_derive`. No patched `rstml` release or vulnerability advisory
-  exists in the resolved graph. Track and replace it before the first public
-  GitHub Release if an upstream release removes the dependency.
+  exists in the resolved graph. It is an accepted, build-time-only maintenance
+  exception for `0.0.1` and remains tracked for removal.
 
 CI now runs both Node and Rust dependency audits. An audit result is evidence
 for the checked lockfile, not a permanent guarantee.
 
 ## Release trust boundary
 
-GitHub Releases in `celiumsai/pliegors` is the only official distribution
-authority and download origin. The repository and candidate releases remain
-private or draft, and this review authorizes no public release or promotion.
-The separately approved `pliegors.dev` deployment is a private documentation
-preview behind Cloudflare Access; it is not a framework distribution origin.
-No secondary download origin exists in the distribution architecture.
+GitHub Releases in `celiumsai/pliegors` is the only official prebuilt-binary
+authority and download origin. crates.io is the official Rust package registry.
+`pliegors.dev` publishes documentation and the release-key fingerprint; it does
+not mirror packages or binaries. No secondary origin exists.
 
 Production support is limited to Linux x64 and Linux arm64. macOS x64, macOS
 arm64, and Windows x64 remain development surfaces even when their candidate
 archives pass smoke tests. The manual workflow now configures all five native
-runners and can assemble only a private draft; it has not yet produced release
-evidence, and it cannot publish a release.
+runners and assembles only a reviewable draft; it cannot publish a release.
 
-Before publication, the exact GitHub Release assets must pass checksum and
-installer lifecycle verification, an offline-signed manifest must bind every
-asset to its tag and source commit, and promotion must require an explicit human
-decision. Checksums from the same origin provide integrity, not independent
-authenticity.
+Before publication, exact GitHub Release assets pass checksum, installer
+lifecycle, reproducibility, and signed-manifest verification against their tag
+and source commit. Promotion remains an explicit human decision. Checksums from
+the same origin provide integrity, not independent authenticity; the public
+fingerprint bootstrap is `pliegors.dev/security/`.
 
 ## Reproduce
 

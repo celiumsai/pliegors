@@ -25,7 +25,7 @@ target="${PLIEGO_R5_CLI_TARGET:-/tmp/pliegors-r5-first-app-cli}"
 work="$(mktemp -d "${TMPDIR:-/tmp}/pliegors-r5-first-app.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 
-PLIEGORS_SOURCE_REV="$revision" CARGO_TARGET_DIR="$target" \
+CARGO_TARGET_DIR="$target" \
   cargo build --manifest-path "$root/Cargo.toml" -p pliego-cli --release --locked
 source_cli="$target/release/pliego"
 if [[ ! -x "$source_cli" ]]; then
