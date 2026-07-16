@@ -359,6 +359,52 @@ fn mounted_root_disposal_is_idempotent_and_removes_its_entire_range() {
 }
 
 #[wasm_bindgen_test]
+fn scope_dispose_event_and_owned_cleanup_run_before_dom_removal() {
+    let host = test_host();
+    let order = Rc::new(RefCell::new(Vec::new()));
+    let event_connected = Rc::new(Cell::new(false));
+
+    let event_order = Rc::clone(&order);
+    let event_connected_observer = Rc::clone(&event_connected);
+    let view = el("pliego-adapter")
+        .attr("data-role", "scope-owned-adapter")
+        .on("pliego:scope-dispose", move |event| {
+            event_connected_observer.set(
+                event
+                    .target()
+                    .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                    .is_some_and(|element| element.is_connected()),
+            );
+            event_order.borrow_mut().push("event");
+        })
+        .child("owned")
+        .into_view();
+    let root = mount(&view, host.as_ref()).expect("mount scope-owned adapter");
+    let adapter = query(&host, "[data-role=scope-owned-adapter]");
+    let cleanup_order = Rc::clone(&order);
+    let cleanup_connected = Rc::new(Cell::new(false));
+    let cleanup_connected_observer = Rc::clone(&cleanup_connected);
+    root.scope()
+        .on_cleanup(move || {
+            cleanup_connected_observer.set(adapter.is_connected());
+            cleanup_order.borrow_mut().push("cleanup");
+        })
+        .expect("register mount cleanup");
+
+    root.dispose();
+    root.dispose();
+
+    assert_eq!(&*order.borrow(), &["event", "cleanup"]);
+    assert!(event_connected.get(), "scope event ran after disconnection");
+    assert!(
+        cleanup_connected.get(),
+        "owned cleanup ran after disconnection"
+    );
+    assert!(!host.has_child_nodes());
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
 fn disposal_preserves_foreign_dom_inserted_inside_mount_boundaries() {
     let host = test_host();
     let root = mount(

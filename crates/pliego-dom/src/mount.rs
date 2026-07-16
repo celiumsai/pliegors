@@ -78,6 +78,7 @@ pub enum MountOperation {
     SetAttribute,
     AddEventListener,
     RemoveEventListener,
+    DispatchLifecycle,
     RestoreFocus,
     RegisterCleanup,
     InstallEffect,
@@ -93,6 +94,7 @@ impl fmt::Display for MountOperation {
             Self::SetAttribute => "set DOM attribute",
             Self::AddEventListener => "add event listener",
             Self::RemoveEventListener => "remove event listener",
+            Self::DispatchLifecycle => "dispatch lifecycle event",
             Self::RestoreFocus => "restore keyed focus",
             Self::RegisterCleanup => "register mount cleanup",
             Self::InstallEffect => "install render effect",
@@ -1171,6 +1173,32 @@ impl MountCleanup {
         self.retiring.set(true);
     }
 
+    fn notify_scope_dispose(&self) {
+        let roots = self
+            .range
+            .borrow()
+            .as_ref()
+            .map(|range| range.owned_top_level.clone())
+            .unwrap_or_default();
+        for root in roots {
+            let Some(element) = root.dyn_ref::<web_sys::Element>() else {
+                continue;
+            };
+            let init = web_sys::EventInit::new();
+            init.set_bubbles(true);
+            init.set_composed(true);
+            let result = web_sys::Event::new_with_event_init_dict("pliego:scope-dispose", &init)
+                .and_then(|event| element.dispatch_event(&event).map(|_| ()));
+            if let Err(error) = result {
+                self.errors.record(dom_error(
+                    MountOperation::DispatchLifecycle,
+                    "pliego:scope-dispose",
+                    error,
+                ));
+            }
+        }
+    }
+
     fn suppress_ownership_mismatch(&self) {
         self.report_ownership_mismatch.set(false);
     }
@@ -1934,6 +1962,15 @@ impl MountScope {
         }
     }
 
+    /// Register a callback owned by this mount scope.
+    ///
+    /// Callbacks run before the owned DOM range is removed. Registration fails
+    /// after disposal has started, so a resource can never outlive a scope by
+    /// racing teardown.
+    pub fn on_cleanup(&self, f: impl FnOnce() + 'static) -> Result<(), MountError> {
+        self.owner_operation(MountOperation::RegisterCleanup, |owner| owner.on_cleanup(f))
+    }
+
     /// Dispose all reactive resources/listeners and then remove the owned range.
     /// The order is intentional and is safe to call repeatedly.
     pub fn dispose(&self) {
@@ -1942,6 +1979,7 @@ impl MountScope {
         }
 
         if let Some(cleanup) = self.cleanup.borrow().as_ref() {
+            cleanup.0.notify_scope_dispose();
             cleanup.0.begin_retiring();
         }
 

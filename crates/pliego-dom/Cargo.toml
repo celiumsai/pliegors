@@ -29,6 +29,7 @@ web-sys = { workspace = true, features = [
     "Comment",
     "Node",
     "Event",
+    "EventInit",
     "EventTarget",
 ] }
 
