@@ -187,7 +187,8 @@ jobs:
               export CHROMEDRIVER="$CHROMEWEBDRIVER"
             fi
           else
-            export CHROMEDRIVER="$(command -v chromedriver)"
+            CHROMEDRIVER="$(command -v chromedriver)"
+            export CHROMEDRIVER
           fi
           test -x "$CHROMEDRIVER"
           "$CHROMEDRIVER" --version
@@ -210,7 +211,8 @@ jobs:
               export CHROMEDRIVER="$CHROMEWEBDRIVER"
             fi
           else
-            export CHROMEDRIVER="$(command -v chromedriver)"
+            CHROMEDRIVER="$(command -v chromedriver)"
+            export CHROMEDRIVER
           fi
           test -x "$CHROMEDRIVER"
           npm run test:adapters:browser
