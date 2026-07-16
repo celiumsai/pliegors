@@ -1,6 +1,6 @@
 # Distribution and release
 
-**Status:** `0.0.1` is the first public PliegoRS release. The repository,
+**Status:** `0.0.1` is the first PliegoRS public preview release. The repository,
 crates.io packages, signed GitHub Release, and `pliegors.dev` documentation are
 the public surfaces for the same version.
 

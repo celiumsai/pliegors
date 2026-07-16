@@ -101,8 +101,8 @@ fn hero(locale: Locale) -> View {
                 .child(el("span").child("RUST-NATIVE WEB FRAMEWORK"))
                 .child(el("span").child(l(
                     locale,
-                    "PUBLIC RELEASE / MEDELLÍN / 2026",
-                    "RELEASE PÚBLICO / MEDELLÍN / 2026",
+                    "PUBLIC PREVIEW / MEDELLÍN / 2026",
+                    "PREVIEW PÚBLICO / MEDELLÍN / 2026",
                 ))),
         )
         .child(
@@ -117,7 +117,7 @@ fn hero(locale: Locale) -> View {
                 .child(
                     el("p")
                         .class("utility-label")
-                        .child("PLIEGORS / 0.0.1 / PUBLIC"),
+                        .child("PLIEGORS / 0.0.1 / PUBLIC PREVIEW"),
                 )
                 .child(el("h1").child("Pliego").child(el("em").child("RS")))
                 .child(el("p").class("rs-hero__lead").child(l(
@@ -684,8 +684,8 @@ fn closing(locale: Locale) -> View {
         .child(el("h2").child(l(locale, "The authored web, with a memory.", "La web con autoría, y con memoria.")))
         .child(el("p").child(l(
             locale,
-            "The public release completed R0-R7 hardening: documented, inspectable, independently exercised, and owned from source to output.",
-            "El release público completó el fortalecimiento R0-R7: documentado, inspeccionable, ejercitado de forma independiente y controlado de fuente a salida.",
+            "The public preview carries the completed R0-R7 hardening: documented, inspectable, independently exercised, and owned from source to output.",
+            "El preview público incorpora el fortalecimiento R0-R7 completo: documentado, inspeccionable, ejercitado de forma independiente y controlado de fuente a salida.",
         )))
         .child(action("mailto:hello@pliegors.dev", "hello@pliegors.dev", true))
         .into_view()
@@ -901,7 +901,7 @@ fn about_release(locale: Locale) -> View {
             "04",
             l(locale, "Current state", "Estado actual"),
         ))
-        .child(el("p").class("utility-label").child("0.0.1 / PUBLIC"))
+        .child(el("p").class("utility-label").child("0.0.1 / PUBLIC PREVIEW"))
         .child(el("h2").child(l(
             locale,
             "The first release is evidence, not a countdown.",
@@ -909,8 +909,8 @@ fn about_release(locale: Locale) -> View {
         )))
         .child(el("p").child(l(
             locale,
-            "Source, documentation, crates.io packages, platform builds, checksums, security posture, and R0-R7 evidence agree on the public 0.0.1 release. Support is intentionally bounded to the published matrix and pre-1.0 policy.",
-            "El código, la documentación, los paquetes de crates.io, los builds por plataforma, los checksums, la postura de seguridad y la evidencia R0-R7 coinciden en el release público 0.0.1. El soporte se limita deliberadamente a la matriz publicada y a la política pre-1.0.",
+            "Source, documentation, crates.io packages, platform builds, checksums, security posture, and R0-R7 evidence agree on the 0.0.1 public preview release. Support is intentionally bounded to the published matrix and pre-1.0 policy.",
+            "El código, la documentación, los paquetes de crates.io, los builds por plataforma, los checksums, la postura de seguridad y la evidencia R0-R7 coinciden en el release 0.0.1 de preview público. El soporte se limita deliberadamente a la matriz publicada y a la política pre-1.0.",
         )))
         .child(
             el("div")
@@ -1097,7 +1097,7 @@ fn security_hero(locale: Locale) -> View {
                 )
                 .child(
                     el("span")
-                        .child("PUBLIC")
+                        .child("PUBLIC PREVIEW")
                         .child(el("small").child(l(locale, "0.0.1 supported", "0.0.1 soportado"))),
                 ),
         )
@@ -1172,8 +1172,8 @@ fn security_posture(locale: Locale) -> View {
                 )))
                 .child(el("p").child(l(
                     locale,
-                    "These numbers describe the public 0.0.1 release and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
-                    "Estas cifras describen el release público 0.0.1 y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
+                    "These numbers describe the 0.0.1 public preview release and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
+                    "Estas cifras describen el release 0.0.1 de preview público y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
                 ))),
         )
         .child(grid)
