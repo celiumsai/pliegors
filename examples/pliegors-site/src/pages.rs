@@ -999,47 +999,776 @@ pub fn changelog(locale: Locale) -> View {
 }
 
 pub fn security(locale: Locale) -> View {
-    let items = [
+    View::Fragment(vec![
+        security_hero(locale),
+        security_posture(locale),
+        security_boundaries(locale),
+        security_evidence(locale),
+        security_supply_chain(locale),
+        security_limitations(locale),
+        security_support(locale),
+        security_report(locale),
+    ])
+}
+
+fn security_hero(locale: Locale) -> View {
+    el("section")
+        .class("rs-security-hero")
+        .child(
+            el("picture")
+                .class("rs-security-hero__media")
+                .child(
+                    el("source")
+                        .attr("type", "image/avif")
+                        .attr("srcset", "/media/pliegors/security-trust.avif"),
+                )
+                .child(
+                    el("img")
+                        .attr("src", "/media/pliegors/security-trust.webp")
+                        .attr(
+                            "alt",
+                            l(
+                                locale,
+                                "Five interlocking planes of glass, metal, stone, resin, and chrome surrounding a protected center",
+                                "Cinco planos de vidrio, metal, piedra, resina y cromo alrededor de un centro protegido",
+                            ),
+                        )
+                        .attr("width", "1600")
+                        .attr("height", "900")
+                        .attr("fetchpriority", "high"),
+                ),
+        )
+        .child(
+            el("div")
+                .class("rs-security-hero__scrim")
+                .attr("aria-hidden", "true"),
+        )
+        .child(
+            el("div")
+                .class("rs-security-hero__register")
+                .child(el("span").child("PLIEGORS / TRUST CENTER"))
+                .child(el("span").child(l(
+                    locale,
+                    "REVIEWED / 2026-07-16",
+                    "REVISADO / 2026-07-16",
+                ))),
+        )
+        .child(
+            el("div")
+                .class("rs-security-hero__content")
+                .child(el("p").class("utility-label").child("SECURITY / R0-R7"))
+                .child(el("h1").child(l(
+                    locale,
+                    "Trust is verified. Not implied.",
+                    "La confianza se verifica. No se presume.",
+                )))
+                .child(el("p").class("rs-security-hero__lead").child(l(
+                    locale,
+                    "PliegoRS treats content, builds, plugins, replay, and distribution as explicit trust boundaries with bounded inputs and inspectable evidence.",
+                    "PliegoRS trata contenido, builds, plugins, replay y distribución como límites explícitos de confianza con entradas acotadas y evidencia inspeccionable.",
+                )))
+                .child(
+                    el("div")
+                        .class("rs-actions")
+                        .child(action(
+                            "mailto:hello@pliegors.dev?subject=SECURITY%3A%20PliegoRS%20report",
+                            l(locale, "Report privately", "Reportar en privado"),
+                            true,
+                        ))
+                        .child(action(
+                            "https://github.com/celiumsai/pliegors/blob/main/SECURITY.md",
+                            l(locale, "Read the policy", "Leer la política"),
+                            false,
+                        )),
+                ),
+        )
+        .child(
+            el("div")
+                .class("rs-security-hero__status")
+                .attr(
+                    "aria-label",
+                    l(locale, "Current security posture", "Postura actual de seguridad"),
+                )
+                .child(
+                    el("span")
+                        .child("19")
+                        .child(el("small").child(l(locale, "findings closed", "hallazgos cerrados"))),
+                )
+                .child(
+                    el("span")
+                        .child("R0–R7")
+                        .child(el("small").child(l(locale, "evidence accepted", "evidencia aceptada"))),
+                )
+                .child(
+                    el("span")
+                        .child("PRIVATE")
+                        .child(el("small").child(l(locale, "no public release", "sin release público"))),
+                ),
+        )
+        .into_view()
+}
+
+fn security_posture(locale: Locale) -> View {
+    let metrics = [
         (
-            l(locale, "Report privately", "Reporta en privado"),
+            "19",
+            l(locale, "Findings closed", "Hallazgos cerrados"),
+            l(locale, "1 P0 · 12 P1 · 6 P2", "1 P0 · 12 P1 · 6 P2"),
+        ),
+        (
+            "0",
             l(
                 locale,
-                "Send reproducible details to hello@pliegors.dev. Do not publish an unpatched exploit.",
-                "Envía detalles reproducibles a hello@pliegors.dev. No publiques un exploit sin corregir.",
+                "Known vulnerable packages",
+                "Paquetes vulnerables conocidos",
+            ),
+            l(
+                locale,
+                "Current audit · 2026-07-16 · 1 maintenance warning",
+                "Auditoría actual · 2026-07-16 · 1 alerta de mantenimiento",
             ),
         ),
         (
-            l(locale, "Trust boundaries", "Límites de confianza"),
+            "5",
             l(
                 locale,
-                "Route output, content inputs, plugin capabilities, replay chains, and release artifacts are validated at explicit boundaries.",
-                "La salida de rutas, entradas de contenido, capacidades de plugins, cadenas de replay y artefactos de release se validan en límites explícitos.",
+                "Native targets reproduced",
+                "Targets nativos reproducidos",
+            ),
+            l(
+                locale,
+                "Two binary replicas per target",
+                "Dos réplicas binarias por target",
             ),
         ),
         (
-            l(locale, "Release integrity", "Integridad de releases"),
+            "15",
+            l(locale, "Signed primary assets", "Assets primarios firmados"),
             l(
                 locale,
-                "Candidates require target checksums, a final manifest, reproducibility evidence, and a private review before publication.",
-                "Los candidatos requieren checksums por target, manifest final, evidencia de reproducibilidad y revisión privada antes de publicarse.",
+                "One exact Ed25519 manifest",
+                "Un manifest Ed25519 de conjunto exacto",
             ),
         ),
     ];
-    framework_page(
-        locale,
-        "SECURITY",
-        l(
-            locale,
-            "Fail loudly at trust boundaries.",
-            "Fallar con claridad en los límites de confianza.",
+    let mut grid = el("dl").class("rs-security-posture__grid");
+    for (value, label, detail) in metrics {
+        grid = grid.child(
+            el("div")
+                .attr("data-reveal", "")
+                .child(el("dt").child(label))
+                .child(el("dd").child(value))
+                .child(el("p").child(detail)),
+        );
+    }
+    el("section")
+        .class("rs-security-posture")
+        .child(
+            el("header")
+                .child(section_code(
+                    "01",
+                    l(locale, "Current posture", "Postura actual"),
+                ))
+                .child(el("h2").child(l(
+                    locale,
+                    "A snapshot with a date, not a permanent promise.",
+                    "Una captura con fecha, no una promesa permanente.",
+                )))
+                .child(el("p").child(l(
+                    locale,
+                    "These numbers describe the accepted private candidate and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
+                    "Estas cifras describen el candidato privado aceptado y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
+                ))),
+        )
+        .child(grid)
+        .child(action(
+            "https://github.com/celiumsai/pliegors/blob/main/docs/26-security-plugins-and-adaptive-media.md",
+            l(locale, "Inspect the hardening review", "Inspeccionar la revisión de seguridad"),
+            false,
+        ))
+        .into_view()
+}
+
+fn security_boundaries(locale: Locale) -> View {
+    let boundaries = [
+        (
+            "01",
+            l(locale, "Filesystem + content", "Filesystem + contenido"),
+            l(
+                locale,
+                "Root capabilities, no-follow opens, canonical confinement, and byte, depth, count, and graph ceilings.",
+                "Capabilities de raíz, aperturas no-follow, confinamiento canónico y límites de bytes, profundidad, cantidad y grafo.",
+            ),
+            locale_path(locale, "/docs/content"),
         ),
-        l(
-            locale,
-            "Security is part of the framework contract, not a launch-week checklist.",
-            "La seguridad es parte del contrato del framework, no una lista para la semana del lanzamiento.",
+        (
+            "02",
+            l(locale, "Build + artifact", "Build + artefacto"),
+            l(
+                locale,
+                "Guarded staging, rollback replacement, exact output receipts, causal graphs, and verification before explanation.",
+                "Staging protegido, reemplazo con rollback, recibos exactos de salida, grafos causales y verificación antes de explicar.",
+            ),
+            locale_path(locale, "/docs/artifact-trust"),
         ),
-        items,
-    )
+        (
+            "03",
+            l(locale, "Plugins + browser", "Plugins + navegador"),
+            l(
+                locale,
+                "Capability admission, same-origin modules, bounded props, serialized updates, reduced motion, and awaited cleanup.",
+                "Admisión por capacidades, módulos same-origin, props acotadas, updates serializados, movimiento reducido y cleanup esperado.",
+            ),
+            locale_path(locale, "/docs/dom-lifecycle"),
+        ),
+        (
+            "04",
+            l(locale, "Replay + sync", "Replay + sync"),
+            l(
+                locale,
+                "Canonical signatures, explicit authority, contiguous cursors, fork rejection, and verified pages before replay.",
+                "Firmas canónicas, autoridad explícita, cursores contiguos, rechazo de forks y páginas verificadas antes del replay.",
+            ),
+            locale_path(locale, "/docs/hyphae-sync"),
+        ),
+        (
+            "05",
+            l(locale, "Release + install", "Release + instalación"),
+            l(
+                locale,
+                "Exact asset sets, two-replica binary agreement, detached Ed25519 signatures, lifecycle smoke tests, and explicit promotion.",
+                "Conjuntos exactos de assets, acuerdo binario de dos réplicas, firmas Ed25519 separadas, smoke tests de lifecycle y promoción explícita.",
+            ),
+            locale_path(locale, "/docs/build-and-deploy"),
+        ),
+    ];
+    let mut list = el("ol").class("rs-security-boundaries__map");
+    for (number, title, body, href) in boundaries {
+        list = list.child(
+            el("li")
+                .attr("data-security-boundary", number)
+                .attr("data-reveal", "")
+                .child(el("span").child(number))
+                .child(el("h3").child(title))
+                .child(el("p").child(body))
+                .child(
+                    el("a")
+                        .attr("href", href)
+                        .child(l(locale, "Open contract", "Abrir contrato"))
+                        .child(el("span").attr("aria-hidden", "true").child("↗")),
+                ),
+        );
+    }
+    el("section")
+        .class("rs-security-boundaries")
+        .child(
+            el("header")
+                .child(section_code(
+                    "02",
+                    l(locale, "Trust topology", "Topología de confianza"),
+                ))
+                .child(el("h2").child(l(
+                    locale,
+                    "Five boundaries. No invisible handoff.",
+                    "Cinco límites. Ningún traspaso invisible.",
+                )))
+                .child(el("p").child(l(
+                    locale,
+                    "A value becomes trusted only after the boundary that owns its risk has admitted it. Failure stops publication, replay, import, or installation.",
+                    "Un valor sólo se vuelve confiable cuando el límite que controla su riesgo lo admite. Un fallo detiene publicación, replay, import o instalación.",
+                ))),
+        )
+        .child(
+            el("div")
+                .class("rs-security-boundaries__core")
+                .attr("aria-hidden", "true")
+                .child(brand_mark(62, None))
+                .child(el("span").child("FAIL / CLOSED")),
+        )
+        .child(list)
+        .into_view()
+}
+
+fn security_evidence(locale: Locale) -> View {
+    let rows = [
+        (
+            "P0",
+            l(locale, "Destructive output", "Salida destructiva"),
+            l(
+                locale,
+                "Output paths cannot target the project, an ancestor, a link, or an unowned directory.",
+                "Las rutas de salida no pueden apuntar al proyecto, un ancestro, un link ni un directorio sin ownership.",
+            ),
+            "R1 / ARTIFACT TRUST",
+        ),
+        (
+            "P1",
+            l(locale, "Preview confinement", "Confinamiento de preview"),
+            l(
+                locale,
+                "Loopback by default, bounded workers and queue, finite heartbeats, no linked-file traversal.",
+                "Loopback por defecto, workers y cola acotados, heartbeats finitos y sin traversal mediante links.",
+            ),
+            "SECURITY / REVIEW",
+        ),
+        (
+            "P1",
+            l(locale, "Adapter races", "Carreras de adapters"),
+            l(
+                locale,
+                "Generation tokens, serialized updates, cancellation, terminal guards, and awaited teardown prevent revival after disposal.",
+                "Tokens de generación, updates serializados, cancelación, guards terminales y teardown esperado impiden revivir tras dispose.",
+            ),
+            "R4 / DOM LIFECYCLE",
+        ),
+        (
+            "P1",
+            l(locale, "Verified replay", "Replay verificado"),
+            l(
+                locale,
+                "Unknown authorities, invalid signatures, gaps, forks, and unsupported event versions fail before replay state exists.",
+                "Autoridades desconocidas, firmas inválidas, gaps, forks y versiones no soportadas fallan antes de que exista estado de replay.",
+            ),
+            "R2 / VERIFIED SYNC",
+        ),
+        (
+            "P2",
+            l(locale, "Resource exhaustion", "Agotamiento de recursos"),
+            l(
+                locale,
+                "Content, manifests, media recipes, props, graphs, ledgers, sources, and staged output have explicit ceilings.",
+                "Contenido, manifests, recetas de media, props, grafos, ledgers, fuentes y salida staged tienen límites explícitos.",
+            ),
+            "SECURITY / REVIEW",
+        ),
+        (
+            "R6",
+            l(locale, "Distribution mutation", "Mutación de distribución"),
+            l(
+                locale,
+                "Changed bytes, extras, missing files, key drift, sidecar drift, and replica disagreement reject the candidate.",
+                "Bytes alterados, extras, archivos faltantes, drift de key, sidecars o réplicas rechazan el candidato.",
+            ),
+            "R6 / DISTRIBUTION",
+        ),
+    ];
+    let mut body = el("tbody");
+    for (severity, surface, control, evidence) in rows {
+        body = body.child(
+            el("tr")
+                .attr("data-security-evidence", severity)
+                .child(el("td").attr("data-label", "ID").child(severity))
+                .child(
+                    el("th")
+                        .attr("scope", "row")
+                        .attr("data-label", l(locale, "Surface", "Superficie"))
+                        .child(surface),
+                )
+                .child(
+                    el("td")
+                        .attr(
+                            "data-label",
+                            l(locale, "Enforced control", "Control aplicado"),
+                        )
+                        .child(control),
+                )
+                .child(
+                    el("td")
+                        .attr("data-label", l(locale, "Evidence", "Evidencia"))
+                        .child(evidence),
+                )
+                .child(
+                    el("td")
+                        .attr("data-label", l(locale, "State", "Estado"))
+                        .child(l(locale, "CLOSED", "CERRADO")),
+                ),
+        );
+    }
+    el("section")
+        .class("rs-security-evidence")
+        .child(
+            el("header")
+                .child(section_code(
+                    "03",
+                    l(locale, "Evidence ledger", "Ledger de evidencia"),
+                ))
+                .child(el("h2").child(l(
+                    locale,
+                    "Security evidence, not decorative badges.",
+                    "Evidencia de seguridad, no badges decorativos.",
+                )))
+                .child(el("p").child(l(
+                    locale,
+                    "The public ledger summarizes representative controls. The repository preserves the complete threat models, adversarial fixtures, commands, and residual risks.",
+                    "El ledger público resume controles representativos. El repositorio conserva threat models completos, fixtures adversariales, comandos y riesgos residuales.",
+                ))),
+        )
+        .child(
+            el("div")
+                .class("rs-security-evidence__table")
+                .child(
+                    el("table")
+                        .child(
+                            el("thead").child(
+                                el("tr")
+                                    .child(el("th").attr("scope", "col").child("ID"))
+                                    .child(el("th").attr("scope", "col").child(l(locale, "Surface", "Superficie")))
+                                    .child(el("th").attr("scope", "col").child(l(locale, "Enforced control", "Control aplicado")))
+                                    .child(el("th").attr("scope", "col").child(l(locale, "Evidence", "Evidencia")))
+                                    .child(el("th").attr("scope", "col").child(l(locale, "State", "Estado"))),
+                            ),
+                        )
+                        .child(body),
+                ),
+        )
+        .child(
+            el("div")
+                .class("rs-security-evidence__links")
+                .child(action(
+                    "https://github.com/celiumsai/pliegors/blob/main/docs/26-security-plugins-and-adaptive-media.md",
+                    l(locale, "Complete security review", "Revisión completa de seguridad"),
+                    false,
+                ))
+                .child(action(
+                    "https://github.com/celiumsai/pliegors/tree/main/docs/evidence",
+                    l(locale, "R0-R7 evidence", "Evidencia R0-R7"),
+                    false,
+                )),
+        )
+        .into_view()
+}
+
+fn security_supply_chain(locale: Locale) -> View {
+    el("section")
+        .class("rs-security-supply")
+        .child(
+            el("div")
+                .class("rs-security-supply__copy")
+                .child(section_code(
+                    "04",
+                    l(locale, "Release trust", "Confianza del release"),
+                ))
+                .child(el("h2").child(l(
+                    locale,
+                    "The manifest signs the set, not the story.",
+                    "El manifest firma el conjunto, no la historia.",
+                )))
+                .child(el("p").child(l(
+                    locale,
+                    "The accepted candidate binds 15 primary assets, five ordered targets, two binary replicas per target, source commit, sizes, hashes, roles, and a detached Ed25519 signature.",
+                    "El candidato aceptado vincula 15 assets primarios, cinco targets ordenados, dos réplicas binarias por target, commit fuente, tamaños, hashes, roles y una firma Ed25519 separada.",
+                )))
+                .child(
+                    el("dl")
+                        .class("rs-security-supply__facts")
+                        .child(
+                            el("div")
+                                .child(el("dt").child(l(locale, "Key ID", "ID de key")))
+                                .child(el("dd").child("pliegors-candidate-2026-01")),
+                        )
+                        .child(
+                            el("div")
+                                .child(el("dt").child(l(locale, "Algorithm", "Algoritmo")))
+                                .child(el("dd").child("Ed25519")),
+                        )
+                        .child(
+                            el("div")
+                                .child(el("dt").child(l(locale, "Install lifecycle", "Lifecycle de instalación")))
+                                .child(el("dd").child("install → execute → rollback → uninstall")),
+                        ),
+                )
+                .child(el("p").class("rs-security-supply__boundary").child(l(
+                    locale,
+                    "Boundary: there is no public install claim until a GitHub Release publishes the exact sealed bytes and an independent fingerprint bootstrap.",
+                    "Límite: no existe una afirmación pública de instalación hasta que un GitHub Release publique los bytes sellados exactos y un bootstrap independiente del fingerprint.",
+                ))),
+        )
+        .child(
+            el("div")
+                .class("rs-security-supply__verification")
+                .child(el("span").class("utility-label").child("CANDIDATE / TRUST ROOT"))
+                .child(el("code").class("rs-security-fingerprint").child(
+                    "sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250",
+                ))
+                .child(
+                    el("pre")
+                        .attr(
+                            "aria-label",
+                            l(locale, "Release verification command", "Comando de verificación de release"),
+                        )
+                        .child(el("code").child("node scripts/verify-release-bundle.mjs \\\n  --dir release-assets \\\n  --expected-key-fingerprint \\\n  sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250")),
+                )
+                .child(action(
+                    "https://github.com/celiumsai/pliegors/blob/main/docs/33-candidate-distribution-contract.md",
+                    l(locale, "Read the distribution contract", "Leer el contrato de distribución"),
+                    false,
+                )),
+        )
+        .into_view()
+}
+
+fn security_limitations(locale: Locale) -> View {
+    let items = [
+        (
+            "01",
+            l(
+                locale,
+                "External JavaScript is not sandboxed",
+                "JavaScript externo no está sandboxed",
+            ),
+            l(
+                locale,
+                "Capability admission and lifecycle cleanup reduce integration risk; they do not make arbitrary third-party code trustworthy.",
+                "La admisión por capacidades y el cleanup de lifecycle reducen riesgo de integración; no vuelven confiable código arbitrario de terceros.",
+            ),
+        ),
+        (
+            "02",
+            l(
+                locale,
+                "No future server claim",
+                "Sin afirmaciones sobre un server futuro",
+            ),
+            l(
+                locale,
+                "The completed review covers the static Rust/WASM surface. A server runtime, credentials, and product backend require their own threat models.",
+                "La revisión completada cubre la superficie estática Rust/WASM. Un runtime server, credenciales y backend de producto requieren sus propios threat models.",
+            ),
+        ),
+        (
+            "03",
+            l(
+                locale,
+                "Integrity is not authority",
+                "Integridad no es autoridad",
+            ),
+            l(
+                locale,
+                "A content hash detects change. It does not identify a signer, grant permission, or establish provenance without an authority policy.",
+                "Un hash de contenido detecta cambios. No identifica a un firmante, concede permisos ni establece provenance sin una política de autoridad.",
+            ),
+        ),
+        (
+            "04",
+            l(
+                locale,
+                "Candidate is not a public release",
+                "El candidato no es un release público",
+            ),
+            l(
+                locale,
+                "The accepted R6 bundle is private. Network installers still verify archive sidecars and do not independently verify the full signed bundle.",
+                "El bundle R6 aceptado es privado. Los instaladores de red aún verifican sidecars del archivo y no verifican independientemente el bundle firmado completo.",
+            ),
+        ),
+        (
+            "05",
+            l(
+                locale,
+                "One transitive crate is unmaintained",
+                "Un crate transitivo no tiene mantenimiento",
+            ),
+            l(
+                locale,
+                "RustSec RUSTSEC-2026-0173 flags the build-time proc-macro-error2 dependency through rstml. No vulnerability is reported; replacement is tracked before a public release.",
+                "RustSec RUSTSEC-2026-0173 señala la dependencia de build proc-macro-error2 a través de rstml. No reporta una vulnerabilidad; su reemplazo queda rastreado antes de un release público.",
+            ),
+        ),
+    ];
+    let mut grid = el("div").class("rs-security-limitations__grid");
+    for (number, title, body) in items {
+        grid = grid.child(
+            el("article")
+                .attr("data-security-limitation", number)
+                .attr("data-reveal", "")
+                .child(el("span").child(number))
+                .child(el("h3").child(title))
+                .child(el("p").child(body)),
+        );
+    }
+    el("section")
+        .class("rs-security-limitations")
+        .child(
+            el("header")
+                .child(section_code(
+                    "05",
+                    l(locale, "Claim boundary", "Límite de afirmaciones"),
+                ))
+                .child(el("h2").child(l(
+                    locale,
+                    "What PliegoRS does not claim matters too.",
+                    "Lo que PliegoRS no afirma también importa.",
+                )))
+                .child(el("p").child(l(
+                    locale,
+                    "Security documentation becomes dangerous when it turns a scoped control into a universal promise.",
+                    "La documentación de seguridad se vuelve peligrosa cuando convierte un control acotado en una promesa universal.",
+                ))),
+        )
+        .child(grid)
+        .into_view()
+}
+
+fn security_support(locale: Locale) -> View {
+    el("section")
+        .class("rs-security-support")
+        .child(
+            el("div")
+                .class("rs-security-support__versions")
+                .child(section_code(
+                    "06",
+                    l(locale, "Support window", "Ventana de soporte"),
+                ))
+                .child(el("h2").child(l(
+                    locale,
+                    "Supported means named and bounded.",
+                    "Soportado significa nombrado y acotado.",
+                )))
+                .child(
+                    el("table")
+                        .child(
+                            el("thead").child(
+                                el("tr")
+                                    .child(el("th").attr("scope", "col").child(l(locale, "Line", "Línea")))
+                                    .child(el("th").attr("scope", "col").child(l(locale, "Status", "Estado")))
+                                    .child(el("th").attr("scope", "col").child(l(locale, "Security fixes", "Correcciones"))),
+                            ),
+                        )
+                        .child(
+                            el("tbody").child(
+                                el("tr")
+                                    .child(el("th").attr("scope", "row").child("0.0.1 candidate"))
+                                    .child(el("td").child(l(locale, "Private pre-release", "Pre-release privado")))
+                                    .child(el("td").child(l(locale, "Latest accepted candidate and main", "Último candidato aceptado y main"))),
+                            ),
+                        ),
+                )
+                .child(el("p").child(l(
+                    locale,
+                    "After 1.0, this table will identify every maintained release line and end-of-support date.",
+                    "Después de 1.0, esta tabla identificará cada línea mantenida y su fecha de fin de soporte.",
+                ))),
+        )
+        .child(
+            el("div")
+                .class("rs-security-support__advisories")
+                .child(el("span").class("utility-label").child("ADVISORIES / CURRENT"))
+                .child(el("strong").child("00"))
+                .child(el("h2").child(l(
+                    locale,
+                    "No published advisories.",
+                    "Sin advisories publicados.",
+                )))
+                .child(el("p").child(l(
+                    locale,
+                    "There is no public release yet. This is a disclosure status, not a claim that undiscovered vulnerabilities do not exist.",
+                    "Aún no existe un release público. Este es un estado de divulgación, no una afirmación de que no existan vulnerabilidades desconocidas.",
+                )))
+                .child(action(
+                    "https://github.com/celiumsai/pliegors/security/advisories",
+                    l(locale, "Open GitHub advisories", "Abrir advisories en GitHub"),
+                    false,
+                )),
+        )
+        .into_view()
+}
+
+fn security_report(locale: Locale) -> View {
+    let steps = [
+        (
+            "01",
+            l(locale, "Acknowledgment", "Confirmación"),
+            l(
+                locale,
+                "Complete reports: within 3 business days",
+                "Reportes completos: dentro de 3 días hábiles",
+            ),
+        ),
+        (
+            "02",
+            l(locale, "Initial assessment", "Evaluación inicial"),
+            l(
+                locale,
+                "Target: within 7 business days",
+                "Objetivo: dentro de 7 días hábiles",
+            ),
+        ),
+        (
+            "03",
+            l(locale, "Coordinated disclosure", "Divulgación coordinada"),
+            l(
+                locale,
+                "Agree a date after a supported fix exists",
+                "Acordar una fecha después de existir un fix soportado",
+            ),
+        ),
+    ];
+    let mut process = el("ol").class("rs-security-report__process");
+    for (number, title, body) in steps {
+        process = process.child(
+            el("li")
+                .child(el("span").child(number))
+                .child(el("strong").child(title))
+                .child(el("p").child(body)),
+        );
+    }
+    el("section")
+        .class("rs-security-report")
+        .child(
+            el("div")
+                .class("rs-security-report__intro")
+                .child(section_code(
+                    "07",
+                    l(locale, "Private disclosure", "Divulgación privada"),
+                ))
+                .child(el("h2").child(l(
+                    locale,
+                    "Found a boundary that does not hold? Tell us privately.",
+                    "¿Encontraste un límite que no se sostiene? Repórtalo en privado.",
+                )))
+                .child(el("p").child(l(
+                    locale,
+                    "Include the version or commit, affected surface, minimal reproduction, impact, prerequisites, mitigations, and your disclosure preference. Never send unrelated credentials, private source, or personal data.",
+                    "Incluye versión o commit, superficie afectada, reproducción mínima, impacto, prerrequisitos, mitigaciones y tu preferencia de divulgación. Nunca envíes credenciales, código privado o datos personales no relacionados.",
+                )))
+                .child(action(
+                    "mailto:hello@pliegors.dev?subject=SECURITY%3A%20PliegoRS%20report",
+                    "hello@pliegors.dev",
+                    true,
+                )),
+        )
+        .child(
+            el("div")
+                .class("rs-security-report__details")
+                .child(process)
+                .child(
+                    el("div")
+                        .class("rs-security-report__safe-harbor")
+                        .child(el("strong").child(l(locale, "Good-faith research", "Investigación de buena fe")))
+                        .child(el("p").child(l(
+                            locale,
+                            "Research that avoids privacy violations, data destruction, service degradation, and unauthorized access will be handled constructively. This policy never authorizes testing systems you do not own or have permission to test.",
+                            "La investigación que evite violaciones de privacidad, destrucción de datos, degradación de servicio y acceso no autorizado será tratada constructivamente. Esta política nunca autoriza probar sistemas que no te pertenecen o para los que no tienes permiso.",
+                        ))),
+                )
+                .child(
+                    el("div")
+                        .class("rs-security-report__links")
+                        .child(
+                            el("a")
+                                .attr("href", "/.well-known/security.txt")
+                                .child("/.well-known/security.txt")
+                                .child(el("span").attr("aria-hidden", "true").child("↗")),
+                        )
+                        .child(
+                            el("a")
+                                .attr("href", "https://github.com/celiumsai/pliegors/blob/main/SECURITY.md")
+                                .child(l(locale, "Repository security policy", "Política de seguridad del repositorio"))
+                                .child(el("span").attr("aria-hidden", "true").child("↗")),
+                        ),
+                ),
+        )
+        .into_view()
 }
 
 pub fn accessibility(locale: Locale) -> View {

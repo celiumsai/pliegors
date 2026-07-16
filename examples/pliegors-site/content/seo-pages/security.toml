@@ -1,5 +1,5 @@
 key = "security"
-title = { en = "PliegoRS Security | Reporting and Trust Boundaries", es = "Seguridad de PliegoRS | Reportes y límites de confianza" }
-description = { en = "Security reporting, trust boundaries, plugin capability rules, replay verification, artifact integrity, and release requirements for PliegoRS.", es = "Reportes de seguridad, límites de confianza, capacidades de plugins, replay verificado, integridad de artefactos y requisitos de release." }
-image = "/media/pliegors/fold-hero.webp"
-imageAlt = { en = "A precise folded artifact representing PliegoRS trust boundaries", es = "Un artefacto plegado de precisión que representa los límites de confianza de PliegoRS" }
+title = { en = "PliegoRS Security Trust Center | Evidence and Disclosure", es = "Trust Center de PliegoRS | Evidencia y divulgación" }
+description = { en = "Verify the PliegoRS security posture, five trust boundaries, R0-R7 evidence, signed release contract, limitations, support window, and private disclosure process.", es = "Verifica la postura de seguridad de PliegoRS, cinco límites de confianza, evidencia R0-R7, contrato de release firmado, limitaciones, soporte y divulgación privada." }
+image = "/media/pliegors/security-trust.webp"
+imageAlt = { en = "Five interlocking material planes representing explicit PliegoRS trust boundaries", es = "Cinco planos materiales interconectados que representan límites explícitos de confianza de PliegoRS" }

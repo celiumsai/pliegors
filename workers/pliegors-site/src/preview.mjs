@@ -16,6 +16,9 @@ export default {
 
     const response = await env.ASSETS.fetch(request);
     const headers = new Headers(response.headers);
+    if (url.pathname === "/.well-known/security.txt") {
+      headers.set("Content-Type", "text/plain; charset=utf-8");
+    }
     headers.set("X-Robots-Tag", ROBOTS_POLICY);
     return new Response(response.body, {
       status: response.status,

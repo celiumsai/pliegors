@@ -3398,6 +3398,7 @@ fn mime_for(path: &Path) -> &'static str {
         Some("png") => "image/png",
         Some("ico") => "image/x-icon",
         Some("json" | "webmanifest") => "application/json; charset=utf-8",
+        Some("txt") => "text/plain; charset=utf-8",
         Some("mp4") => "video/mp4",
         Some("woff") => "font/woff",
         Some("woff2") => "font/woff2",
@@ -3408,6 +3409,14 @@ fn mime_for(path: &Path) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_serves_plain_text_with_a_text_mime_type() {
+        assert_eq!(
+            mime_for(Path::new(".well-known/security.txt")),
+            "text/plain; charset=utf-8"
+        );
+    }
 
     #[test]
     fn project_manifest_is_generic_and_strict() {

@@ -193,23 +193,37 @@ fn structured_graph(
             PageType::Collection => "CollectionPage",
         }
     };
+    let mut page_schema = json!({
+        "@type": page_kind,
+        "@id": format!("{url}#webpage"),
+        "url": url,
+        "name": page.title.text(locale),
+        "headline": page.title.text(locale),
+        "description": page.description.text(locale),
+        "inLanguage": locale.language_tag(),
+        "isAccessibleForFree": true,
+        "isPartOf": { "@id": website_id },
+        "mainEntityOfPage": { "@id": format!("{url}#webpage") },
+        "author": { "@id": organization_id },
+        "publisher": { "@id": organization_id },
+        "breadcrumb": { "@id": breadcrumb_id },
+        "primaryImageOfPage": { "@type": "ImageObject", "url": absolute_url(seo, &page.image) },
+    });
+    if base_path.trim_end_matches('/') == "/security" {
+        page_schema["about"] = json!([
+            { "@type": "Thing", "name": "Software supply chain security" },
+            { "@type": "Thing", "name": "Vulnerability disclosure" },
+            { "@type": "Thing", "name": "Web framework trust boundaries" }
+        ]);
+        page_schema["mainEntity"] = json!({
+            "@type": "ContactPoint",
+            "contactType": "security vulnerability reports",
+            "email": seo.contact_email,
+            "availableLanguage": ["en", "es"]
+        });
+    }
     let mut graph = vec![
-        json!({
-            "@type": page_kind,
-            "@id": format!("{url}#webpage"),
-            "url": url,
-            "name": page.title.text(locale),
-            "headline": page.title.text(locale),
-            "description": page.description.text(locale),
-            "inLanguage": locale.language_tag(),
-            "isAccessibleForFree": true,
-            "isPartOf": { "@id": website_id },
-            "mainEntityOfPage": { "@id": format!("{url}#webpage") },
-            "author": { "@id": organization_id },
-            "publisher": { "@id": organization_id },
-            "breadcrumb": { "@id": breadcrumb_id },
-            "primaryImageOfPage": { "@type": "ImageObject", "url": absolute_url(seo, &page.image) },
-        }),
+        page_schema,
         breadcrumb_schema(seo, locale, pathname, page.title.text(locale)),
     ];
     if pathname == "/" || pathname == "/es" {
@@ -342,6 +356,8 @@ fn social_image_dimensions(path: &str) -> Option<(&'static str, &'static str)> {
         Some(("1122", "1402"))
     } else if path.ends_with("/ledger-wide.webp") || path.ends_with("/ledger-wide.avif") {
         Some(("1536", "1024"))
+    } else if path.ends_with("/security-trust.webp") || path.ends_with("/security-trust.avif") {
+        Some(("1600", "900"))
     } else {
         None
     }
@@ -371,6 +387,10 @@ mod tests {
             social_image_dimensions("/media/pliegors/ledger-wide.webp"),
             Some(("1536", "1024"))
         );
+        assert_eq!(
+            social_image_dimensions("/media/pliegors/security-trust.avif"),
+            Some(("1600", "900"))
+        );
         assert_eq!(social_image_dimensions("/media/unknown.webp"), None);
     }
 
@@ -389,5 +409,23 @@ mod tests {
         let entries = graph["@graph"].as_array().unwrap();
         assert_eq!(entries[0]["@type"], "TechArticle");
         assert_eq!(entries[1]["itemListElement"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn security_schema_exposes_disclosure_contact_and_scope() {
+        let content = crate::content::SiteContent::load().unwrap();
+        let page = content.metadata("security").unwrap();
+        let graph = structured_graph(
+            content.seo(),
+            page,
+            Locale::En,
+            "/security",
+            PageType::Standard,
+            RobotsPolicy::IndexFollow,
+        );
+        let entry = &graph["@graph"][0];
+        assert_eq!(entry["mainEntity"]["@type"], "ContactPoint");
+        assert_eq!(entry["mainEntity"]["email"], "hello@pliegors.dev");
+        assert_eq!(entry["about"].as_array().unwrap().len(), 3);
     }
 }

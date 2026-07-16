@@ -106,6 +106,11 @@ for (const route of expected) {
       if (route === "/" || route === "/es") {
         if (!graph.some((node) => node["@type"] === "SoftwareSourceCode")) failures.push(`${route}: missing SoftwareSourceCode schema`);
       }
+      if (route === "/security" || route === "/es/security") {
+        if (graph[0]?.mainEntity?.["@type"] !== "ContactPoint") failures.push(`${route}: missing security ContactPoint schema`);
+        if (graph[0]?.mainEntity?.email !== "hello@pliegors.dev") failures.push(`${route}: security ContactPoint email drift`);
+        if (graph[0]?.about?.length !== 3) failures.push(`${route}: incomplete security topic schema`);
+      }
     } catch {
       failures.push(`${route}: invalid JSON-LD`);
     }
@@ -119,9 +124,12 @@ for (const asset of [
   "assets/pliegors_site_client_bg.wasm",
   "favicon.svg",
   "robots.txt",
+  ".well-known/security.txt",
   "site.webmanifest",
   "sitemap-index.xml",
   "sitemap-0.xml",
+  "media/pliegors/security-trust.avif",
+  "media/pliegors/security-trust.webp",
 ]) {
   try {
     if ((await stat(path.join(root, asset))).size === 0) failures.push(`${asset}: empty`);
@@ -213,6 +221,63 @@ for (const crate of [
   if (!crateGuide.includes(crate)) failures.push(`crate reference: missing ${crate}`);
 }
 
+const securityPages = [
+  ["/security", path.join(root, "security/index.html"), "en"],
+  ["/es/security", path.join(root, "es/security/index.html"), "es"],
+];
+for (const [route, file, language] of securityPages) {
+  const html = await readFile(file, "utf8").catch(() => "");
+  const document = parse(html);
+  const boundaries = elements(document, "li").filter((node) => attribute(node, "data-security-boundary"));
+  const evidence = elements(document, "tr").filter((node) => attribute(node, "data-security-evidence"));
+  const limitations = elements(document, "article").filter((node) => attribute(node, "data-security-limitation"));
+  if (boundaries.length !== 5) failures.push(`${route}: expected five explicit trust boundaries, found ${boundaries.length}`);
+  if (evidence.length < 6) failures.push(`${route}: expected at least six evidence rows, found ${evidence.length}`);
+  if (limitations.length !== 5) failures.push(`${route}: expected five honest claim limitations, found ${limitations.length}`);
+  for (const required of [
+    "19",
+    "R0–R7",
+    "Ed25519",
+    "pliegors-candidate-2026-01",
+    "node scripts/verify-release-bundle.mjs",
+    "--dir release-assets",
+    "sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250",
+    "/.well-known/security.txt",
+    "hello@pliegors.dev",
+    "RUSTSEC-2026-0173",
+  ]) {
+    if (!html.includes(required)) failures.push(`${route}: missing security contract ${required}`);
+  }
+  const languageClaims = language === "es"
+    ? ["3 días hábiles", "7 días hábiles", "Investigación de buena fe", "Sin advisories publicados"]
+    : ["3 business days", "7 business days", "Good-faith research", "No published advisories"];
+  for (const claim of languageClaims) {
+    if (!html.includes(claim)) failures.push(`${route}: missing disclosure claim ${claim}`);
+  }
+  if (!html.includes("/media/pliegors/security-trust.avif") || !html.includes("/media/pliegors/security-trust.webp")) {
+    failures.push(`${route}: missing authored security trust media`);
+  }
+  if (!html.includes("github.com/celiumsai/pliegors/blob/main/SECURITY.md")) {
+    failures.push(`${route}: missing canonical repository security policy`);
+  }
+}
+
+const securityTxt = await readFile(path.join(root, ".well-known/security.txt"), "utf8").catch(() => "");
+const securityTxtLines = securityTxt.trim().split(/\r?\n/);
+for (const field of [
+  "Contact: mailto:hello@pliegors.dev",
+  "Preferred-Languages: en, es",
+  "Canonical: https://pliegors.dev/.well-known/security.txt",
+  "Policy: https://pliegors.dev/security/",
+]) {
+  if (!securityTxtLines.includes(field)) failures.push(`security.txt: missing ${field}`);
+}
+const expiryLine = securityTxtLines.find((line) => line.startsWith("Expires: "));
+const expiry = Date.parse(expiryLine?.slice("Expires: ".length) ?? "");
+if (!Number.isFinite(expiry) || expiry <= Date.now() + (30 * 24 * 60 * 60 * 1000)) {
+  failures.push("security.txt: expiry must remain at least 30 days in the future");
+}
+
 const sitemap = await readFile(path.join(root, "sitemap-0.xml"), "utf8").catch(() => "");
 for (const route of expected.filter((route) => route !== "/404.html")) {
   const canonical = route === "/" ? "/" : `${route.replace(/\/$/, "")}/`;
@@ -292,7 +357,12 @@ for (const [sourcePath, document] of htmlByPath) {
     const documentPath = targetDocument(resolved.pathname);
     const destination = htmlByPath.get(documentPath);
     if (!destination) {
-      failures.push(`${sourcePath}: broken local link ${href}`);
+      const assetPath = path.join(root, resolved.pathname.replace(/^\//, ""));
+      try {
+        if ((await stat(assetPath)).size === 0) failures.push(`${sourcePath}: empty local asset ${href}`);
+      } catch {
+        failures.push(`${sourcePath}: broken local link ${href}`);
+      }
       continue;
     }
     if (resolved.hash) {
