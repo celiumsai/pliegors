@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import path from 'node:path';
 
@@ -144,19 +144,61 @@ async function waitForRegistry(name, expectedVersion) {
 }
 
 async function publishPackage(name, expectedVersion) {
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const result = spawnSync('cargo', ['publish', '--locked', '-p', name], {
-      cwd: root,
-      stdio: 'inherit',
-      env: process.env,
-    });
-    if (result.error) throw result.error;
+  let ordinaryFailures = 0;
+  for (let attempt = 1; attempt <= 40; attempt += 1) {
+    const result = await spawnLiveCapture('cargo', ['publish', '--locked', '-p', name]);
     if (result.status === 0) return;
     if (await registryVersion(name, expectedVersion) === 'ours') return;
-    if (attempt < 3) {
-      console.warn(`retry ${name}: registry dependencies may still be converging`);
-      await new Promise((resolve) => setTimeout(resolve, attempt * 15_000));
+
+    const retryAt = cratesIoRetryAt(result.output);
+    if (retryAt !== undefined) {
+      const waitMs = Math.max(retryAt - Date.now() + 5_000, 5_000);
+      console.warn(`rate-limited ${name}: waiting until ${new Date(retryAt).toISOString()}`);
+      await waitWithHeartbeat(waitMs, name);
+      continue;
     }
+
+    ordinaryFailures += 1;
+    if (ordinaryFailures < 3) {
+      console.warn(`retry ${name}: registry dependencies may still be converging`);
+      await new Promise((resolve) => setTimeout(resolve, ordinaryFailures * 15_000));
+      continue;
+    }
+    break;
   }
-  throw new Error(`cargo publish -p ${name} failed after three attempts`);
+  throw new Error(`cargo publish -p ${name} exhausted its guarded retry budget`);
+}
+
+function spawnLiveCapture(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    for (const stream of [child.stdout, child.stderr]) {
+      stream.on('data', (chunk) => {
+        const text = chunk.toString();
+        output += text;
+        if (stream === child.stdout) process.stdout.write(text);
+        else process.stderr.write(text);
+      });
+    }
+    child.once('error', reject);
+    child.once('close', (status) => resolve({ status, output }));
+  });
+}
+
+function cratesIoRetryAt(output) {
+  const match = output.match(/Please try again after (.+? GMT) and see/u);
+  if (!match) return undefined;
+  const timestamp = Date.parse(match[1]);
+  assert.ok(Number.isFinite(timestamp), `invalid crates.io retry timestamp: ${match[1]}`);
+  return timestamp;
+}
+
+async function waitWithHeartbeat(waitMs, name) {
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline) {
+    const remaining = deadline - Date.now();
+    console.log(`wait ${name}: ${Math.ceil(remaining / 1_000)}s remaining`);
+    await new Promise((resolve) => setTimeout(resolve, Math.min(60_000, remaining)));
+  }
 }
