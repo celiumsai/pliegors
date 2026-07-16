@@ -1,6 +1,6 @@
 # External adapter contract
 
-**Status:** API v1 stable (`pliego-adapters` 0.0.1)
+**Status:** API v1 stable (`pliego-adapters` 0.0.1, runtime `1.1.0`)
 
 PliegoRS renders useful static markup before external browser code is loaded.
 An adapter owns enhancement below one `<pliego-adapter>` root. The framework
@@ -73,6 +73,12 @@ cleanup. Promise-returning callbacks are awaited in that order. `unmount()`
 keeps its synchronous boolean return for v1 compatibility, while any later
 mount waits on the complete teardown barrier.
 
+The runtime creates a provisional lifecycle before invoking plugin `mount`.
+Unmount therefore aborts and executes cleanup already registered through
+`onCleanup` without waiting for a pending `mount` or `update` promise. A cleanup
+returned later by an obsolete mount is executed once; that generation cannot
+become mounted again.
+
 Updates are serialized in invocation order. An update received while a module
 is still importing waits for mount and is then applied. Unmount invalidates the
 queue, so a late resolve or rejection cannot revive a disposed island or change
@@ -120,7 +126,8 @@ this validation after DOM parsing to reject client-side attribute tampering.
 The runtime scans initial markup and nodes added later by `MutationObserver`.
 Removing a root aborts pending imports and disposes mounted state. A microtask
 connectivity check prevents a DOM move from being mistaken for deletion.
-`pagehide` disposes every island; a persisted `pageshow` scans again for bfcache.
+`pagehide` disposes every known island, including a root already detached from
+the current document query; a persisted `pageshow` scans again for bfcache.
 
 ## Admission policy
 
@@ -177,6 +184,11 @@ An island can also dispatch `pliego:adapter-update` with
 The current state is inspectable as `data-pliego-status`: `scheduled`,
 `loading`, `mounted`, `skipped`, `error`, or `disposed`.
 
+Rust-owned DOM does not require application glue for teardown. `MountScope`
+dispatches `pliego:scope-dispose` while its top-level elements are still
+connected. The runtime listens in capture phase, finds adapter descendants, and
+aborts them before PliegoRS removes the owned range.
+
 ## Library recipes
 
 ### GSAP
@@ -215,6 +227,8 @@ framework-owned policy and v1 lifecycle runtimes.
 ```text
 cargo test -p pliego-adapters --locked
 node --test crates/pliego-adapters/tests/runtime-v1.test.mjs
+node scripts/test-adapters-browser.mjs --chromedriver <matching-driver>
+npm run check:wasm-lifetimes
 cargo clippy -p pliego-adapters --all-targets --locked -- -D warnings
 ```
 
@@ -223,5 +237,7 @@ Save-Data/reduced-motion/tier denial before import, live policy changes, mutated
 paths and versions, failure isolation, cleanup exceptions, interaction loading,
 overlapping mount generations, ordered updates, updates during import,
 rejections after unmount, asynchronous teardown barriers, and removal during an
-unresolved dynamic import. First-party source-contract tests require every
+unresolved dynamic import. The Chromium gate covers scope-event propagation,
+never-settling updates, and real MutationObserver removal. First-party
+source-contract tests require every
 maintained adapter to declare API v1 and emit policy before the loader.

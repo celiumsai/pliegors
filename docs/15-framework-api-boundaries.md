@@ -45,8 +45,9 @@ contract.
   stream-bound replay typestate. The authenticated transport, production
   gateway/service, key distribution, durable outbox, and replay persistence are
   not implemented by that client crate.
-- DOM keyed reconciliation and complete arena reclamation still require
-  hardening before application-scale 1.0.
+- DOM ownership, retained keyed reconciliation, strict SSR adoption, and
+  adapter cancellation are complete under the R4 lifecycle contract. Partial
+  or streaming SSR adoption is not implemented.
 - The current production proof is static generation plus Rust/WASM; streaming
   SSR and server functions are not implemented.
 - Package publication and Cloudflare deployment commands are not implemented.

@@ -93,17 +93,18 @@ is *conceptually reusable*; the missing 20% is precisely our thesis.
    retained `State`): components run once, build real DOM, and leaf effects patch
    the exact node. The renderer neither knows nor cares that values come from
    folds. The current M4 renderer proves HTML output, DOM mounting, and dynamic
-   segments; retained keyed reconciliation and hydration remain to be built.
+   segments. R4 adds retained keyed reconciliation, exact lifecycle ownership,
+   and strict versioned SSR adoption with mismatch diagnostics.
 4. **Ownership/disposal tree** with `on_cleanup`: folds and their render effects
    are owned, cancelled and dropped when their UI decision-point re-runs.
 5. **Layer separation.** Leptos proved the reactive graph, the renderer, and the
    scheduler can be independent crates. We adopt that decomposition from day one.
 
-**Leptos's honest costs we design around:** WASM bundle/startup (mitigate with an
-islands-style mode later; apps amortize it), disposed-signal panics (our handles
-are typed against the owner; `try_` variants everywhere), hydration mismatches
-   (deterministic folds remove one source of mismatch, but hydration still needs
-   an explicit DOM adoption algorithm, serialized prefix contract, and tests).
+**Leptos's honest costs we design around:** WASM bundle/startup (mitigated by
+static output and resumable islands), disposed-signal panics (our handles are
+typed against the owner; `try_` variants exist at runtime-controlled
+boundaries), and SSR mismatches (R4 now fails closed through a versioned seed,
+strict preflight, bounded diagnostics, and complete rollback).
 
 ## 3. The PliegoRS thesis and its implementation state
 
@@ -170,9 +171,9 @@ pliegors/
   production target uses `panic=abort`, so a panic is a terminal WASM trap and
   no post-panic recovery is promised for that instance. Reactive unwind safety
   applies only to targets built with unwinding support.
-- **Server/SSR (planned):** the same folds will render HTML server-side. Hydration
-  must be implemented and verified; deterministic reducers alone do not adopt or
-  reconcile server DOM. Cloudflare Workers is the required deployment target.
+- **Server/SSR:** bounded HTML serialization and versioned browser adoption are
+  implemented and verified. Streaming SSR and server functions remain future
+  work. Cloudflare Workers is the required deployment target.
 - **Native later:** the reactive core + folds are DOM-free crates; a native
   renderer is additive.
 
@@ -190,8 +191,8 @@ M2  pliego-reactive: the graph (tracking, coloring, equality gate, ownership)
     NOTE: disposal reclamation, scoped runtimes, and panic safety remain.
 M3  pliego-fold as a first-class node + snapshots
     GATE: reducer consumes only the exact tail from a snapshot.    ← R3 complete
-M4  pliego-dom: HTML/DOM proof                                    ← experimental
-    NEXT: retained/keyed rebuilds, properties/SVG, cleanup, hydration, macros.
+M4  pliego-dom: owned DOM, keyed reconciliation, SSR adoption     ← R4 complete
+    NEXT: broader property ergonomics and component macros.
 M5  Hyphae seam
     protocol v2 client verification boundary                      ← implemented
     NEXT: production auth/tenant gateway, v2 service, durable outbox/replay

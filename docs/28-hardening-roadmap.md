@@ -63,6 +63,10 @@ outside the bounded R2 client contract.
 - Define event taxonomy, authority, conflicts, selective sync, compaction,
   privacy/erasure, effects, receipts, and unknown-version policy explicitly.
 
+The DOM-name, adapter-ownership, keyed-identity, and JavaScript safe-integer
+items in this historical list are closed by R2-R4 evidence. Compiler/tool locks
+and final release-manifest authenticity remain R5-R6 work.
+
 ## Architecture boundary
 
 | Plane | Responsibility |
@@ -107,7 +111,10 @@ implementation and its cross-target gates.
 
 Validate names, make mounted scopes own listeners and nodes, prove keyed
 reconciliation, and demonstrate cleanup plateaus.
-Status: active.
+Status: complete. The [R4 DOM lifecycle contract](31-dom-lifecycle-contract.md)
+and [acceptance evidence](evidence/r4-dom-lifecycle.md) cover exact ownership,
+keyed reconciliation, strict SSR adoption, adapter cancellation, and the
+10,000-cycle browser plateau.
 
 ### R5 - Golden developer experience
 
