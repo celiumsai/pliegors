@@ -53,6 +53,13 @@ fn json_diagnostics_have_a_stable_machine_contract() {
     assert_eq!(value["exit_code"], 2);
     assert_eq!(value["category"], "usage");
     assert!(value["help"].as_str().is_some_and(|help| !help.is_empty()));
+    assert!(value["spans"].is_array());
+    assert!(
+        value["fixes"]
+            .as_array()
+            .is_some_and(|fixes| !fixes.is_empty())
+    );
+    assert_eq!(value["fixes"][0]["applicability"], "manual");
 }
 
 #[test]

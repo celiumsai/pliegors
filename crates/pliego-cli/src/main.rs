@@ -207,6 +207,20 @@ struct CliFailure {
     message: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct DiagnosticSpan {
+    file: Option<String>,
+    line: u64,
+    column: u64,
+    label: &'static str,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FixSuggestion {
+    message: String,
+    applicability: &'static str,
+}
+
 impl CliFailure {
     fn new(kind: FailureKind, message: String) -> Self {
         Self { kind, message }
@@ -236,14 +250,25 @@ fn main() {
 }
 
 fn print_failure(format: DiagnosticFormat, error: &CliFailure) {
+    let spans = diagnostic_spans(&error.message);
+    let fixes = diagnostic_fixes(error);
     match format {
-        DiagnosticFormat::Human => eprintln!(
-            "PLIEGO[{}] {}: {}\nhelp: {}",
-            error.kind.diagnostic_code(),
-            error.kind.label(),
-            error.message,
-            error.kind.help()
-        ),
+        DiagnosticFormat::Human => {
+            eprintln!(
+                "PLIEGO[{}] {}: {}\nhelp: {}",
+                error.kind.diagnostic_code(),
+                error.kind.label(),
+                error.message,
+                error.kind.help()
+            );
+            for span in &spans {
+                let file = span.file.as_deref().unwrap_or(PROJECT_FILE);
+                eprintln!("at: {file}:{}:{} ({})", span.line, span.column, span.label);
+            }
+            for fix in fixes.iter().filter(|fix| fix.message != error.kind.help()) {
+                eprintln!("fix: {}", fix.message);
+            }
+        }
         DiagnosticFormat::Json => eprintln!(
             "{}",
             serde_json::json!({
@@ -252,9 +277,96 @@ fn print_failure(format: DiagnosticFormat, error: &CliFailure) {
                 "category": error.kind.label(),
                 "message": error.message,
                 "help": error.kind.help(),
+                "spans": spans.iter().map(|span| serde_json::json!({
+                    "file": span.file,
+                    "line": span.line,
+                    "column": span.column,
+                    "label": span.label,
+                })).collect::<Vec<_>>(),
+                "fixes": fixes.iter().map(|fix| serde_json::json!({
+                    "message": fix.message,
+                    "applicability": fix.applicability,
+                })).collect::<Vec<_>>(),
             })
         ),
     }
+}
+
+fn diagnostic_spans(message: &str) -> Vec<DiagnosticSpan> {
+    let mut spans = Vec::new();
+    for line in message.lines() {
+        let Some(location) = line.trim().strip_prefix("--> ") else {
+            continue;
+        };
+        if let Some(span) = parse_diagnostic_location(location, "compiler primary") {
+            if !spans.contains(&span) {
+                spans.push(span);
+            }
+        }
+        if spans.len() == 16 {
+            return spans;
+        }
+    }
+    if spans.is_empty() {
+        if let Some((file, location)) = message.split_once(": TOML parse error at line ") {
+            let mut parts = location.split(|character: char| !character.is_ascii_digit());
+            let line = parts.find_map(|value| value.parse::<u64>().ok());
+            let column = parts.find_map(|value| value.parse::<u64>().ok());
+            if let (Some(line), Some(column)) = (line, column) {
+                spans.push(DiagnosticSpan {
+                    file: Some(file.trim().to_owned()),
+                    line,
+                    column,
+                    label: "manifest parse",
+                });
+            }
+        }
+    }
+    spans
+}
+
+fn parse_diagnostic_location(location: &str, label: &'static str) -> Option<DiagnosticSpan> {
+    let mut parts = location.rsplitn(3, ':');
+    let column = parts.next()?.parse::<u64>().ok()?;
+    let line = parts.next()?.parse::<u64>().ok()?;
+    let file = parts.next()?.trim();
+    if file.is_empty() || file.len() > 4096 || line == 0 || column == 0 {
+        return None;
+    }
+    Some(DiagnosticSpan {
+        file: Some(file.to_owned()),
+        line,
+        column,
+        label,
+    })
+}
+
+fn diagnostic_fixes(error: &CliFailure) -> Vec<FixSuggestion> {
+    let mut messages = BTreeSet::from([error.kind.help().to_owned()]);
+    for line in error.message.lines() {
+        let line = line.trim();
+        let suggestion = line
+            .strip_prefix("help: ")
+            .or_else(|| line.strip_prefix("= help: "));
+        let Some(suggestion) = suggestion else {
+            continue;
+        };
+        let suggestion = sanitize_diagnostic(suggestion);
+        let suggestion = suggestion.trim();
+        if !suggestion.is_empty() && suggestion.len() <= 512 {
+            messages.insert(suggestion.to_owned());
+        }
+        if messages.len() == 16 {
+            break;
+        }
+    }
+    messages
+        .into_iter()
+        .map(|message| FixSuggestion {
+            message,
+            applicability: "manual",
+        })
+        .collect()
 }
 
 fn parse_global_options(
@@ -3860,6 +3972,30 @@ mod tests {
         assert_eq!(FailureKind::Build.code(), 5);
         assert_eq!(FailureKind::Artifact.code(), 6);
         assert_eq!(FailureKind::Server.code(), 7);
+    }
+
+    #[test]
+    fn diagnostics_extract_compiler_and_manifest_spans_with_bounded_fixes() {
+        let compiler = "error[E0000]: example\n  --> C:\\work\\src\\main.rs:12:7\nhelp: replace the invalid expression";
+        assert_eq!(
+            diagnostic_spans(compiler),
+            vec![DiagnosticSpan {
+                file: Some(r"C:\work\src\main.rs".to_owned()),
+                line: 12,
+                column: 7,
+                label: "compiler primary",
+            }]
+        );
+        let failure = CliFailure::new(FailureKind::Build, compiler.to_owned());
+        assert!(
+            diagnostic_fixes(&failure)
+                .iter()
+                .any(|fix| fix.message == "replace the invalid expression")
+        );
+
+        let manifest = r"C:\work\pliego.toml: TOML parse error at line 4, column 9";
+        assert_eq!(diagnostic_spans(manifest)[0].line, 4);
+        assert_eq!(diagnostic_spans(manifest)[0].column, 9);
     }
 
     #[test]
