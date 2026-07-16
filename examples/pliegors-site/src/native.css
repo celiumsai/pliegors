@@ -362,12 +362,17 @@ main {
 }
 
 [data-reveal] {
+  opacity: 1;
+  transform: none;
+}
+
+[data-reveal].is-reveal-pending {
   opacity: 0;
   transform: translateY(24px);
   transition: opacity 720ms var(--ease), transform 720ms var(--ease);
 }
 
-[data-reveal].is-visible {
+[data-reveal].is-reveal-pending.is-visible {
   opacity: 1;
   transform: none;
 }
@@ -1755,6 +1760,14 @@ main {
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   transition: background-color 180ms ease, color 180ms ease;
+}
+
+.rs-doc-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.rs-doc-card[hidden] {
+  display: none;
 }
 
 .rs-doc-card:hover,

@@ -362,6 +362,7 @@ mod browser {
                     }
                     let target: Element = entry.target().unchecked_into();
                     target.class_list().add_1("is-visible").ok();
+                    target.class_list().remove_1("is-reveal-pending").ok();
                     observer.unobserve(&target);
                 }
             },
@@ -373,6 +374,7 @@ mod browser {
             IntersectionObserver::new_with_options(callback.as_ref().unchecked_ref(), &options)
         {
             for target in &targets {
+                target.class_list().add_1("is-reveal-pending").ok();
                 observer.observe(target);
             }
             let observed = targets.clone();
@@ -384,6 +386,7 @@ mod browser {
                         observer_for_motion.disconnect();
                         for target in &observed {
                             target.class_list().add_1("is-visible").ok();
+                            target.class_list().remove_1("is-reveal-pending").ok();
                         }
                     }
                 });

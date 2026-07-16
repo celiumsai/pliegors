@@ -1,6 +1,6 @@
 # Framework API boundaries
 
-**Status:** reviewed for the first native theme
+**Status:** accepted private R0-R7 candidate; public SemVer surface not yet frozen
 
 ## Framework-owned
 
@@ -50,7 +50,10 @@ contract.
   or streaming SSR adoption is not implemented.
 - The current production proof is static generation plus Rust/WASM; streaming
   SSR and server functions are not implemented.
-- Package publication and Cloudflare deployment commands are not implemented.
+- Registry publication is not implemented. The maintained Cloudflare static
+  deployment package supports separate protected-preview and public delivery
+  profiles, but deployment and repository visibility remain deliberate release
+  operations outside the framework API.
 
 These limitations are release boundaries, not hidden fallbacks to Astro, Vite,
 Next.js, or another application framework.

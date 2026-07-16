@@ -179,10 +179,19 @@ fn structured_graph(
     let organization_id = format!("{}#organization", seo.origin);
     let website_id = format!("{}#website", seo.origin);
     let breadcrumb_id = format!("{url}#breadcrumb");
-    let page_kind = match page_type {
-        PageType::Standard => "WebPage",
-        PageType::About => "AboutPage",
-        PageType::Collection => "CollectionPage",
+    let localized_path = canonical_pathname(pathname);
+    let base_path = localized_path
+        .strip_prefix("/es/")
+        .map(|path| format!("/{path}"))
+        .unwrap_or_else(|| localized_path.clone());
+    let page_kind = if base_path.starts_with("/docs/") {
+        "TechArticle"
+    } else {
+        match page_type {
+            PageType::Standard => "WebPage",
+            PageType::About => "AboutPage",
+            PageType::Collection => "CollectionPage",
+        }
     };
     let mut graph = vec![
         json!({
@@ -190,9 +199,13 @@ fn structured_graph(
             "@id": format!("{url}#webpage"),
             "url": url,
             "name": page.title.text(locale),
+            "headline": page.title.text(locale),
             "description": page.description.text(locale),
             "inLanguage": locale.language_tag(),
+            "isAccessibleForFree": true,
             "isPartOf": { "@id": website_id },
+            "mainEntityOfPage": { "@id": format!("{url}#webpage") },
+            "author": { "@id": organization_id },
             "publisher": { "@id": organization_id },
             "breadcrumb": { "@id": breadcrumb_id },
             "primaryImageOfPage": { "@type": "ImageObject", "url": absolute_url(seo, &page.image) },
@@ -202,8 +215,25 @@ fn structured_graph(
     if pathname == "/" || pathname == "/es" {
         graph.push(organization_schema(seo, locale));
         graph.push(website_schema(seo, locale));
+        graph.push(software_schema(seo, locale));
     }
     json!({ "@context": "https://schema.org", "@graph": graph })
+}
+
+fn software_schema(seo: &SeoConfig, locale: Locale) -> Value {
+    json!({
+        "@type": "SoftwareSourceCode",
+        "@id": format!("{}#software", seo.origin),
+        "name": seo.site_name,
+        "description": seo.website_description.text(locale),
+        "url": absolute_url(seo, "/"),
+        "codeRepository": seo.repository_url,
+        "license": seo.license_url,
+        "programmingLanguage": "Rust",
+        "runtimePlatform": ["Static HTML", "WebAssembly"],
+        "isAccessibleForFree": true,
+        "author": { "@id": format!("{}#organization", seo.origin) }
+    })
 }
 
 fn organization_schema(seo: &SeoConfig, locale: Locale) -> Value {
@@ -243,7 +273,45 @@ fn breadcrumb_schema(seo: &SeoConfig, locale: Locale, pathname: &str, title: &st
     let mut items = vec![json!({
         "@type": "ListItem", "position": 1, "name": "PliegoRS", "item": absolute_url(seo, home)
     })];
-    if canonical_pathname(pathname) != home {
+    let canonical = canonical_pathname(pathname);
+    let base = canonical
+        .strip_prefix("/es/")
+        .map(|path| format!("/{path}"))
+        .unwrap_or_else(|| canonical.clone());
+    let parent = if base.starts_with("/docs/") {
+        Some((
+            if locale.is_spanish() {
+                "Documentación"
+            } else {
+                "Documentation"
+            },
+            if locale.is_spanish() {
+                "/es/docs/"
+            } else {
+                "/docs/"
+            },
+        ))
+    } else if base.starts_with("/legal/") {
+        Some((
+            "Legal",
+            if locale.is_spanish() {
+                "/es/legal/"
+            } else {
+                "/legal/"
+            },
+        ))
+    } else {
+        None
+    };
+    if let Some((name, path)) = parent {
+        items.push(json!({
+            "@type": "ListItem",
+            "position": 2,
+            "name": name,
+            "item": absolute_url(seo, path)
+        }));
+        items.push(json!({ "@type": "ListItem", "position": 3, "name": title, "item": url }));
+    } else if canonical != home {
         items.push(json!({ "@type": "ListItem", "position": 2, "name": title, "item": url }));
     }
     json!({ "@type": "BreadcrumbList", "@id": format!("{url}#breadcrumb"), "itemListElement": items })
@@ -304,5 +372,22 @@ mod tests {
             Some(("1536", "1024"))
         );
         assert_eq!(social_image_dimensions("/media/unknown.webp"), None);
+    }
+
+    #[test]
+    fn documentation_schema_is_technical_and_hierarchical() {
+        let content = crate::content::SiteContent::load().unwrap();
+        let page = content.metadata("docs-crate-reference").unwrap();
+        let graph = structured_graph(
+            content.seo(),
+            page,
+            Locale::En,
+            "/docs/crate-reference",
+            PageType::Standard,
+            RobotsPolicy::IndexFollow,
+        );
+        let entries = graph["@graph"].as_array().unwrap();
+        assert_eq!(entries[0]["@type"], "TechArticle");
+        assert_eq!(entries[1]["itemListElement"].as_array().unwrap().len(), 3);
     }
 }

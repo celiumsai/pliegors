@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "check": "wrangler deploy --dry-run",
-    "deploy": "wrangler deploy"
+    "check:preview": "node --test preview.test.mjs && wrangler deploy --dry-run --config wrangler.preview.jsonc",
+    "deploy": "wrangler deploy",
+    "deploy:public": "wrangler deploy",
+    "deploy:preview": "wrangler deploy --config wrangler.preview.jsonc"
   },
   "devDependencies": {
     "wrangler": "4.110.0"

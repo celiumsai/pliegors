@@ -1,0 +1,5 @@
+key = "docs-hyphae-sync"
+title = { en = "Hyphae verified sync | PliegoRS", es = "Sync verificado con Hyphae | PliegoRS" }
+description = { en = "Connect PliegoRS to optional Hyphae durability through signed attestations, authority policy, fixed snapshots, and verified replay typestate.", es = "Conecta PliegoRS con durabilidad opcional de Hyphae mediante attestations firmadas, política de autoridad, snapshots fijos y typestate de replay verificado." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A precision ledger representing verified PliegoRS and Hyphae synchronization", es = "Un ledger de precisión que representa sincronización verificada entre PliegoRS y Hyphae" }

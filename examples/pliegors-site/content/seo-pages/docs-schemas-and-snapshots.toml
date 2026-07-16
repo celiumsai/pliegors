@@ -1,0 +1,5 @@
+key = "docs-schemas-and-snapshots"
+title = { en = "Schemas and snapshots | PliegoRS", es = "Schemas y snapshots | PliegoRS" }
+description = { en = "Version PliegoRS events, seal adjacent upcasters, bind reducer and codec identity, and restore compatible projection snapshots fail closed.", es = "Versiona eventos PliegoRS, sella upcasters adyacentes, vincula identidades de reducer y codec y restaura snapshots compatibles de forma fail-closed." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A material ledger representing versioned schemas and projection snapshots", es = "Un ledger material que representa schemas versionados y snapshots de proyección" }

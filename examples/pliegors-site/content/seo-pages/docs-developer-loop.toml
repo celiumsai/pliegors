@@ -1,0 +1,5 @@
+key = "docs-developer-loop"
+title = { en = "Developer loop | PliegoRS", es = "Bucle de desarrollo | PliegoRS" }
+description = { en = "Use PliegoRS native file events, typed HMR, causal graphs, why commands, bounded diagnostics, and last-valid-output recovery.", es = "Usa eventos nativos de archivos, HMR tipado, grafos causales, comandos why, diagnósticos limitados y recuperación de la última salida válida en PliegoRS." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A precision causal ledger representing the PliegoRS developer loop", es = "Un ledger causal de precisión que representa el bucle de desarrollo de PliegoRS" }
