@@ -381,23 +381,39 @@ fn scope_dispose_event_and_owned_cleanup_run_before_dom_removal() {
         .into_view();
     let root = mount(&view, host.as_ref()).expect("mount scope-owned adapter");
     let adapter = query(&host, "[data-role=scope-owned-adapter]");
-    let cleanup_order = Rc::clone(&order);
-    let cleanup_connected = Rc::new(Cell::new(false));
-    let cleanup_connected_observer = Rc::clone(&cleanup_connected);
+    let cleanup_connected = Rc::new(Cell::new(0_u8));
+    let first_order = Rc::clone(&order);
+    let first_connected = Rc::clone(&cleanup_connected);
+    let first_adapter = adapter.clone();
     root.scope()
         .on_cleanup(move || {
-            cleanup_connected_observer.set(adapter.is_connected());
-            cleanup_order.borrow_mut().push("cleanup");
+            if first_adapter.is_connected() {
+                first_connected.set(first_connected.get() + 1);
+            }
+            first_order.borrow_mut().push("cleanup-first");
         })
-        .expect("register mount cleanup");
+        .expect("register first mount cleanup");
+    let second_order = Rc::clone(&order);
+    let second_connected = Rc::clone(&cleanup_connected);
+    root.scope()
+        .on_cleanup(move || {
+            if adapter.is_connected() {
+                second_connected.set(second_connected.get() + 1);
+            }
+            second_order.borrow_mut().push("cleanup-second");
+        })
+        .expect("register second mount cleanup");
 
     root.dispose();
     root.dispose();
 
-    assert_eq!(&*order.borrow(), &["event", "cleanup"]);
+    assert_eq!(
+        &*order.borrow(),
+        &["event", "cleanup-second", "cleanup-first"]
+    );
     assert!(event_connected.get(), "scope event ran after disconnection");
     assert!(
-        cleanup_connected.get(),
+        cleanup_connected.get() == 2,
         "owned cleanup ran after disconnection"
     );
     assert!(!host.has_child_nodes());
