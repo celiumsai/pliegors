@@ -117,12 +117,31 @@ and does not promise post-panic recovery in the browser. Runtime recovery
 guarantees apply to unwind-capable targets. The R0 WASM EH suite is a separate
 Node.js verification path and is not part of the production client pipeline.
 
-`pliego dev [port]` performs a build, serves the output on `127.0.0.1`, watches
-project files, and rebuilds after a debounced change. A failed rebuild leaves
-the last valid site available and the watcher alive. Development HTML receives
-a small EventSource hook that reloads after the next successful build; this
-hook is never written to production output. Generated directories (`target`,
-`node_modules`, `.git`, and the configured output) are excluded from watching.
+`pliego dev [port]` performs a build, serves the output on `127.0.0.1`, and
+subscribes to the operating system's recursive filesystem event backend through
+`notify`. Events are debounced for 120 ms without rescanning and hashing the
+project tree. A failed rebuild leaves the last valid site available and the
+watcher alive. Generated directories (`target`, `node_modules`, `.git`, and the
+configured output) are excluded from watching.
+
+Every successful build emits `pliego.graph.json`, a deterministic causal graph
+covered by the artifact receipt. `Page::source(...)` and `Asset::source(...)`
+create precise source edges; an undeclared legacy producer visibly depends on
+`allSources` instead of receiving invented precision. Route outputs form
+`source -> route -> artifact` edges, while standalone assets form direct
+`source -> artifact` edges. `pliego why artifact <path|route>` verifies the
+current receipt and explains that chain. `pliego why-rebuilt` reads the last
+bounded private rebuild record and reports changed sources, invalidated routes,
+affected artifacts, byte-changing artifacts, HMR mode, and receipt transition.
+
+Development HTML receives an EventSource client that consumes typed generation
+payloads. CSS changes replace matching stylesheet URLs; content changes fetch
+and replace the current document body after a scope-disposal event; adapter
+changes dispatch `pliego:adapter-hmr`, whose runtime v1.2 remounts through a
+cache-busted module specifier. Mixed or unhandled changes reload the document.
+The hook is never written to production output, and development responses use
+`Cache-Control: no-store`.
+
 Current SSG coordination entries are sibling
 `.pliego-<output-sha256>-stage-<process>-<sequence>` and
 `.pliego-<output-sha256>-backup-<process>-<sequence>` directories plus the
@@ -131,10 +150,9 @@ collision key of the output leaf, keeping names below filesystem limits and
 making case/Unicode aliases contend on the same lock. Because generated outputs
 and their siblings live below `target`, the watcher ignores that root tree
 wholesale rather than observing publication churn. Nested source directories
-named `target`, `node_modules`, or `.git` remain observable. Snapshots include a
-streaming SHA-256 fingerprint per
-source file, so edits
-remain observable even when byte length and filesystem timestamps coincide.
+named `target`, `node_modules`, or `.git` remain observable. Same-length and
+timestamp-coincident edits remain observable because the OS reports the write
+and the verified build context rehashes source bytes before publication.
 Use `--lan` for deliberate `0.0.0.0` exposure on a trusted network or
 `--host <ip>` for one explicit interface. The reload endpoint has exact routing,
 a 4,096-byte request-target ceiling, and a separate bounded 16-worker/32-request
@@ -151,6 +169,10 @@ and return the project's `404.html` with HTTP 404 for missing paths.
 `pliego inspect` recalculates the configured output and current project evidence
 from disk, then reports the verified receipt prefix and HTML route, payload file,
 and byte totals. It never creates or repairs `Cargo.lock`.
+
+`pliego why artifact <path|route>` requires a current verified build and fails
+closed when the graph, output, source set, or receipt disagree. `pliego
+why-rebuilt` becomes available after the first successful development rebuild.
 
 ## Artifact trust and ownership
 

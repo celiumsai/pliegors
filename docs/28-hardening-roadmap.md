@@ -120,6 +120,10 @@ keyed reconciliation, strict SSR adoption, adapter cancellation, and the
 
 Generate event and projection scaffolding, offer progressive operating modes,
 produce compile-time diagnostics, and ship replay/timeline tests in starters.
+Status: complete. The [R5 contract](32-golden-developer-experience.md) and
+[acceptance evidence](evidence/r5-golden-developer-experience.md) cover the
+receipt-bound causal graph, native watcher, typed HMR, explanation commands,
+diagnostic spans/fixes, replayable starter, and measured golden path.
 
 ### R6 - Candidate distribution
 

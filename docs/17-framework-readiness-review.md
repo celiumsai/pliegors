@@ -21,6 +21,9 @@ Rust/WASM sites; not ready for a public compatibility or trust claim.
   acceptance evidence.
 - Exact DOM ownership, retained keyed reconciliation, strict versioned SSR
   adoption, adapter scope cancellation, and 10,000-cycle R4 evidence.
+- A replayable default application, receipt-bound causal build graph, native
+  event watcher, typed CSS/content/adapter HMR, structured diagnostics, and
+  measured install-to-first-replayable-app path.
 - The official PliegoRS site and neutral references as native framework evidence.
 - Manual five-target GitHub Actions candidate workflow and installer lifecycle.
 
@@ -62,7 +65,10 @@ acceptance remain separate gates.
 
 ## Next review
 
-Repeat this review after R5 closes with the measured first-replayable-app golden
-path and developer diagnostics. Client-side R2 closure remains separate from
-production sync readiness. Release readiness is decided against R5-R6, and
-external product credibility against R7, not visual completeness.
+R5 is closed by the [golden developer experience contract](32-golden-developer-experience.md)
+and its [committed acceptance evidence](evidence/r5-golden-developer-experience.md).
+Repeat this review after R6 proves the five candidate targets, final signed
+manifest, installer lifecycle, independent hashes, reproducibility, and a
+golden path that starts from the candidate distribution. Client-side R2 closure
+remains separate from production sync readiness. External product credibility
+is decided against R7, not visual completeness.

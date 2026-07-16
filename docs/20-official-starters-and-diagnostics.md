@@ -1,6 +1,6 @@
 # Official starters and CLI diagnostics
 
-**Status:** DX-05 and DX-06 accepted; official first-use contract revised on 2026-07-14
+**Status:** R5 accepted; official first-use contract revision 2 on 2026-07-16
 
 ## Architecture
 
@@ -33,7 +33,7 @@ to run inside a PliegoRS checkout.
 
 | ID | Revision | Intended use | Capabilities |
 | --- | ---: | --- | --- |
-| `default` | 1 | first PliegoRS project and framework onboarding | SSG, SEO, local guide, branded errors |
+| `default` | 2 | first replayable PliegoRS application | SSG, events, projection, replay tests, branded errors |
 | `minimal` | 1 | studios, portfolios, small authored sites | SSG, SEO, responsive |
 | `editorial` | 1 | journals, archives, research, publishing | SSG, SEO, local media, dark mode |
 | `cinematic` | 1 | films, festivals, visual launches | SSG, SEO, local media, adaptive motion |
@@ -45,10 +45,11 @@ pliego new my-journal --template editorial
 pliego new my-film --template cinematic
 ```
 
-`default` is the explicit CLI default. It ships `/`, `/guide/`, an authored
-`/404.html`, the PliegoRS favicon, complete metadata, a web manifest, crawler
-policy, README, and Apache-2.0 license. The other entries remain opt-in design
-starters rather than silently defining the framework's first-run experience.
+`default` is the explicit CLI default. It ships a typed action, versioned event,
+sealed schema catalog, reducer identity, transactional projection, live versus
+replay test, snapshot-tail test, invalid-action test, `/`, `/guide/`, an
+authored `/404.html`, local identity assets, metadata, and Apache-2.0 license.
+The other entries remain opt-in design starters.
 
 Each generated README identifies the source, identity, domain, metadata, image,
 font, copy, and style files that must be changed before launch. Demonstration
@@ -62,8 +63,10 @@ ships the framework `LICENSE` file.
 
 ## Diagnostics
 
-Human diagnostics include a stable identifier, category, message, and next
-action. Machine consumers can request one JSON object on standard error:
+Human diagnostics include a stable identifier, category, message, next action,
+bounded primary spans when compiler or manifest locations exist, and additional
+fix suggestions. Machine consumers receive the same contract as one JSON object
+with `spans[]` and `fixes[]`; fixes state their `manual` applicability:
 
 ```powershell
 pliego build --diagnostic-format json
@@ -81,39 +84,30 @@ pliego build --diagnostic-format json
 
 `pliego dev` keeps serving when the initial build or a rebuild fails. Document
 requests receive a branded HTTP 500 diagnostic surface containing
-`PLG-BLD-001`, escaped compiler output, a concrete recovery instruction, and a
-live-reload channel. Successful recompilation clears the failure and reloads
-the valid document. Missing routes use the project's authored `/404.html`; when
+`PLG-BLD-001`, escaped compiler output, a concrete recovery instruction, and the
+typed HMR channel. Successful recompilation clears the failure and applies CSS,
+content, adapter, or full-document recovery as classified by the causal graph.
+Missing routes use the project's authored `/404.html`; when
 one is absent, the server returns a branded `PLG-HTTP-404` fallback instead of
 an untyped text response.
 
 ## Acceptance evidence
 
-The original three design starters were generated from the standalone test binary outside the
-framework workspace with `--name "Acceptance <template>"`, then ran
-`pliego check`, two identical `pliego build` passes, and `pliego inspect`.
-
-| Starter | Routes | Files | Bytes | Ledger SHA-256 |
-| --- | ---: | ---: | ---: | --- |
-| default | 3 | 7 | 15,429 | `CF07AF0A3E7A69AAE54A247744A3B818A7F3EFF8A6DCD9BDA717D9C1CB0C19B2` |
-| minimal | 2 | 5 | 7,667 | `240BFA68604A6BFE054ED55DC041A5A4AACA239A2BA339294E84537BC0D29D07` |
-| editorial | 2 | 14 | 1,267,285 | `064B5F1CFB89092E5097FB4EF7A297014D9A41C656064288945916E9C599811E` |
-| cinematic | 2 | 12 | 405,284 | `FBBCAE6AE41CC92DB174BE022DA2880608EBDC6977F0FC1393A69FBA7DA85967` |
-
-The default starter was scaffolded without `--template`, checked, built twice,
-inspected, and produced the identical ledger hash shown above. Ledger hashes
-matched across both builds. Every emitted file matches its ledger,
-every local HTML/CSS reference resolves, former-framework runtime markers are
-absent, canonical routes return HTTP 200, unknown routes return the authored 404,
-and preview output contains no development reload hook.
+The committed [R5 evidence](evidence/r5-golden-developer-experience.md) replaces
+the pre-causal-graph file counts and hashes previously recorded here. The
+standalone default starter is scaffolded outside the workspace, checked, runs
+all three replay tests, builds, verifies, answers `why artifact /`, and is timed
+from release-binary installation through that complete path. The native watcher
+acceptance additionally proves CSS and content HMR plus `why-rebuilt` against a
+real generated project.
 
 Browser acceptance used 1440x1000 desktop and 390x844 mobile viewports. All six
 cases had zero horizontal overflow, zero clipped text, and no failed visible
 images. Editorial lazy images were additionally loaded after a 7,117-pixel
 scroll and all reported their real 1536-pixel intrinsic width.
 
-`pliego-starters` also passes Cargo's packaged-tarball verification: 49 files,
-1.6 MiB compressed. Framework crates explicitly reject registry publication;
+`pliego-starters` also passes Cargo's packaged-tarball verification. Framework
+crates explicitly reject registry publication;
 the distributed CLI instead generates `git + rev` dependencies that resolve
 the same canonical source commit on every machine once the repository opens.
 
