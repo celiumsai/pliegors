@@ -3,6 +3,12 @@
 
 //! Deterministic full-document and static-route generation for PliegoRS.
 
+mod product;
+
+pub use product::{
+    ProductComponent, ProductIsland, ProductRegistry, ProductRegistryError, ProductRoute,
+};
+
 use cap_fs_ext::{DirExt, FollowSymlinks, MetadataExt, OpenOptionsFollowExt, ambient_authority};
 use cap_std::fs::{Dir, OpenOptions as CapOpenOptions};
 use fs2::FileExt;
