@@ -9,19 +9,20 @@
 //! insert it, and only then retire the previous stable range.
 
 use std::cell::{Cell, RefCell};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::rc::{Rc, Weak};
 
-use pliego_reactive::{Owner, OwnerError};
+use pliego_reactive::{Owner, OwnerError, untrack};
 use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
 
 use super::{
-    AttrValue, DirectChildState, DomError, Element, ElementNamespace, ParentContext, ParserContext,
-    RenderError, TagName, View, validate_attribute_value, validate_direct_element,
-    validate_direct_text, validate_parser_adjusted_svg_attribute, validate_parser_adjusted_svg_tag,
+    AttrValue, DirectChildState, DomError, Element, ElementNamespace, KeyedError, KeyedKey,
+    ParentContext, ParserContext, RenderError, TagName, View, keyed::KeyedSpec,
+    validate_attribute_value, validate_direct_element, validate_direct_text,
+    validate_parser_adjusted_svg_attribute, validate_parser_adjusted_svg_tag,
 };
 
 /// Maximum text retained from a browser exception or caller-controlled host ID.
@@ -73,6 +74,7 @@ pub enum MountOperation {
     SetAttribute,
     AddEventListener,
     RemoveEventListener,
+    RestoreFocus,
     RegisterCleanup,
     InstallEffect,
 }
@@ -87,6 +89,7 @@ impl fmt::Display for MountOperation {
             Self::SetAttribute => "set DOM attribute",
             Self::AddEventListener => "add event listener",
             Self::RemoveEventListener => "remove event listener",
+            Self::RestoreFocus => "restore keyed focus",
             Self::RegisterCleanup => "register mount cleanup",
             Self::InstallEffect => "install render effect",
         })
@@ -102,6 +105,7 @@ pub enum MountStructureViolation {
     BoundaryEndNotReachable,
     BoundaryOwnershipMismatch,
     DynamicUpdateReentered,
+    KeyedUpdateReentered,
 }
 
 impl fmt::Display for MountStructureViolation {
@@ -117,6 +121,7 @@ impl fmt::Display for MountStructureViolation {
             Self::DynamicUpdateReentered => {
                 "a dynamic slot update re-entered an active transaction"
             }
+            Self::KeyedUpdateReentered => "a keyed slot update re-entered an active transaction",
         })
     }
 }
@@ -136,6 +141,9 @@ pub enum MountError {
     InvalidView(DomError),
     InvalidRender(RenderError),
     DynamicUpdatePoisoned {
+        cause: Box<MountError>,
+    },
+    KeyedUpdatePoisoned {
         cause: Box<MountError>,
     },
     DiagnosticOverflow {
@@ -176,6 +184,9 @@ impl fmt::Display for MountError {
             Self::InvalidRender(error) => write!(f, "mount would diverge from SSR: {error}"),
             Self::DynamicUpdatePoisoned { cause } => {
                 write!(f, "dynamic slot is terminally poisoned: {cause}")
+            }
+            Self::KeyedUpdatePoisoned { cause } => {
+                write!(f, "keyed slot is terminally poisoned: {cause}")
             }
             Self::DiagnosticOverflow {
                 dropped_recoverable_events,
@@ -220,6 +231,12 @@ impl From<DomError> for MountError {
 impl From<RenderError> for MountError {
     fn from(error: RenderError) -> Self {
         Self::InvalidRender(error)
+    }
+}
+
+impl From<KeyedError> for MountError {
+    fn from(error: KeyedError) -> Self {
+        Self::InvalidRender(error.into())
     }
 }
 
@@ -699,7 +716,9 @@ fn dynamic_update_poisoned(cause: MountError) -> MountError {
 
 fn has_structural_failure(error: &MountError) -> bool {
     match error {
-        MountError::DynamicUpdatePoisoned { cause } => has_structural_failure(cause),
+        MountError::DynamicUpdatePoisoned { cause } | MountError::KeyedUpdatePoisoned { cause } => {
+            has_structural_failure(cause)
+        }
         MountError::Structure { .. } => true,
         _ => false,
     }
@@ -709,6 +728,231 @@ fn dynamic_stable_snapshot(
     state: &Rc<RefCell<DynamicSlotState>>,
 ) -> Result<Option<OwnedRangeSnapshot>, MountError> {
     state.borrow().stable_snapshot()
+}
+
+enum KeyedSlotStatus {
+    Ready,
+    Updating,
+    Poisoned { cause: MountError },
+}
+
+struct KeyedRow {
+    key: KeyedKey,
+    scope: MountScope,
+}
+
+struct KeyedSlotState {
+    status: KeyedSlotStatus,
+    rows: Vec<KeyedRow>,
+}
+
+impl KeyedSlotState {
+    fn new() -> Self {
+        Self {
+            status: KeyedSlotStatus::Ready,
+            rows: Vec::new(),
+        }
+    }
+
+    fn begin_update(&mut self) -> Result<bool, MountError> {
+        match &self.status {
+            KeyedSlotStatus::Ready => {
+                self.status = KeyedSlotStatus::Updating;
+                Ok(true)
+            }
+            KeyedSlotStatus::Updating => {
+                let cause = keyed_update_poisoned(keyed_update_reentered());
+                self.status = KeyedSlotStatus::Poisoned {
+                    cause: cause.clone(),
+                };
+                Err(cause)
+            }
+            KeyedSlotStatus::Poisoned { .. } => Ok(false),
+        }
+    }
+
+    fn ensure_updating(&self) -> Result<(), MountError> {
+        match &self.status {
+            KeyedSlotStatus::Updating => Ok(()),
+            KeyedSlotStatus::Poisoned { cause } => Err(cause.clone()),
+            KeyedSlotStatus::Ready => Err(keyed_update_reentered()),
+        }
+    }
+
+    fn snapshots(&self) -> Result<Vec<OwnedRangeSnapshot>, MountError> {
+        self.rows
+            .iter()
+            .map(|row| row.scope.owned_range_snapshot())
+            .collect()
+    }
+
+    fn validate_owned_nodes_present(&self) -> Result<(), MountError> {
+        self.rows
+            .iter()
+            .try_for_each(|row| row.scope.validate_owned_nodes_present())
+    }
+
+    fn suppress_ownership_mismatch(&self) {
+        for row in &self.rows {
+            row.scope.suppress_cleanup_ownership_mismatch();
+        }
+    }
+
+    fn replace_rows(&mut self, rows: Vec<KeyedRow>) -> Result<Vec<KeyedRow>, MountError> {
+        self.ensure_updating()?;
+        Ok(std::mem::replace(&mut self.rows, rows))
+    }
+
+    fn take_rows(&mut self) -> Vec<KeyedRow> {
+        std::mem::take(&mut self.rows)
+    }
+
+    fn finish_update(&mut self) -> Result<(), MountError> {
+        match &self.status {
+            KeyedSlotStatus::Updating => {
+                self.status = KeyedSlotStatus::Ready;
+                Ok(())
+            }
+            KeyedSlotStatus::Poisoned { cause } => Err(cause.clone()),
+            KeyedSlotStatus::Ready => Err(keyed_update_reentered()),
+        }
+    }
+
+    fn poison(&mut self, error: MountError) -> (MountError, bool) {
+        if let KeyedSlotStatus::Poisoned { cause } = &self.status {
+            return (cause.clone(), false);
+        }
+        let error = keyed_update_poisoned(error);
+        self.status = KeyedSlotStatus::Poisoned {
+            cause: error.clone(),
+        };
+        (error, true)
+    }
+
+    fn fail_update(&mut self, error: MountError, irreversible: bool) -> (MountError, bool, bool) {
+        match &self.status {
+            KeyedSlotStatus::Poisoned { cause } => (cause.clone(), true, false),
+            KeyedSlotStatus::Updating if !irreversible => {
+                self.status = KeyedSlotStatus::Ready;
+                (error, false, false)
+            }
+            KeyedSlotStatus::Updating | KeyedSlotStatus::Ready => {
+                let (error, newly_terminal) = self.poison(error);
+                (error, true, newly_terminal)
+            }
+        }
+    }
+}
+
+fn keyed_update_reentered() -> MountError {
+    MountError::Structure {
+        violation: MountStructureViolation::KeyedUpdateReentered,
+        subject: MountDiagnostic::new("keyed slot"),
+    }
+}
+
+fn keyed_update_poisoned(cause: MountError) -> MountError {
+    match cause {
+        poisoned @ MountError::KeyedUpdatePoisoned { .. } => poisoned,
+        cause => MountError::KeyedUpdatePoisoned {
+            cause: Box::new(cause),
+        },
+    }
+}
+
+fn validate_keyed_layout(
+    outer_start: &web_sys::Comment,
+    outer_end: &web_sys::Comment,
+    rows: &[OwnedRangeSnapshot],
+) -> Result<(), MountError> {
+    validate_boundary_range(outer_start, outer_end, "keyed range")?;
+    let mut cursor = outer_start.next_sibling();
+    for row in rows {
+        validate_node_sequence(&row.start, &row.end, &row.nodes, "keyed row range")?;
+        let first = row
+            .nodes
+            .first()
+            .ok_or_else(|| ownership_mismatch("keyed row range"))?;
+        if !cursor
+            .as_ref()
+            .is_some_and(|node| node.is_same_node(Some(first)))
+        {
+            return Err(ownership_mismatch("keyed range"));
+        }
+        cursor = row.end.next_sibling();
+    }
+    if !cursor
+        .as_ref()
+        .is_some_and(|node| node.is_same_node(Some(outer_end.as_ref())))
+    {
+        return Err(ownership_mismatch("keyed range"));
+    }
+    Ok(())
+}
+
+fn poison_and_retire_keyed(
+    state: &Rc<RefCell<KeyedSlotState>>,
+    parent_cleanup: &Weak<MountCleanup>,
+    outer_start: &web_sys::Comment,
+    outer_end: &web_sys::Comment,
+    errors: &ErrorSlot,
+    cause: MountError,
+) -> MountError {
+    state.borrow().suppress_ownership_mismatch();
+    let (terminal, newly_terminal) = state.borrow_mut().poison(cause);
+    let cleanup_chain = parent_cleanup
+        .upgrade()
+        .and_then(|cleanup| cleanup.live_chain().ok());
+
+    let rows = {
+        let mut state = state.borrow_mut();
+        state.take_rows()
+    };
+    drop(rows);
+    if let Some(cleanup_chain) = cleanup_chain.as_ref() {
+        for cleanup in cleanup_chain {
+            cleanup.forget_dynamic_slot_topology(outer_start, outer_end);
+        }
+    }
+
+    let outer_end_node: &web_sys::Node = outer_end.as_ref();
+    let outer_start_node: &web_sys::Node = outer_start.as_ref();
+    let markers = [outer_end_node, outer_start_node];
+    let mut passes = 0;
+    for pass in 0..MAX_CLEANUP_DRAIN_PASSES {
+        passes = pass + 1;
+        for marker in markers {
+            if let Some(parent) = marker.parent_node() {
+                if let Err(error) = remove_child(&parent, marker, "poisoned keyed boundary") {
+                    errors.record(error);
+                }
+            }
+        }
+        if markers.iter().all(|marker| marker.parent_node().is_none()) {
+            break;
+        }
+    }
+    let remaining_owned_nodes = markers
+        .iter()
+        .filter(|marker| marker.parent_node().is_some())
+        .count();
+    if remaining_owned_nodes == 0 {
+        if let Some(cleanup_chain) = cleanup_chain.as_ref() {
+            for cleanup in cleanup_chain {
+                cleanup.forget_dynamic_boundary_registry(outer_start, outer_end);
+            }
+        }
+    } else {
+        errors.record_terminal(MountError::CleanupDidNotConverge {
+            subject: MountDiagnostic::new("poisoned keyed boundaries"),
+            remaining_owned_nodes,
+            passes,
+        });
+    }
+    if newly_terminal {
+        errors.record_terminal(terminal.clone());
+    }
+    terminal
 }
 
 fn poison_and_retire_corrupted_stable(
@@ -1050,6 +1294,47 @@ impl MountCleanup {
         );
         after_retire.extend_from_slice(&range.owned_top_level[..=start_index]);
         after_retire.extend(candidate.nodes.iter().cloned());
+        after_retire.extend_from_slice(&range.owned_top_level[end_index..]);
+        Ok(Some(DynamicTopologyPlan {
+            before_retire,
+            after_retire,
+        }))
+    }
+
+    fn plan_keyed_replacement(
+        &self,
+        outer_start: &web_sys::Comment,
+        outer_end: &web_sys::Comment,
+        target_nodes: &[web_sys::Node],
+    ) -> Result<Option<DynamicTopologyPlan>, MountError> {
+        let range = self.range.borrow();
+        let Some(range) = range.as_ref() else {
+            return Ok(None);
+        };
+        range.validate_exact()?;
+        let start_index = range
+            .owned_top_level
+            .iter()
+            .position(|node| node.is_same_node(Some(outer_start.as_ref())));
+        let end_index = range
+            .owned_top_level
+            .iter()
+            .position(|node| node.is_same_node(Some(outer_end.as_ref())));
+        let (start_index, end_index) = match (start_index, end_index) {
+            (Some(start_index), Some(end_index)) => (start_index, end_index),
+            (None, None) => return Ok(None),
+            _ => return Err(ownership_mismatch("parent keyed slot")),
+        };
+        if start_index >= end_index {
+            return Err(ownership_mismatch("parent keyed slot"));
+        }
+
+        let before_retire = range.owned_top_level.clone();
+        let mut after_retire = Vec::with_capacity(
+            range.owned_top_level.len() - (end_index - start_index - 1) + target_nodes.len(),
+        );
+        after_retire.extend_from_slice(&range.owned_top_level[..=start_index]);
+        after_retire.extend(target_nodes.iter().cloned());
         after_retire.extend_from_slice(&range.owned_top_level[end_index..]);
         Ok(Some(DynamicTopologyPlan {
             before_retire,
@@ -1407,6 +1692,20 @@ impl DynamicTopologyTransaction {
         let mut entries = Vec::with_capacity(chain.len());
         for cleanup in chain {
             let plan = cleanup.plan_dynamic_replacement(outer_start, outer_end, candidate)?;
+            entries.push(DynamicTopologyEntry { cleanup, plan });
+        }
+        Ok(Self { entries })
+    }
+
+    fn plan_keyed(
+        chain: Vec<Rc<MountCleanup>>,
+        outer_start: &web_sys::Comment,
+        outer_end: &web_sys::Comment,
+        target_nodes: &[web_sys::Node],
+    ) -> Result<Self, MountError> {
+        let mut entries = Vec::with_capacity(chain.len());
+        for cleanup in chain {
+            let plan = cleanup.plan_keyed_replacement(outer_start, outer_end, target_nodes)?;
             entries.push(DynamicTopologyEntry { cleanup, plan });
         }
         Ok(Self { entries })
@@ -2007,6 +2306,7 @@ fn mount_before(
         View::DynView(view) => {
             mount_dynamic_view(document, Rc::clone(view), position, direct, scope)
         }
+        View::Keyed(spec) => mount_keyed_view(document, Rc::clone(spec), position, direct, scope),
     }
 }
 
@@ -2179,6 +2479,394 @@ fn install_listener(
     element
         .add_event_listener_with_callback(event, callback.as_ref().as_ref().unchecked_ref())
         .map_err(|error| dom_error(MountOperation::AddEventListener, event, error))
+}
+
+enum PlannedKeyedRow {
+    Retained {
+        old_index: usize,
+        snapshot: OwnedRangeSnapshot,
+    },
+    Fresh {
+        key: KeyedKey,
+        staged: StagedMount,
+        snapshot: OwnedRangeSnapshot,
+    },
+}
+
+impl PlannedKeyedRow {
+    fn old_index(&self) -> Option<usize> {
+        match self {
+            Self::Retained { old_index, .. } => Some(*old_index),
+            Self::Fresh { .. } => None,
+        }
+    }
+
+    fn snapshot(&self) -> &OwnedRangeSnapshot {
+        match self {
+            Self::Retained { snapshot, .. } | Self::Fresh { snapshot, .. } => snapshot,
+        }
+    }
+}
+
+fn keyed_lis(rows: &[PlannedKeyedRow]) -> Vec<bool> {
+    let mut keep = vec![false; rows.len()];
+    let mut tails = Vec::<usize>::new();
+    let mut tail_positions = Vec::<usize>::new();
+    let mut predecessor = vec![None; rows.len()];
+
+    for (position, old_index) in rows
+        .iter()
+        .enumerate()
+        .filter_map(|(position, row)| row.old_index().map(|index| (position, index)))
+    {
+        let slot = tails.partition_point(|tail| *tail < old_index);
+        if slot > 0 {
+            predecessor[position] = Some(tail_positions[slot - 1]);
+        }
+        if slot == tails.len() {
+            tails.push(old_index);
+            tail_positions.push(position);
+        } else {
+            tails[slot] = old_index;
+            tail_positions[slot] = position;
+        }
+    }
+
+    let Some(mut position) = tail_positions.last().copied() else {
+        return keep;
+    };
+    loop {
+        keep[position] = true;
+        let Some(previous) = predecessor[position] else {
+            break;
+        };
+        position = previous;
+    }
+    keep
+}
+
+fn mount_keyed_view(
+    document: &web_sys::Document,
+    spec: Rc<KeyedSpec>,
+    position: MountPosition<'_>,
+    direct: &mut DirectChildState,
+    scope: &MountScope,
+) -> Result<(), MountError> {
+    if let Some(parent) = position.parent_context {
+        if ["pre", "textarea", "title"]
+            .iter()
+            .any(|unsupported| parent.tag.as_str().eq_ignore_ascii_case(unsupported))
+        {
+            return Err(KeyedError::UnsupportedParent {
+                tag: parent.tag.to_string(),
+            }
+            .into());
+        }
+    }
+
+    let start = document.create_comment("pliego:keyed");
+    let end = document.create_comment("/pliego:keyed");
+    scope.register_node(start.as_ref())?;
+    scope.register_node(end.as_ref())?;
+    insert_before(
+        position.parent,
+        start.as_ref(),
+        position.before,
+        "keyed start boundary",
+    )?;
+    insert_before(
+        position.parent,
+        end.as_ref(),
+        position.before,
+        "keyed end boundary",
+    )?;
+
+    let state = Rc::new(RefCell::new(KeyedSlotState::new()));
+    let parent_cleanup = scope.cleanup_weak()?;
+    let document = document.clone();
+    let errors = scope.errors.fork_origin();
+    let namespace = position.inherited_namespace;
+    let parent_context = position.parent_context.cloned();
+    let guaranteed_prefix_content = direct.has_serialized_content;
+    let initial_error = Rc::new(RefCell::new(None));
+    let initial_error_effect = Rc::clone(&initial_error);
+    let first_run = Rc::new(Cell::new(true));
+    let first_run_effect = Rc::clone(&first_run);
+    #[cfg(test)]
+    let effect_guard = TestResourceGuard::new(TestResourceKind::Effect);
+
+    scope.owner_operation(MountOperation::InstallEffect, move |owner| {
+        owner.effect(move || {
+            #[cfg(test)]
+            let _keep_effect_live = &effect_guard;
+            let is_initial = first_run_effect.replace(false);
+            match state.borrow_mut().begin_update() {
+                Ok(true) => {}
+                Ok(false) => return,
+                Err(error) => {
+                    errors.record_terminal(error.clone());
+                    if is_initial {
+                        *initial_error_effect.borrow_mut() = Some(error);
+                    }
+                    return;
+                }
+            }
+
+            let mut irreversible = false;
+            let mut stable_corrupted = false;
+            let update = (|| {
+                let parent_cleanup = parent_cleanup.upgrade().ok_or(MountError::Reactive {
+                    operation: MountOperation::RegisterCleanup,
+                    source: OwnerError::Disposed,
+                })?;
+                let cleanup_chain = parent_cleanup.active_chain(MountOperation::InsertRange)?;
+                state.borrow().ensure_updating()?;
+
+                let pending = spec.collect()?;
+                for cleanup in &cleanup_chain {
+                    cleanup.ensure_active(MountOperation::InsertRange)?;
+                }
+                state.borrow().ensure_updating()?;
+
+                let old_snapshots = match state.borrow().snapshots() {
+                    Ok(snapshots) => snapshots,
+                    Err(error) => {
+                        stable_corrupted = state.borrow().validate_owned_nodes_present().is_err();
+                        return Err(error);
+                    }
+                };
+                for cleanup in &cleanup_chain {
+                    cleanup.validate_if_attached()?;
+                }
+                if let Err(error) = validate_keyed_layout(&start, &end, &old_snapshots) {
+                    stable_corrupted = true;
+                    return Err(error);
+                }
+
+                let old_indices: HashMap<_, _> = state
+                    .borrow()
+                    .rows
+                    .iter()
+                    .enumerate()
+                    .map(|(index, row)| (row.key.clone(), index))
+                    .collect();
+                let mut planned = Vec::with_capacity(pending.len());
+                for pending_row in pending {
+                    let key = pending_row.key.clone();
+                    if let Some(old_index) = old_indices.get(&key).copied() {
+                        planned.push(PlannedKeyedRow::Retained {
+                            old_index,
+                            snapshot: old_snapshots[old_index].clone(),
+                        });
+                        continue;
+                    }
+
+                    let (built_key, view) = untrack(|| pending_row.build())?;
+                    debug_assert_eq!(key, built_key);
+                    let staged = stage_view(
+                        &document,
+                        &view,
+                        namespace,
+                        parent_context.clone(),
+                        guaranteed_prefix_content,
+                        parent_cleanup.child_ancestry(),
+                        errors.clone(),
+                    )?;
+                    let snapshot = staged.scope.owned_range_snapshot()?;
+                    planned.push(PlannedKeyedRow::Fresh {
+                        key,
+                        staged,
+                        snapshot,
+                    });
+                }
+
+                for cleanup in &cleanup_chain {
+                    cleanup.ensure_active(MountOperation::InsertRange)?;
+                    cleanup.validate_if_attached()?;
+                }
+                state.borrow().ensure_updating()?;
+                let current_snapshots = match state.borrow().snapshots() {
+                    Ok(snapshots) => snapshots,
+                    Err(error) => {
+                        stable_corrupted = state.borrow().validate_owned_nodes_present().is_err();
+                        return Err(error);
+                    }
+                };
+                if let Err(error) = validate_keyed_layout(&start, &end, &current_snapshots) {
+                    stable_corrupted = true;
+                    return Err(error);
+                }
+                let parent = validate_boundary_range(&start, &end, "keyed range")?;
+
+                let target_snapshots: Vec<_> =
+                    planned.iter().map(|row| row.snapshot().clone()).collect();
+                let target_nodes: Vec<_> = target_snapshots
+                    .iter()
+                    .flat_map(|snapshot| snapshot.nodes.iter().cloned())
+                    .collect();
+                let retained_focus = document.active_element().filter(|active| {
+                    active.dyn_ref::<web_sys::HtmlElement>().is_some()
+                        && target_nodes
+                            .iter()
+                            .any(|node| node_is_within(active.as_ref(), node))
+                });
+                let topology = DynamicTopologyTransaction::plan_keyed(
+                    cleanup_chain,
+                    &start,
+                    &end,
+                    &target_nodes,
+                )?;
+                topology.validate_before_retire()?;
+                topology.ensure_active(MountOperation::InsertRange)?;
+                state.borrow().ensure_updating()?;
+
+                let keep = keyed_lis(&planned);
+                let mut retained = vec![false; current_snapshots.len()];
+                for row in &planned {
+                    if let Some(index) = row.old_index() {
+                        retained[index] = true;
+                    }
+                }
+
+                let mut anchor: web_sys::Node = end.clone().into();
+                for (target_index, row) in planned.iter().enumerate().rev() {
+                    if row.old_index().is_some() && keep[target_index] {
+                        anchor = row.snapshot().start.clone().into();
+                        continue;
+                    }
+                    irreversible = true;
+                    match row {
+                        PlannedKeyedRow::Retained { snapshot, .. } => {
+                            for node in &snapshot.nodes {
+                                insert_before(&parent, node, Some(&anchor), "keyed retained row")?;
+                            }
+                        }
+                        PlannedKeyedRow::Fresh { staged, .. } => {
+                            insert_before(
+                                &parent,
+                                staged.fragment.as_ref(),
+                                Some(&anchor),
+                                "keyed fresh row",
+                            )?;
+                        }
+                    }
+                    anchor = row.snapshot().start.clone().into();
+                }
+
+                let retirement = document.create_document_fragment();
+                for (index, snapshot) in current_snapshots.iter().enumerate() {
+                    if retained[index] {
+                        continue;
+                    }
+                    irreversible = true;
+                    for node in &snapshot.nodes {
+                        append_child(retirement.as_ref(), node, "retired keyed row")?;
+                    }
+                }
+
+                if let Some(focused) = retained_focus {
+                    let focus_was_lost = !document
+                        .active_element()
+                        .is_some_and(|active| active.is_same_node(Some(&focused)));
+                    if focus_was_lost {
+                        focused
+                            .dyn_ref::<web_sys::HtmlElement>()
+                            .ok_or_else(|| MountError::Dom {
+                                operation: MountOperation::RestoreFocus,
+                                subject: MountDiagnostic::new("keyed focused descendant"),
+                                detail: MountDiagnostic::new(
+                                    "active element is not an HTMLElement",
+                                ),
+                            })?
+                            .focus()
+                            .map_err(|error| {
+                                dom_error(
+                                    MountOperation::RestoreFocus,
+                                    "keyed focused descendant",
+                                    error,
+                                )
+                            })?;
+                    }
+                }
+
+                topology.ensure_active(MountOperation::InsertRange)?;
+                state.borrow().ensure_updating()?;
+                validate_keyed_layout(&start, &end, &target_snapshots)?;
+                for row in &planned {
+                    row.snapshot()
+                        .start
+                        .parent_node()
+                        .ok_or_else(|| MountError::Structure {
+                            violation: MountStructureViolation::BoundaryDetached,
+                            subject: MountDiagnostic::new("keyed target row"),
+                        })?;
+                }
+                topology.commit_after_retire()?;
+
+                let old_rows = {
+                    let mut state = state.borrow_mut();
+                    state.ensure_updating()?;
+                    state.take_rows()
+                };
+                let mut old_slots: Vec<_> = old_rows.into_iter().map(Some).collect();
+                let mut next_rows = Vec::with_capacity(planned.len());
+                for row in planned {
+                    match row {
+                        PlannedKeyedRow::Retained { old_index, .. } => {
+                            next_rows.push(
+                                old_slots[old_index]
+                                    .take()
+                                    .ok_or_else(|| ownership_mismatch("keyed retained row"))?,
+                            );
+                        }
+                        PlannedKeyedRow::Fresh { key, staged, .. } => {
+                            next_rows.push(KeyedRow {
+                                key,
+                                scope: staged.scope,
+                            });
+                        }
+                    }
+                }
+                let retired_rows: Vec<_> = old_slots.into_iter().flatten().collect();
+                let replaced = state.borrow_mut().replace_rows(next_rows)?;
+                debug_assert!(replaced.is_empty());
+
+                let terminal_checkpoint = errors.terminal_checkpoint();
+                drop(retired_rows);
+                if let Some(error) = errors.terminal_recorded_after(terminal_checkpoint) {
+                    return Err(error);
+                }
+                state.borrow_mut().finish_update()?;
+                Ok::<(), MountError>(())
+            })();
+
+            if let Err(error) = update {
+                let error = if irreversible || stable_corrupted {
+                    poison_and_retire_keyed(&state, &parent_cleanup, &start, &end, &errors, error)
+                } else {
+                    error
+                };
+                if (irreversible || stable_corrupted) && has_structural_failure(&error) {
+                    state.borrow().suppress_ownership_mismatch();
+                }
+                let (error, terminal, newly_terminal) = state
+                    .borrow_mut()
+                    .fail_update(error, irreversible || stable_corrupted);
+                if terminal && newly_terminal {
+                    errors.record_terminal(error.clone());
+                } else if !terminal {
+                    errors.record(error.clone());
+                }
+                if is_initial {
+                    *initial_error_effect.borrow_mut() = Some(error);
+                }
+            }
+        })
+    })?;
+    if let Some(error) = initial_error.borrow_mut().take() {
+        return Err(error);
+    }
+    Ok(())
 }
 
 fn mount_dynamic_view(

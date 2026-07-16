@@ -6,10 +6,11 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use pliego_dom::{
-    DomError, ElementNamespace, IntoView, MountError, MountStructureViolation, RenderError, View,
-    dyn_text, dyn_view, el, mount, text, try_el,
+    DomError, ElementNamespace, IntoView, KeyedError, KeyedKey, MountError,
+    MountStructureViolation, RenderError, View, dyn_text, dyn_view, el, keyed, mount, text, try_el,
 };
 use pliego_reactive::Signal;
+use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -135,6 +136,29 @@ export function definePliegoDisconnectOuterBoundaryMover() {
 }
 
 let pliegoRemoveChildTrap;
+let pliegoInsertBeforeTrap;
+
+export function installPliegoInsertBeforeCounter() {
+  if (pliegoInsertBeforeTrap) throw new Error("Pliego insertBefore trap is already installed");
+  const original = Node.prototype.insertBefore;
+  let calls = 0;
+  const wrapped = function(child, before) {
+    calls += 1;
+    return original.call(this, child, before);
+  };
+  Node.prototype.insertBefore = wrapped;
+  pliegoInsertBeforeTrap = { original, wrapped, calls: () => calls };
+}
+
+export function restorePliegoInsertBeforeCounter() {
+  if (!pliegoInsertBeforeTrap) return 0;
+  const calls = pliegoInsertBeforeTrap.calls();
+  if (Node.prototype.insertBefore === pliegoInsertBeforeTrap.wrapped) {
+    Node.prototype.insertBefore = pliegoInsertBeforeTrap.original;
+  }
+  pliegoInsertBeforeTrap = undefined;
+  return calls;
+}
 
 export function installPliegoRemoveChildTrap(target, externalId, persistent) {
   if (pliegoRemoveChildTrap) throw new Error("Pliego removeChild trap is already installed");
@@ -189,13 +213,21 @@ extern "C" {
     #[wasm_bindgen::prelude::wasm_bindgen(js_name = installPliegoRemoveChildTrap)]
     fn install_remove_child_trap(target: &web_sys::Node, external_id: &str, persistent: bool);
 
+    #[wasm_bindgen::prelude::wasm_bindgen(js_name = installPliegoInsertBeforeCounter)]
+    fn install_insert_before_counter();
+
+    #[wasm_bindgen::prelude::wasm_bindgen(js_name = restorePliegoInsertBeforeCounter)]
+    fn restore_insert_before_counter() -> u32;
+
     #[wasm_bindgen::prelude::wasm_bindgen(js_name = restorePliegoRemoveChildTrap)]
     fn restore_remove_child_trap();
 }
 
 fn has_ownership_mismatch(error: &MountError) -> bool {
     match error {
-        MountError::DynamicUpdatePoisoned { cause } => has_ownership_mismatch(cause),
+        MountError::DynamicUpdatePoisoned { cause } | MountError::KeyedUpdatePoisoned { cause } => {
+            has_ownership_mismatch(cause)
+        }
         MountError::Structure { violation, .. } => {
             *violation == MountStructureViolation::BoundaryOwnershipMismatch
         }
@@ -222,7 +254,9 @@ fn is_recoverable_ownership(error: &MountError) -> bool {
 
 fn has_boundary_structure_error(error: &MountError) -> bool {
     match error {
-        MountError::DynamicUpdatePoisoned { cause } => has_boundary_structure_error(cause),
+        MountError::DynamicUpdatePoisoned { cause } | MountError::KeyedUpdatePoisoned { cause } => {
+            has_boundary_structure_error(cause)
+        }
         MountError::Structure { violation, .. } => matches!(
             violation,
             MountStructureViolation::BoundaryDetached
@@ -241,7 +275,9 @@ fn is_poisoned_by_boundary_structure(error: &MountError) -> bool {
 
 fn has_cleanup_non_convergence(error: &MountError) -> bool {
     match error {
-        MountError::DynamicUpdatePoisoned { cause } => has_cleanup_non_convergence(cause),
+        MountError::DynamicUpdatePoisoned { cause } | MountError::KeyedUpdatePoisoned { cause } => {
+            has_cleanup_non_convergence(cause)
+        }
         MountError::CleanupDidNotConverge { .. } => true,
         _ => false,
     }
@@ -2433,6 +2469,241 @@ fn invalid_initial_mount_is_transactional() {
     ));
     assert!(!host.has_child_nodes());
     remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn keyed_reorder_preserves_identity_focus_listeners_and_row_lifetimes() {
+    let host = test_host();
+    let order = Signal::new(vec![1_u32, 2, 3]);
+    let builds = Rc::new(RefCell::new(Vec::new()));
+    let clicks = Rc::new(RefCell::new(Vec::new()));
+    let observed_builds = Rc::clone(&builds);
+    let observed_clicks = Rc::clone(&clicks);
+    let view = keyed(
+        move || order.get(),
+        |id| *id,
+        move |id| {
+            observed_builds.borrow_mut().push(id);
+            let row_clicks = Rc::clone(&observed_clicks);
+            el("button")
+                .attr("data-key", id.to_string())
+                .on("click", move |_| row_clicks.borrow_mut().push(id))
+                .child(id.to_string())
+                .into_view()
+        },
+    );
+    let root = mount(&view, host.as_ref()).expect("mount keyed rows");
+    let one = query(&host, "[data-key='1']");
+    let two = query(&host, "[data-key='2']");
+    let three = query(&host, "[data-key='3']");
+    two.clone()
+        .dyn_into::<web_sys::HtmlElement>()
+        .expect("button is an HtmlElement")
+        .focus()
+        .expect("focus keyed row");
+
+    install_insert_before_counter();
+    order.set(vec![3, 2, 1]);
+    let reorder_insertions = restore_insert_before_counter();
+
+    assert_eq!(host.text_content().as_deref(), Some("321"));
+    assert_eq!(
+        reorder_insertions, 6,
+        "three-node row ranges should move only outside the retained LIS"
+    );
+    assert!(query(&host, "[data-key='1']").is_same_node(Some(&one)));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&two)));
+    assert!(query(&host, "[data-key='3']").is_same_node(Some(&three)));
+    assert!(
+        document()
+            .active_element()
+            .is_some_and(|active| active.is_same_node(Some(&two))),
+        "keyed reorder lost focus"
+    );
+    two.dispatch_event(&web_sys::Event::new("click").expect("create click"))
+        .expect("dispatch retained listener");
+    assert_eq!(&*clicks.borrow(), &[2]);
+    assert_eq!(&*builds.borrow(), &[1, 2, 3]);
+
+    order.set(vec![3, 4, 2]);
+
+    assert_eq!(host.text_content().as_deref(), Some("342"));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&two)));
+    assert!(query(&host, "[data-key='3']").is_same_node(Some(&three)));
+    assert_eq!(&*builds.borrow(), &[1, 2, 3, 4]);
+    one.dispatch_event(&web_sys::Event::new("click").expect("create detached click"))
+        .expect("dispatch detached listener probe");
+    assert_eq!(&*clicks.borrow(), &[2], "retired row listener survived");
+    assert_eq!(root.last_error(), None);
+
+    root.dispose();
+    assert!(!host.has_child_nodes());
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn keyed_duplicate_update_rolls_back_before_building_and_can_recover() {
+    let host = test_host();
+    let items = Signal::new(vec![(1_u32, 1_u32), (2, 2)]);
+    let builds = Rc::new(RefCell::new(Vec::new()));
+    let observed_builds = Rc::clone(&builds);
+    let view = keyed(
+        move || items.get(),
+        |item| item.1,
+        move |item| {
+            observed_builds.borrow_mut().push(item.1);
+            el("span")
+                .attr("data-key", item.1.to_string())
+                .child(item.0.to_string())
+                .into_view()
+        },
+    );
+    let root = mount(&view, host.as_ref()).expect("mount keyed rollback fixture");
+    let first = query(&host, "[data-key='1']");
+    let second = query(&host, "[data-key='2']");
+
+    items.set(vec![(10, 1), (20, 1)]);
+
+    assert_eq!(host.text_content().as_deref(), Some("12"));
+    assert!(query(&host, "[data-key='1']").is_same_node(Some(&first)));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&second)));
+    assert_eq!(&*builds.borrow(), &[1, 2]);
+    assert!(matches!(
+        root.take_error(),
+        Some(MountError::InvalidRender(RenderError::Keyed(
+            KeyedError::DuplicateKey {
+                key: KeyedKey::Unsigned(1)
+            }
+        )))
+    ));
+
+    items.set(vec![(2, 2), (4, 4)]);
+
+    assert_eq!(host.text_content().as_deref(), Some("24"));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&second)));
+    assert_eq!(&*builds.borrow(), &[1, 2, 4]);
+    assert_eq!(root.last_error(), None);
+    root.dispose();
+    assert!(!host.has_child_nodes());
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn keyed_rows_retain_nested_reactive_scopes_across_reorder_and_removal() {
+    let host = test_host();
+    let order = Signal::new(vec![1_u32, 2]);
+    let revision = Signal::new("a".to_owned());
+    let view = keyed(
+        move || order.get(),
+        |id| *id,
+        move |id| {
+            el("span")
+                .attr("data-key", id.to_string())
+                .child(dyn_text(move || format!("{id}:{}", revision.get())))
+                .into_view()
+        },
+    );
+    let root = mount(&view, host.as_ref()).expect("mount nested keyed fixture");
+    let second = query(&host, "[data-key='2']");
+
+    revision.set("b".to_owned());
+    assert_eq!(host.text_content().as_deref(), Some("1:b2:b"));
+    order.set(vec![2, 1]);
+    assert_eq!(host.text_content().as_deref(), Some("2:b1:b"));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&second)));
+
+    order.set(vec![2]);
+    revision.set("c".to_owned());
+    assert_eq!(host.text_content().as_deref(), Some("2:c"));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&second)));
+    assert_eq!(root.last_error(), None);
+
+    root.dispose();
+    assert!(!host.has_child_nodes());
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn foreign_node_in_keyed_gap_blocks_commit_and_survives_cleanup() {
+    let host = test_host();
+    let order = Signal::new(vec![1_u32, 2]);
+    let view = keyed(
+        move || order.get(),
+        |id| *id,
+        |id| {
+            el("span")
+                .attr("data-key", id.to_string())
+                .child(id.to_string())
+                .into_view()
+        },
+    );
+    let root = mount(&view, host.as_ref()).expect("mount keyed foreign-gap fixture");
+    let first = query(&host, "[data-key='1']");
+    let second = query(&host, "[data-key='2']");
+    let outer_end = direct_comment(&host, "/pliego:keyed");
+    let foreign = document()
+        .create_element("aside")
+        .expect("create foreign gap");
+    foreign
+        .set_attribute("data-role", "keyed-foreign")
+        .expect("mark foreign gap");
+    foreign.set_text_content(Some("foreign"));
+    host.insert_before(&foreign, Some(&outer_end))
+        .expect("insert foreign keyed gap");
+
+    order.set(vec![2, 1]);
+
+    assert!(matches!(
+        root.last_error(),
+        Some(MountError::Structure {
+            violation: MountStructureViolation::BoundaryOwnershipMismatch,
+            ..
+        })
+    ));
+    assert_eq!(count_direct_comment(&host, "pliego:keyed"), 1);
+    assert_eq!(count_direct_comment(&host, "/pliego:keyed"), 1);
+    assert_eq!(host.text_content().as_deref(), Some("12foreign"));
+    assert!(query(&host, "[data-key='1']").is_same_node(Some(&first)));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&second)));
+    assert!(
+        host.query_selector("[data-role=keyed-foreign]")
+            .expect("valid foreign selector")
+            .is_some()
+    );
+
+    root.dispose();
+    assert!(
+        host.first_child()
+            .is_some_and(|node| node.is_same_node(Some(&foreign)))
+            && host
+                .last_child()
+                .is_some_and(|node| node.is_same_node(Some(&foreign)))
+    );
+    host.remove_child(&foreign).expect("remove foreign gap");
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn keyed_rejects_marker_unsafe_parents_without_partial_dom() {
+    for tag in ["pre", "textarea", "title"] {
+        let host = test_host();
+        let view = el(tag).child(keyed(
+            || [1_u32],
+            |item| *item,
+            |item| text(item.to_string()),
+        ));
+
+        let result = mount(&view.into_view(), host.as_ref());
+
+        assert!(matches!(
+            result,
+            Err(MountError::InvalidRender(RenderError::Keyed(
+                KeyedError::UnsupportedParent { tag: ref rejected }
+            ))) if rejected.eq_ignore_ascii_case(tag)
+        ));
+        assert!(!host.has_child_nodes());
+        remove_test_host(&host);
+    }
 }
 
 #[wasm_bindgen_test]

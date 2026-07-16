@@ -24,11 +24,16 @@ use std::rc::Rc;
 
 use pliego_reactive::untrack;
 
+mod keyed;
 mod name;
 
 #[cfg(target_arch = "wasm32")]
 mod mount;
 
+pub use keyed::{
+    IntoKeyedKey, KeyedError, KeyedKey, KeyedStage, MAX_KEYED_BYTES, MAX_KEYED_ITEMS,
+    MAX_KEYED_TEXT_BYTES, keyed, try_keyed,
+};
 pub use name::{
     AttributeName, ElementNamespace, EventName, MAX_DOM_NAME_BYTES, NameError, NameKind,
     NameViolation, TagName,
@@ -70,6 +75,8 @@ pub enum View {
     /// A reactive subtree: re-built (only between its markers) when its
     /// dependencies change. `<Show>`/`<For>` sugar composes on this.
     DynView(Rc<dyn Fn() -> View>),
+    /// A reactive collection reconciled by stable typed keys.
+    Keyed(Rc<keyed::KeyedSpec>),
 }
 
 /// An element under construction / in the tree.
@@ -608,6 +615,7 @@ pub enum RenderError {
     ForbiddenElement {
         tag: String,
     },
+    Keyed(KeyedError),
 }
 
 impl std::fmt::Display for RenderError {
@@ -638,6 +646,7 @@ impl std::fmt::Display for RenderError {
                 f,
                 "element {tag:?} requires a future trusted/parser-aware API"
             ),
+            Self::Keyed(error) => error.fmt(f),
         }
     }
 }
@@ -647,6 +656,12 @@ impl std::error::Error for RenderError {}
 impl From<DomError> for RenderError {
     fn from(error: DomError) -> Self {
         Self::InvalidAttribute(error)
+    }
+}
+
+impl From<KeyedError> for RenderError {
+    fn from(error: KeyedError) -> Self {
+        Self::Keyed(error)
     }
 }
 
@@ -921,6 +936,33 @@ fn write_html(
                 state,
                 output,
             )
+        }
+        View::Keyed(spec) => {
+            if let Some(parent) = parent {
+                let tag = parent.tag.as_str();
+                if ["pre", "textarea", "title"]
+                    .iter()
+                    .any(|unsupported| tag.eq_ignore_ascii_case(unsupported))
+                {
+                    return Err(KeyedError::UnsupportedParent {
+                        tag: parent.tag.to_string(),
+                    }
+                    .into());
+                }
+            }
+            for row in untrack(|| spec.collect())? {
+                let (_key, row) = untrack(|| row.build())?;
+                write_html(
+                    &row,
+                    inherited_namespace,
+                    depth + 1,
+                    parent,
+                    direct,
+                    state,
+                    output,
+                )?;
+            }
+            Ok(())
         }
         View::Element(element) => {
             if is_forbidden_element(element.tag.as_str()) {
