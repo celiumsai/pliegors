@@ -298,14 +298,33 @@ const installerSources = {
   shell: readFileSync(path.join(root, 'scripts/install.sh'), 'utf8'),
   powershell: readFileSync(path.join(root, 'scripts/install.ps1'), 'utf8'),
 };
-const githubReleaseBase = 'https://github.com/celiumsai/pliegors/releases/download';
 for (const [name, source] of Object.entries(installerSources)) {
-  assert.ok(source.includes(githubReleaseBase), `${name} installer lacks the GitHub release base`);
+  assert.ok(hasCanonicalReleaseBase(source), `${name} installer lacks the GitHub release base`);
   assert.match(source, /release selector is required/iu, `${name} installer must require a release selector`);
   assert.match(source, /channel latest/iu, `${name} installer must expose the explicit latest channel`);
   assert.ok(source.includes('.sha256'), `${name} installer must fetch a checksum sidecar`);
   assert.match(source, /sha256 mismatch/iu, `${name} installer must fail on checksum mismatch`);
   assert.doesNotMatch(source, /api\.github\.com|latest\.txt|dl\.pliego\.run/iu);
+}
+
+function hasCanonicalReleaseBase(source) {
+  const candidates = source.match(/https:\/\/[^"'\s]+/gu) ?? [];
+  return candidates.some((candidate) => {
+    let url;
+    try {
+      url = new URL(candidate);
+    } catch {
+      return false;
+    }
+    return url.protocol === 'https:' &&
+      url.hostname === 'github.com' &&
+      url.port === '' &&
+      url.username === '' &&
+      url.password === '' &&
+      url.pathname === '/celiumsai/pliegors/releases/download' &&
+      url.search === '' &&
+      url.hash === '';
+  });
 }
 assert.ok(
   installerSources.shell.includes('archive="pliego-$target.zip"'),

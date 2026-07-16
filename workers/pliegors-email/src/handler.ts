@@ -135,7 +135,32 @@ function normalizeMailbox(value: string): string {
 }
 
 function isMailbox(value: string): boolean {
-  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value);
+  if (value.length === 0 || value.length > 254) return false;
+  const separator = value.indexOf("@");
+  if (separator <= 0 || separator !== value.lastIndexOf("@")) return false;
+
+  const local = value.slice(0, separator);
+  const domain = value.slice(separator + 1);
+  if (local.length > 64 || domain.length === 0 || domain.length > 253) return false;
+  for (const character of local) {
+    const code = character.charCodeAt(0);
+    if (code <= 32 || code >= 127 || character === "<" || character === ">") return false;
+  }
+
+  const labels = domain.split(".");
+  if (labels.length < 2) return false;
+  return labels.every((label) => {
+    if (label.length === 0 || label.length > 63 || label.startsWith("-") || label.endsWith("-")) {
+      return false;
+    }
+    for (const character of label) {
+      const code = character.charCodeAt(0);
+      const alpha = (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+      const digit = code >= 48 && code <= 57;
+      if (!alpha && !digit && character !== "-") return false;
+    }
+    return true;
+  });
 }
 
 function errorName(error: unknown): string {

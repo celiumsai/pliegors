@@ -9,7 +9,6 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const githubReleaseBase = 'https://github.com/celiumsai/pliegors/releases/download';
 
 test('GitHub draft release contract is self-verifying', () => {
   const result = spawnSync(process.execPath, ['scripts/check-distribution.mjs'], {
@@ -32,7 +31,7 @@ test('installers require an explicit GitHub release selector', async () => {
     ['install.sh', shell],
     ['install.ps1', powershell],
   ]) {
-    assert.ok(source.includes(githubReleaseBase), `${name} lacks the GitHub release base`);
+    assert.ok(hasCanonicalReleaseBase(source), `${name} lacks the GitHub release base`);
     assert.doesNotMatch(source, /api\.github\.com|latest\.txt|dl\.pliego\.run/u);
     assert.match(source, /release selector is required/iu);
     assert.match(source, /channel latest/iu);
@@ -51,6 +50,26 @@ test('installers require an explicit GitHub release selector', async () => {
   assert.doesNotMatch(shell, /archive="pliego-\$version-/u);
   assert.doesNotMatch(powershell, /\$archive = "pliego-\$Version-/u);
 });
+
+function hasCanonicalReleaseBase(source) {
+  const candidates = source.match(/https:\/\/[^"'\s]+/gu) ?? [];
+  return candidates.some((candidate) => {
+    let url;
+    try {
+      url = new URL(candidate);
+    } catch {
+      return false;
+    }
+    return url.protocol === 'https:' &&
+      url.hostname === 'github.com' &&
+      url.port === '' &&
+      url.username === '' &&
+      url.password === '' &&
+      url.pathname === '/celiumsai/pliegors/releases/download' &&
+      url.search === '' &&
+      url.hash === '';
+  });
+}
 
 test('Unix installer covers the supported release target matrix', async () => {
   const shell = await readFile(path.join(root, 'scripts', 'install.sh'), 'utf8');

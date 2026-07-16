@@ -61,6 +61,20 @@ describe("PliegoRS email Worker", () => {
     expect(message.forward).not.toHaveBeenCalled();
   });
 
+  it("rejects malformed and oversized forwarding mailboxes in linear time", async () => {
+    for (const destination of [
+      "team@example..com",
+      "team@-example.com",
+      `team@example.${"a.".repeat(2_000)}invalid`,
+    ]) {
+      const message = testMessage();
+      await expect(processEmail(message, { FORWARD_TO: destination })).rejects.toThrow(
+        "FORWARD_TO",
+      );
+      expect(message.forward).not.toHaveBeenCalled();
+    }
+  });
+
   it("detects mailing lists and reference floods", () => {
     const list = testMessage({ headers: new Headers({ "List-Id": "project.example" }) });
     expect(autoReplySkipReason(list)).toBe("mailing-list");
