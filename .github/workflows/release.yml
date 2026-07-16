@@ -98,7 +98,11 @@ jobs:
       - name: Build reproducible release binary
         shell: pwsh
         run: |
-          $env:RUSTFLAGS = "-C strip=symbols -C debuginfo=0 --remap-path-prefix=$env:GITHUB_WORKSPACE=/workspace/pliegors"
+          $flags = "-C strip=symbols -C debuginfo=0 --remap-path-prefix=$env:GITHUB_WORKSPACE=/workspace/pliegors"
+          if ('${{ matrix.target }}' -eq 'x86_64-pc-windows-msvc') {
+            $flags = "$flags -C link-arg=/Brepro"
+          }
+          $env:RUSTFLAGS = $flags
           cargo build --locked --release -p pliego-cli --target '${{ matrix.target }}'
 
       - name: Smoke test built CLI

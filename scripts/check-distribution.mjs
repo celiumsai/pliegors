@@ -81,6 +81,7 @@ for (const contract of [
   'workflow_dispatch', "format('candidate:{0}', inputs.tag)", "format('draft:{0}', inputs.tag)",
   'PLIEGORS_SOURCE_REV', 'replica: [1, 2]',
   'ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15-intel', 'macos-15', 'windows-2025',
+  'link-arg=/Brepro',
   'pliego-$env:RELEASE_TARGET.zip', 'retention-days: 7', 'retention-days: 14',
   'CANDIDATE-METADATA.json',
   'PLIEGORS_CANDIDATE_SIGNING_KEY', 'create-release-manifest.mjs',
