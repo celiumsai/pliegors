@@ -20,10 +20,14 @@ use wasm_bindgen::closure::Closure;
 
 use super::{
     AttrValue, DirectChildState, DomError, Element, ElementNamespace, KeyedError, KeyedKey,
-    ParentContext, ParserContext, RenderError, TagName, View, keyed::KeyedSpec,
+    ParentContext, ParserContext, RenderError, RenderLimits, TagName, View, keyed::KeyedSpec,
     validate_attribute_value, validate_direct_element, validate_direct_text,
     validate_parser_adjusted_svg_attribute, validate_parser_adjusted_svg_tag,
 };
+
+mod adopt;
+
+pub use adopt::{adopt, adopt_to, adopt_with_limits};
 
 /// Maximum text retained from a browser exception or caller-controlled host ID.
 pub const MAX_MOUNT_DIAGNOSTIC_BYTES: usize = 256;
@@ -146,6 +150,11 @@ pub enum MountError {
     KeyedUpdatePoisoned {
         cause: Box<MountError>,
     },
+    AdoptionMismatch {
+        path: MountDiagnostic,
+        expected: MountDiagnostic,
+        actual: MountDiagnostic,
+    },
     DiagnosticOverflow {
         dropped_recoverable_events: usize,
         dropped_terminal_events: usize,
@@ -188,6 +197,14 @@ impl fmt::Display for MountError {
             Self::KeyedUpdatePoisoned { cause } => {
                 write!(f, "keyed slot is terminally poisoned: {cause}")
             }
+            Self::AdoptionMismatch {
+                path,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "SSR adoption mismatch at {path}: expected {expected}, found {actual}"
+            ),
             Self::DiagnosticOverflow {
                 dropped_recoverable_events,
                 dropped_terminal_events,
@@ -2545,6 +2562,20 @@ fn keyed_lis(rows: &[PlannedKeyedRow]) -> Vec<bool> {
     keep
 }
 
+fn keyed_sequence_diagnostic(keys: &[KeyedKey]) -> String {
+    let mut preview = String::new();
+    for (index, key) in keys.iter().take(8).enumerate() {
+        if index > 0 {
+            preview.push_str(", ");
+        }
+        preview.push_str(&key.to_string());
+    }
+    if keys.len() > 8 {
+        preview.push_str(", ...");
+    }
+    format!("{} keys [{preview}]", keys.len())
+}
+
 fn mount_keyed_view(
     document: &web_sys::Document,
     spec: Rc<KeyedSpec>,
@@ -2582,12 +2613,37 @@ fn mount_keyed_view(
     )?;
 
     let state = Rc::new(RefCell::new(KeyedSlotState::new()));
+    install_keyed_view_effect(
+        document,
+        spec,
+        start,
+        end,
+        state,
+        position.inherited_namespace,
+        position.parent_context.cloned(),
+        direct.has_serialized_content,
+        scope,
+        scope.errors.fork_origin(),
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn install_keyed_view_effect(
+    document: &web_sys::Document,
+    spec: Rc<KeyedSpec>,
+    start: web_sys::Comment,
+    end: web_sys::Comment,
+    state: Rc<RefCell<KeyedSlotState>>,
+    namespace: ElementNamespace,
+    parent_context: Option<MountParentContext>,
+    guaranteed_prefix_content: bool,
+    scope: &MountScope,
+    errors: ErrorSlot,
+    initial_keys: Option<(String, Vec<KeyedKey>)>,
+) -> Result<(), MountError> {
     let parent_cleanup = scope.cleanup_weak()?;
     let document = document.clone();
-    let errors = scope.errors.fork_origin();
-    let namespace = position.inherited_namespace;
-    let parent_context = position.parent_context.cloned();
-    let guaranteed_prefix_content = direct.has_serialized_content;
     let initial_error = Rc::new(RefCell::new(None));
     let initial_error_effect = Rc::clone(&initial_error);
     let first_run = Rc::new(Cell::new(true));
@@ -2623,6 +2679,23 @@ fn mount_keyed_view(
                 state.borrow().ensure_updating()?;
 
                 let pending = spec.collect()?;
+                if is_initial {
+                    if let Some((path, expected_keys)) = initial_keys.as_ref() {
+                        let actual_keys: Vec<_> =
+                            pending.iter().map(|row| row.key.clone()).collect();
+                        if &actual_keys != expected_keys {
+                            return Err(MountError::AdoptionMismatch {
+                                path: MountDiagnostic::new(path),
+                                expected: MountDiagnostic::new(&keyed_sequence_diagnostic(
+                                    expected_keys,
+                                )),
+                                actual: MountDiagnostic::new(&keyed_sequence_diagnostic(
+                                    &actual_keys,
+                                )),
+                            });
+                        }
+                    }
+                }
                 for cleanup in &cleanup_chain {
                     cleanup.ensure_active(MountOperation::InsertRange)?;
                 }
@@ -2894,12 +2967,39 @@ fn mount_dynamic_view(
     )?;
 
     let state = Rc::new(RefCell::new(DynamicSlotState::new()));
+    install_dynamic_view_effect(
+        document,
+        view,
+        start,
+        end,
+        state,
+        position.inherited_namespace,
+        position.parent_context.cloned(),
+        direct.has_serialized_content,
+        scope,
+        None,
+        scope.errors.fork_origin(),
+    )
+}
+
+type InitialDynamicValidator = Rc<dyn Fn(&View) -> Result<(), MountError>>;
+
+#[allow(clippy::too_many_arguments)]
+fn install_dynamic_view_effect(
+    document: &web_sys::Document,
+    view: Rc<dyn Fn() -> View>,
+    start: web_sys::Comment,
+    end: web_sys::Comment,
+    state: Rc<RefCell<DynamicSlotState>>,
+    namespace: ElementNamespace,
+    parent_context: Option<MountParentContext>,
+    guaranteed_prefix_content: bool,
+    scope: &MountScope,
+    initial_validator: Option<InitialDynamicValidator>,
+    errors: ErrorSlot,
+) -> Result<(), MountError> {
     let parent_cleanup = scope.cleanup_weak()?;
     let document = document.clone();
-    let errors = scope.errors.fork_origin();
-    let namespace = position.inherited_namespace;
-    let parent_context = position.parent_context.cloned();
-    let guaranteed_prefix_content = direct.has_serialized_content;
     let initial_error = Rc::new(RefCell::new(None));
     let initial_error_effect = Rc::clone(&initial_error);
     let first_run = Rc::new(Cell::new(true));
@@ -2969,6 +3069,30 @@ fn mount_dynamic_view(
                     cleanup.validate_if_attached()?;
                 }
                 validate_dynamic_stable_layout(&start, &end, stable_snapshot.as_ref())?;
+
+                if is_initial {
+                    if let Some(validator) = initial_validator.as_ref() {
+                        validator(&fresh)?;
+                        for cleanup in &cleanup_chain {
+                            cleanup.ensure_active(MountOperation::InsertRange)?;
+                            cleanup.validate_if_attached()?;
+                        }
+                        state.borrow().ensure_updating()?;
+                        stable_snapshot = match dynamic_stable_snapshot(&state) {
+                            Ok(snapshot) => snapshot,
+                            Err(error) => {
+                                stable_corrupted = state
+                                    .borrow()
+                                    .validate_stable_owned_nodes_present()
+                                    .is_err();
+                                return Err(error);
+                            }
+                        };
+                        validate_dynamic_stable_layout(&start, &end, stable_snapshot.as_ref())?;
+                        state.borrow_mut().finish_update()?;
+                        return Ok(());
+                    }
+                }
 
                 let candidate = stage_view(
                     &document,

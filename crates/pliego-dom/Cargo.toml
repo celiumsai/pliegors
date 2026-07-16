@@ -15,11 +15,14 @@ pliego-reactive = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
 web-sys = { workspace = true, features = [
     "Window",
     "Document",
     "DocumentFragment",
     "Element",
+    "Attr",
+    "NamedNodeMap",
     "HtmlElement",
     "CharacterData",
     "Text",

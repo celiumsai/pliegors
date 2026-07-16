@@ -556,6 +556,7 @@ dependencies = [
 name = "pliego-dom"
 version = "0.0.1"
 dependencies = [
+ "js-sys",
  "pliego-reactive",
  "wasm-bindgen",
  "wasm-bindgen-test",

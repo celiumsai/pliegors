@@ -42,7 +42,7 @@ pub use name::{
 #[cfg(target_arch = "wasm32")]
 pub use mount::{
     MountDiagnostic, MountError, MountOperation, MountScope, MountStructureViolation, MountedRoot,
-    mount, mount_to, mount_to_body,
+    adopt, adopt_to, adopt_with_limits, mount, mount_to, mount_to_body,
 };
 
 // On the browser target listeners receive the real event; natively (SSR/tests)
@@ -615,6 +615,10 @@ pub enum RenderError {
     ForbiddenElement {
         tag: String,
     },
+    AdoptionUnsupported {
+        parent: String,
+        view: &'static str,
+    },
     Keyed(KeyedError),
 }
 
@@ -646,6 +650,10 @@ impl std::fmt::Display for RenderError {
                 f,
                 "element {tag:?} requires a future trusted/parser-aware API"
             ),
+            Self::AdoptionUnsupported { parent, view } => write!(
+                f,
+                "adoptable SSR does not support {view} directly under {parent:?}"
+            ),
             Self::Keyed(error) => error.fmt(f),
         }
     }
@@ -671,9 +679,29 @@ impl From<KeyedError> for RenderError {
 /// passed conservative parser-repair checks, but R4 DOM adoption still performs
 /// a strict preflight before reusing server nodes.
 pub fn try_render_html(view: &View, limits: RenderLimits) -> Result<String, RenderError> {
+    try_render_html_mode(view, limits, RenderMode::Plain)
+}
+
+/// Render a versioned SSR seed that the browser can adopt without rebuilding
+/// the authored DOM nodes.
+///
+/// The output contains inert PliegoRS comment boundaries. On browser targets it
+/// is intended for `adopt`, not for insertion as an arbitrary HTML fragment.
+pub fn try_render_adoptable_html(view: &View, limits: RenderLimits) -> Result<String, RenderError> {
+    try_render_html_mode(view, limits, RenderMode::Adoptable)
+}
+
+fn try_render_html_mode(
+    view: &View,
+    limits: RenderLimits,
+    mode: RenderMode,
+) -> Result<String, RenderError> {
     let mut state = RenderState { limits, nodes: 0 };
     let mut output = BoundedHtml::new(limits.max_output_bytes);
     let mut direct = DirectChildState::default();
+    if mode == RenderMode::Adoptable {
+        output.push_str("<!--pliego:ssr:v1-->")?;
+    }
     write_html(
         view,
         ElementNamespace::Html,
@@ -682,7 +710,11 @@ pub fn try_render_html(view: &View, limits: RenderLimits) -> Result<String, Rend
         &mut direct,
         &mut state,
         &mut output,
+        mode,
     )?;
+    if mode == RenderMode::Adoptable {
+        output.push_str("<!--/pliego:ssr:v1-->")?;
+    }
     Ok(output.finish())
 }
 
@@ -693,6 +725,19 @@ pub fn try_render_html(view: &View, limits: RenderLimits) -> Result<String, Rend
 pub fn render_html(view: &View) -> String {
     try_render_html(view, RenderLimits::default())
         .unwrap_or_else(|error| panic!("SSR validation failed: {error}"))
+}
+
+/// Render an adoptable SSR seed with the default bounded policy.
+#[must_use]
+pub fn render_adoptable_html(view: &View) -> String {
+    try_render_adoptable_html(view, RenderLimits::default())
+        .unwrap_or_else(|error| panic!("adoptable SSR validation failed: {error}"))
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum RenderMode {
+    Plain,
+    Adoptable,
 }
 
 struct RenderState {
@@ -895,6 +940,7 @@ impl ParserContext {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_html(
     view: &View,
     inherited_namespace: ElementNamespace,
@@ -903,13 +949,39 @@ fn write_html(
     direct: &mut DirectChildState,
     state: &mut RenderState,
     output: &mut BoundedHtml,
+    mode: RenderMode,
 ) -> Result<(), RenderError> {
     state.visit(depth)?;
     match view {
-        View::Text(value) => write_text(value, parent, direct, output),
+        View::Text(value) => {
+            let marked = mode == RenderMode::Adoptable && !is_html_rcdata_parent(parent);
+            if marked {
+                output.push_str("<!--pliego:text-->")?;
+            }
+            write_text(value, parent, direct, output)?;
+            if marked {
+                output.push_str("<!--/pliego:text-->")?;
+            }
+            Ok(())
+        }
         View::DynText(f) => {
+            if mode == RenderMode::Adoptable && is_html_rcdata_parent(parent) {
+                return Err(RenderError::AdoptionUnsupported {
+                    parent: parent
+                        .map(|context| context.tag.to_string())
+                        .unwrap_or_else(|| "#root".to_owned()),
+                    view: "dynamic text",
+                });
+            }
             let value = untrack(|| f());
-            write_text(&value, parent, direct, output)
+            if mode == RenderMode::Adoptable {
+                output.push_str("<!--pliego:dyn-text-->")?;
+            }
+            write_text(&value, parent, direct, output)?;
+            if mode == RenderMode::Adoptable {
+                output.push_str("<!--/pliego:dyn-text-->")?;
+            }
+            Ok(())
         }
         View::Fragment(children) => {
             for child in children {
@@ -921,12 +993,24 @@ fn write_html(
                     direct,
                     state,
                     output,
+                    mode,
                 )?;
             }
             Ok(())
         }
         View::DynView(f) => {
+            if mode == RenderMode::Adoptable && is_html_rcdata_parent(parent) {
+                return Err(RenderError::AdoptionUnsupported {
+                    parent: parent
+                        .map(|context| context.tag.to_string())
+                        .unwrap_or_else(|| "#root".to_owned()),
+                    view: "dynamic view",
+                });
+            }
             let inner = untrack(|| f());
+            if mode == RenderMode::Adoptable {
+                output.push_str("<!--pliego:dyn--><!--pliego:mount-->")?;
+            }
             write_html(
                 &inner,
                 inherited_namespace,
@@ -935,7 +1019,12 @@ fn write_html(
                 direct,
                 state,
                 output,
-            )
+                mode,
+            )?;
+            if mode == RenderMode::Adoptable {
+                output.push_str("<!--/pliego:mount--><!--/pliego:dyn-->")?;
+            }
+            Ok(())
         }
         View::Keyed(spec) => {
             if let Some(parent) = parent {
@@ -950,8 +1039,14 @@ fn write_html(
                     .into());
                 }
             }
+            if mode == RenderMode::Adoptable {
+                output.push_str("<!--pliego:keyed-->")?;
+            }
             for row in untrack(|| spec.collect())? {
                 let (_key, row) = untrack(|| row.build())?;
+                if mode == RenderMode::Adoptable {
+                    output.push_str("<!--pliego:row-->")?;
+                }
                 write_html(
                     &row,
                     inherited_namespace,
@@ -960,7 +1055,14 @@ fn write_html(
                     direct,
                     state,
                     output,
+                    mode,
                 )?;
+                if mode == RenderMode::Adoptable {
+                    output.push_str("<!--/pliego:row-->")?;
+                }
+            }
+            if mode == RenderMode::Adoptable {
+                output.push_str("<!--/pliego:keyed-->")?;
             }
             Ok(())
         }
@@ -1024,6 +1126,7 @@ fn write_html(
                     &mut child_state,
                     state,
                     output,
+                    mode,
                 )?;
             }
             output.push_str("</")?;
@@ -1031,6 +1134,15 @@ fn write_html(
             output.push_char('>')
         }
     }
+}
+
+fn is_html_rcdata_parent(parent: Option<ParentContext<'_>>) -> bool {
+    parent.is_some_and(|context| {
+        context.namespace == ElementNamespace::Html
+            && ["textarea", "title"]
+                .iter()
+                .any(|tag| context.tag.as_str().eq_ignore_ascii_case(tag))
+    })
 }
 
 fn write_text(
@@ -1729,6 +1841,47 @@ mod tests {
         assert_eq!(render_html(&v), r#"<div data-count="1">count is 1</div>"#);
         count.set(7);
         assert_eq!(render_html(&v), r#"<div data-count="7">count is 7</div>"#);
+    }
+
+    #[test]
+    fn adoptable_ssr_is_versioned_bounded_and_keeps_plain_html_unchanged() {
+        let count = Signal::new(1_u32);
+        let view = el("div")
+            .attr_dyn("data-count", move || count.get().to_string())
+            .child(dyn_text(move || format!("count:{}", count.get())))
+            .into_view();
+
+        assert_eq!(render_html(&view), r#"<div data-count="1">count:1</div>"#);
+        assert_eq!(
+            render_adoptable_html(&view),
+            r#"<!--pliego:ssr:v1--><div data-count="1"><!--pliego:dyn-text-->count:1<!--/pliego:dyn-text--></div><!--/pliego:ssr:v1-->"#
+        );
+
+        let limits = RenderLimits::new(8, 1, 1_024).unwrap();
+        assert_eq!(
+            try_render_adoptable_html(&text("bounded"), limits).unwrap(),
+            "<!--pliego:ssr:v1--><!--pliego:text-->bounded<!--/pliego:text--><!--/pliego:ssr:v1-->"
+        );
+    }
+
+    #[test]
+    fn adoptable_rcdata_is_static_and_never_serializes_markers_as_text() {
+        let static_view = el("textarea")
+            .child(View::Fragment(vec![text("alpha"), text(" & beta")]))
+            .into_view();
+        assert_eq!(
+            render_adoptable_html(&static_view),
+            "<!--pliego:ssr:v1--><textarea>alpha &amp; beta</textarea><!--/pliego:ssr:v1-->"
+        );
+
+        let dynamic_view = el("textarea")
+            .child(dyn_text(|| "unsafe marker context".to_owned()))
+            .into_view();
+        assert!(matches!(
+            try_render_adoptable_html(&dynamic_view, RenderLimits::default()),
+            Err(RenderError::AdoptionUnsupported { ref parent, view })
+                if parent == "textarea" && view == "dynamic text"
+        ));
     }
 
     /// THE M4 GATE 3: `show` composes over the same reactive state.

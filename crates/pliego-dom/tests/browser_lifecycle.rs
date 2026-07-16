@@ -7,7 +7,8 @@ use std::rc::Rc;
 
 use pliego_dom::{
     DomError, ElementNamespace, IntoView, KeyedError, KeyedKey, MountError,
-    MountStructureViolation, RenderError, View, dyn_text, dyn_view, el, keyed, mount, text, try_el,
+    MountStructureViolation, RenderError, RenderLimits, View, adopt, adopt_with_limits, dyn_text,
+    dyn_view, el, keyed, mount, render_adoptable_html, text, try_el,
 };
 use pliego_reactive::Signal;
 use wasm_bindgen::JsCast;
@@ -2467,6 +2468,329 @@ fn invalid_initial_mount_is_transactional() {
             ..
         })
     ));
+    assert!(!host.has_child_nodes());
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adopt_reuses_static_dom_and_installs_dynamic_text_attributes_and_listeners() {
+    let host = test_host();
+    let count = Signal::new(1_u32);
+    let clicks = Rc::new(Cell::new(0_u32));
+    let observed_clicks = Rc::clone(&clicks);
+    let view = el("button")
+        .attr("data-role", "adopted-control")
+        .attr_dyn("data-count", move || count.get().to_string())
+        .on("click", move |_| {
+            observed_clicks.set(observed_clicks.get() + 1)
+        })
+        .child(dyn_text(move || format!("count:{}", count.get())))
+        .into_view();
+    host.set_inner_html(&render_adoptable_html(&view));
+    let seeded = query(&host, "[data-role=adopted-control]");
+
+    let root = adopt(&view, host.as_ref()).expect("adopt reactive SSR seed");
+
+    assert!(query(&host, "[data-role=adopted-control]").is_same_node(Some(&seeded)));
+    assert_eq!(seeded.text_content().as_deref(), Some("count:1"));
+    assert_eq!(seeded.get_attribute("data-count").as_deref(), Some("1"));
+    count.set(7);
+    assert_eq!(seeded.text_content().as_deref(), Some("count:7"));
+    assert_eq!(seeded.get_attribute("data-count").as_deref(), Some("7"));
+    seeded
+        .dispatch_event(&web_sys::Event::new("click").expect("create adopted click"))
+        .expect("dispatch adopted listener");
+    assert_eq!(clicks.get(), 1);
+    assert_eq!(root.last_error(), None);
+
+    root.dispose();
+    assert!(!host.has_child_nodes());
+    seeded
+        .dispatch_event(&web_sys::Event::new("click").expect("create detached adopted click"))
+        .expect("dispatch detached adopted listener");
+    assert_eq!(clicks.get(), 1, "adopted listener survived disposal");
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adopt_dynamic_view_reuses_seed_then_replaces_only_its_owned_range() {
+    let host = test_host();
+    let alternate = Signal::new(false);
+    let view = dyn_view(move || {
+        if alternate.get() {
+            el("article")
+                .attr("data-role", "adopted-alternate")
+                .child("alternate")
+                .into_view()
+        } else {
+            el("section")
+                .attr("data-role", "adopted-stable")
+                .child("stable")
+                .into_view()
+        }
+    });
+    host.set_inner_html(&render_adoptable_html(&view));
+    let seeded = query(&host, "[data-role=adopted-stable]");
+
+    let root = adopt(&view, host.as_ref()).expect("adopt dynamic SSR seed");
+
+    assert!(query(&host, "[data-role=adopted-stable]").is_same_node(Some(&seeded)));
+    alternate.set(true);
+    assert!(
+        host.query_selector("[data-role=adopted-stable]")
+            .expect("valid stable selector")
+            .is_none()
+    );
+    assert_eq!(
+        query(&host, "[data-role=adopted-alternate]")
+            .text_content()
+            .as_deref(),
+        Some("alternate")
+    );
+    assert_eq!(root.last_error(), None);
+
+    root.dispose();
+    assert!(!host.has_child_nodes());
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adopt_keyed_rows_preserves_seed_identity_and_enters_retained_reconciliation() {
+    let host = test_host();
+    let order = Signal::new(vec![1_u32, 2, 3]);
+    let builds = Rc::new(Cell::new(0_u32));
+    let observed_builds = Rc::clone(&builds);
+    let view = keyed(
+        move || order.get(),
+        |id| *id,
+        move |id| {
+            observed_builds.set(observed_builds.get() + 1);
+            el("span")
+                .attr("data-key", id.to_string())
+                .child(id.to_string())
+                .into_view()
+        },
+    );
+    host.set_inner_html(&render_adoptable_html(&view));
+    let one = query(&host, "[data-key='1']");
+    let two = query(&host, "[data-key='2']");
+    let three = query(&host, "[data-key='3']");
+    assert_eq!(builds.get(), 3, "SSR should build each row once");
+
+    let root = adopt(&view, host.as_ref()).expect("adopt keyed SSR seed");
+
+    assert_eq!(
+        builds.get(),
+        6,
+        "preflight should build each client row once"
+    );
+    assert!(query(&host, "[data-key='1']").is_same_node(Some(&one)));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&two)));
+    assert!(query(&host, "[data-key='3']").is_same_node(Some(&three)));
+    order.set(vec![3, 2, 4]);
+    assert_eq!(host.text_content().as_deref(), Some("324"));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&two)));
+    assert!(query(&host, "[data-key='3']").is_same_node(Some(&three)));
+    assert_eq!(
+        builds.get(),
+        7,
+        "only the new key should build after adoption"
+    );
+    assert_eq!(root.last_error(), None);
+
+    root.dispose();
+    assert!(!host.has_child_nodes());
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adoption_mismatch_is_structured_and_does_not_mutate_the_seed() {
+    let host = test_host();
+    let view = el("main")
+        .attr("data-role", "adoption-mismatch")
+        .child("trusted")
+        .into_view();
+    host.set_inner_html(&render_adoptable_html(&view));
+    query(&host, "[data-role=adoption-mismatch]").set_text_content(Some("tampered"));
+    let before = host.inner_html();
+
+    let result = adopt(&view, host.as_ref());
+
+    assert!(matches!(result, Err(MountError::AdoptionMismatch { .. })));
+    assert_eq!(
+        host.inner_html(),
+        before,
+        "failed preflight mutated the seed"
+    );
+    host.set_inner_html("");
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adoption_commit_mismatch_retires_the_complete_seed_and_installed_resources() {
+    let host = test_host();
+    let evaluations = Rc::new(Cell::new(0_u32));
+    let clicks = Rc::new(Cell::new(0_u32));
+    let observed_evaluations = Rc::clone(&evaluations);
+    let observed_clicks = Rc::clone(&clicks);
+    let view = el("button")
+        .attr("data-role", "commit-mismatch")
+        .on("click", move |_| {
+            observed_clicks.set(observed_clicks.get() + 1)
+        })
+        .child(dyn_text(move || {
+            let run = observed_evaluations.get() + 1;
+            observed_evaluations.set(run);
+            if run < 3 {
+                "stable".to_owned()
+            } else {
+                "changed".to_owned()
+            }
+        }))
+        .into_view();
+    host.set_inner_html(&render_adoptable_html(&view));
+    let button = query(&host, "[data-role=commit-mismatch]");
+
+    let result = adopt(&view, host.as_ref());
+
+    assert!(matches!(result, Err(MountError::AdoptionMismatch { .. })));
+    assert_eq!(evaluations.get(), 3);
+    assert!(
+        !host.has_child_nodes(),
+        "failed commit left a partial SSR seed"
+    );
+    button
+        .dispatch_event(&web_sys::Event::new("click").expect("create rollback click"))
+        .expect("dispatch rollback listener probe");
+    assert_eq!(
+        clicks.get(),
+        0,
+        "failed adoption left its listener installed"
+    );
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adoption_supports_empty_dynamic_text_static_rcdata_and_exact_limits() {
+    let host = test_host();
+    let value = Signal::new(String::new());
+    let dynamic = el("span")
+        .attr("data-role", "empty-dynamic")
+        .child(dyn_text(move || value.get()))
+        .into_view();
+    host.set_inner_html(&render_adoptable_html(&dynamic));
+    let seeded = query(&host, "[data-role=empty-dynamic]");
+    let root = adopt(&dynamic, host.as_ref()).expect("adopt empty dynamic text");
+    value.set("filled".to_owned());
+    assert_eq!(seeded.text_content().as_deref(), Some("filled"));
+    root.dispose();
+    assert!(!host.has_child_nodes());
+
+    let rcdata = el("textarea")
+        .attr("data-role", "adopted-rcdata")
+        .child(View::Fragment(vec![text("alpha"), text(" & beta")]))
+        .into_view();
+    host.set_inner_html(&render_adoptable_html(&rcdata));
+    let seeded = query(&host, "[data-role=adopted-rcdata]");
+    let root = adopt(&rcdata, host.as_ref()).expect("adopt static RCDATA");
+    assert_eq!(seeded.text_content().as_deref(), Some("alpha & beta"));
+    root.dispose();
+    assert!(!host.has_child_nodes());
+
+    let limits = RenderLimits::new(8, 1, 1_024).expect("valid exact adoption limits");
+    let one_node = text("bounded");
+    host.set_inner_html(
+        &pliego_dom::try_render_adoptable_html(&one_node, limits)
+            .expect("render one-node adoptable seed"),
+    );
+    let root = adopt_with_limits(&one_node, host.as_ref(), limits)
+        .expect("adoption should count authored views, not internal markers");
+    assert_eq!(host.text_content().as_deref(), Some("bounded"));
+    root.dispose();
+    assert!(!host.has_child_nodes());
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adoption_verifies_svg_qualified_attribute_namespaces() {
+    const XLINK_URI: &str = "http://www.w3.org/1999/xlink";
+
+    let host = test_host();
+    let view = el("svg")
+        .child(
+            el("use")
+                .attr("data-role", "adopted-svg-use")
+                .attr("xlink:href", "#shape"),
+        )
+        .into_view();
+    host.set_inner_html(&render_adoptable_html(&view));
+    let use_element = query(&host, "[data-role=adopted-svg-use]");
+    let root = adopt(&view, host.as_ref()).expect("adopt namespaced SVG attribute");
+    assert!(query(&host, "[data-role=adopted-svg-use]").is_same_node(Some(&use_element)));
+    root.dispose();
+    assert!(!host.has_child_nodes());
+
+    host.set_inner_html(&render_adoptable_html(&view));
+    let use_element = query(&host, "[data-role=adopted-svg-use]");
+    use_element
+        .remove_attribute_ns(Some(XLINK_URI), "href")
+        .expect("remove namespaced xlink attribute");
+    use_element
+        .set_attribute("xlink:href", "#shape")
+        .expect("forge unnamespaced qualified attribute");
+    let before = host.inner_html();
+
+    let result = adopt(&view, host.as_ref());
+
+    assert!(matches!(result, Err(MountError::AdoptionMismatch { .. })));
+    assert_eq!(host.inner_html(), before);
+    host.set_inner_html("");
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn nested_adopted_dynamic_and_keyed_scopes_share_exact_ancestor_topology() {
+    let host = test_host();
+    let alternate = Signal::new(false);
+    let order = Signal::new(vec![1_u32, 2]);
+    let view = el("main")
+        .child(dyn_view(move || {
+            if alternate.get() {
+                el("p")
+                    .attr("data-role", "nested-adopted-alternate")
+                    .child("done")
+                    .into_view()
+            } else {
+                keyed(
+                    move || order.get(),
+                    |id| *id,
+                    |id| {
+                        el("button")
+                            .attr("data-key", id.to_string())
+                            .child(id.to_string())
+                            .into_view()
+                    },
+                )
+            }
+        }))
+        .into_view();
+    host.set_inner_html(&render_adoptable_html(&view));
+    let second = query(&host, "[data-key='2']");
+    let root = adopt(&view, host.as_ref()).expect("adopt nested dynamic/keyed scopes");
+
+    order.set(vec![2, 3]);
+    assert_eq!(host.text_content().as_deref(), Some("23"));
+    assert!(query(&host, "[data-key='2']").is_same_node(Some(&second)));
+    alternate.set(true);
+    assert_eq!(
+        query(&host, "[data-role=nested-adopted-alternate]")
+            .text_content()
+            .as_deref(),
+        Some("done")
+    );
+    assert_eq!(root.last_error(), None);
+
+    root.dispose();
     assert!(!host.has_child_nodes());
     remove_test_host(&host);
 }
