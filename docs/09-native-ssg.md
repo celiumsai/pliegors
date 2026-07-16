@@ -29,6 +29,12 @@ v2.
 The resulting pages require no framework runtime. Rust/WASM is added only when a
 route declares resumable behavior.
 
+Build adapters can consume `ProductRegistry` as the framework-owned source of component, route,
+rendered-island, and Cargo source-unit topology. `product_component!(...)` captures and normalizes
+the invoking Rust module's `file!()` path, so applications do not repeat filenames in a second CSS
+configuration. The registry validates IDs, portable paths, references, duplicates, and bounded
+sizes; it does not assign CSS semantics or make PliegoRS depend on a CSS compiler.
+
 ## Closed contract
 
 - One typed view tree feeds the HTML renderer.
@@ -36,6 +42,7 @@ route declares resumable behavior.
 - Text, attributes, title, and metadata escape by default.
 - Routes and assets reject absolute paths, traversal, and unsafe destinations.
 - Stylesheet preloads are opt-in, unique, URL-validated, and must match an applied stylesheet.
+- Product topology is explicit and adapter-neutral; source paths are captured at component modules.
 - Every emitted file has a stable SHA-256 and byte count.
 - Repeated builds from identical inputs produce identical page and asset hashes.
 - Staged publication preserves the last valid output when a build fails.
