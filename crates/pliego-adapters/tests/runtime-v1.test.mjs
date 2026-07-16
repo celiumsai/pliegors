@@ -9,6 +9,11 @@ class FakeEvent {
     this.type = type;
     this.detail = options.detail;
     this.target = options.target;
+    this.defaultPrevented = false;
+  }
+
+  preventDefault() {
+    this.defaultPrevented = true;
   }
 }
 
@@ -531,6 +536,30 @@ test('installed runtime reacts to reduced-motion and Save-Data changes', async (
   env.connection.setSaveData(false);
   await nextTurn();
   assert.equal(mounts, 3);
+  runtime.destroy();
+});
+
+test('adapter HMR remounts through a cache-busted module specifier', async () => {
+  const env = environment();
+  const root = new FakeRoot();
+  env.roots.push(root);
+  const imports = [];
+  let mounts = 0;
+  const runtime = createAdapterRuntime(env, async (specifier) => {
+    imports.push(specifier);
+    return { mount() { mounts += 1; } };
+  });
+
+  runtime.install();
+  await nextTurn();
+  env.document.emit('pliego:adapter-hmr');
+  await nextTurn();
+
+  assert.equal(mounts, 2);
+  assert.deepEqual(imports, [
+    '/assets/plugin.1234.js',
+    '/assets/plugin.1234.js?pliego-hmr=1',
+  ]);
   runtime.destroy();
 });
 

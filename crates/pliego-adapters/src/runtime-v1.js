@@ -2,7 +2,7 @@
 // Copyright 2026 Celiums Solutions LLC
 
 export const API_VERSION = 1;
-export const RUNTIME_VERSION = '1.1.0';
+export const RUNTIME_VERSION = '1.2.0';
 
 const ROOT_SELECTOR = 'pliego-adapter';
 const TIERS = Object.freeze(['universal', 'lite', 'balanced', 'signature']);
@@ -186,6 +186,7 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
   const mountTasks = new WeakMap();
   const updateQueues = new WeakMap();
   const updateEpochs = new WeakMap();
+  let importEpoch = 0;
   const generations = new WeakMap();
   const teardowns = new WeakMap();
   const scheduled = new WeakMap();
@@ -345,7 +346,10 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
       }
       delete root.dataset.pliegoSkipReason;
       const props = parseProps(root);
-      const module = await importer(modulePath);
+      const specifier = importEpoch === 0
+        ? modulePath
+        : `${modulePath}?pliego-hmr=${importEpoch}`;
+      const module = await importer(specifier);
       if (!isCurrent(root, record) || !root.isConnected) return false;
       plugin = pluginFrom(module);
       context = contextFor(root, controller, policy, cleanups);
@@ -629,12 +633,19 @@ export function createAdapterRuntime(env = globalThis, importer = defaultImporte
       const root = event.target?.closest?.(ROOT_SELECTOR);
       if (root) void update(root, event.detail?.props);
     };
+    const onAdapterHmr = (event) => {
+      importEpoch += 1;
+      event.preventDefault?.();
+      const roots = new Set([...knownRoots, ...rootsWithin(env.document)]);
+      for (const root of roots) refresh(root);
+    };
     const onScopeDispose = (event) => {
       for (const root of rootsWithin(event.target)) unmount(root, 'scope-dispose');
     };
     listen(env, 'pagehide', onPageHide);
     listen(env, 'pageshow', onPageShow);
     listen(env.document, 'pliego:adapter-update', onAdapterUpdate);
+    listen(env.document, 'pliego:adapter-hmr', onAdapterHmr);
     listen(env.document, 'pliego:scope-dispose', onScopeDispose, { capture: true });
 
     const motionQuery = env.matchMedia?.('(prefers-reduced-motion: reduce)');

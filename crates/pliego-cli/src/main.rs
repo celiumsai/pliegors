@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod development;
+
+use development::{HmrUpdate, explain_artifact, explain_rebuild, load_verified_graph};
+use notify::{
+    Config as WatchConfig, Event as WatchEvent, RecommendedWatcher, RecursiveMode, Watcher,
+};
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
@@ -355,7 +360,7 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 
     if !matches!(
         command.as_str(),
-        "build" | "check" | "dev" | "preview" | "inspect"
+        "build" | "check" | "dev" | "preview" | "inspect" | "why" | "why-rebuilt"
     ) {
         return Err(CliFailure::new(
             FailureKind::Usage,
@@ -386,13 +391,20 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
         "inspect" => {
             inspect(&context).map_err(|error| CliFailure::new(FailureKind::Artifact, error))
         }
+        "why-rebuilt" => {
+            reject_extra_arguments(arguments)
+                .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
+            why_rebuilt(&context).map_err(|error| CliFailure::new(FailureKind::Artifact, error))
+        }
+        "why" => why(&context, arguments.collect())
+            .map_err(|error| CliFailure::new(FailureKind::Artifact, error)),
         _ => unreachable!("known commands were validated before project discovery"),
     }
 }
 
 fn print_help() {
     println!(
-        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego check\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
+        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego check\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );
 }
 
@@ -2584,6 +2596,46 @@ fn inspect(context: &Context) -> Result<(), String> {
     Ok(())
 }
 
+fn why(context: &Context, arguments: Vec<String>) -> Result<(), String> {
+    if arguments.len() != 2 || arguments[0] != "artifact" {
+        return Err("usage: pliego why artifact <path|route>".to_owned());
+    }
+    let output_root = context.root.join(&context.manifest.project.output);
+    verify_project_build(context, &output_root)?;
+    let verified = load_verified_graph(&output_root)?;
+    println!(
+        "PLIEGO why artifact {}\n{}",
+        arguments[1],
+        explain_artifact(&verified.graph, &arguments[1])?
+    );
+    Ok(())
+}
+
+fn why_rebuilt(context: &Context) -> Result<(), String> {
+    validate_reproducible_command_context(context)?;
+    let record = development::read_rebuild_record(&context.root)?;
+    println!(
+        "PLIEGO why-rebuilt generation {} / {:?}\nchanged sources: {}\naffected routes: {}\naffected artifacts: {}\nchanged artifacts: {}\nreceipt: {} -> {}",
+        record.generation,
+        record.hmr.kind,
+        display_items(&record.changed_sources),
+        display_items(&record.affected_routes),
+        display_items(&record.affected_artifacts),
+        display_items(&record.changed_artifacts),
+        record.receipt_before.as_deref().unwrap_or("initial"),
+        record.receipt_after,
+    );
+    Ok(())
+}
+
+fn display_items(items: &[String]) -> String {
+    if items.is_empty() {
+        "none".to_owned()
+    } else {
+        items.join(", ")
+    }
+}
+
 enum DevFailure {
     Project(String),
     Server(String),
@@ -2601,6 +2653,7 @@ impl DevFailure {
 struct DevState {
     generation: AtomicU64,
     build_failure: RwLock<Option<String>>,
+    update: RwLock<HmrUpdate>,
 }
 
 impl DevState {
@@ -2608,15 +2661,20 @@ impl DevState {
         Self {
             generation: AtomicU64::new(0),
             build_failure: RwLock::new(build_failure),
+            update: RwLock::new(HmrUpdate::reload()),
         }
     }
 
-    fn publish(&self, build_failure: Option<String>) {
+    fn publish(&self, build_failure: Option<String>, update: HmrUpdate) -> u64 {
         match self.build_failure.write() {
             Ok(mut current) => *current = build_failure,
             Err(poisoned) => *poisoned.into_inner() = build_failure,
         }
-        self.generation.fetch_add(1, Ordering::SeqCst);
+        match self.update.write() {
+            Ok(mut current) => *current = update,
+            Err(poisoned) => *poisoned.into_inner() = update,
+        }
+        self.generation.fetch_add(1, Ordering::SeqCst) + 1
     }
 
     fn failure(&self) -> Option<String> {
@@ -2625,130 +2683,173 @@ impl DevState {
             Err(poisoned) => poisoned.into_inner().clone(),
         }
     }
+
+    fn update(&self) -> HmrUpdate {
+        match self.update.read() {
+            Ok(current) => current.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
+    }
 }
 
 fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
     validate_reproducible_command_context(context).map_err(DevFailure::Project)?;
-    let initial_failure = match build(context) {
-        Ok(()) => None,
+    let output_root = context.root.join(&context.manifest.project.output);
+    let (initial_failure, mut current_graph) = match build(context) {
+        Ok(()) => match load_verified_graph(&output_root) {
+            Ok(graph) => (None, Some(graph)),
+            Err(error) => (Some(error), None),
+        },
         Err(error) => {
             eprintln!(
                 "PLIEGO[PLG-BLD-001] build: {error}\nhelp: Fix the source and keep this server open; the browser will recover automatically."
             );
-            Some(error)
+            (Some(error), None)
         }
     };
-    let root = context.root.join(&context.manifest.project.output);
-    let (server, root) = open_server(root, options, "dev", true).map_err(DevFailure::Server)?;
+    let (server, root) =
+        open_server(output_root, options, "dev", true).map_err(DevFailure::Server)?;
     let state = Arc::new(DevState::new(initial_failure));
     let server_state = Arc::clone(&state);
-    std::thread::spawn(move || serve_requests(server, root, Some(server_state)));
+    let server_root = root.clone();
+    std::thread::spawn(move || serve_requests(server, server_root, Some(server_state)));
 
-    println!("PLIEGO dev: watching {}", context.root.display());
-    let mut previous = project_snapshot(&context.root, &context.manifest.project.output)
-        .map_err(DevFailure::Project)?;
+    let (events, mut watcher) = native_watcher(&context.root).map_err(DevFailure::Project)?;
+    watcher
+        .watch(&context.root, RecursiveMode::Recursive)
+        .map_err(|error| DevFailure::Project(format!("cannot watch project: {error}")))?;
+    println!(
+        "PLIEGO dev: watching {} with {:?}",
+        context.root.display(),
+        RecommendedWatcher::kind()
+    );
     loop {
-        std::thread::sleep(Duration::from_millis(250));
-        let current = match project_snapshot(&context.root, &context.manifest.project.output) {
-            Ok(snapshot) => snapshot,
-            Err(error) => {
-                eprintln!("PLIEGO dev: cannot scan project: {error}");
-                continue;
-            }
-        };
-        if current == previous {
-            continue;
-        }
-        std::thread::sleep(Duration::from_millis(120));
-        let build_input = match project_snapshot(&context.root, &context.manifest.project.output) {
-            Ok(snapshot) => snapshot,
-            Err(error) => {
-                eprintln!("PLIEGO dev: cannot scan project: {error}");
-                continue;
-            }
-        };
+        let changed_sources =
+            next_watch_changes(&events, &context.root, &context.manifest.project.output)
+                .map_err(DevFailure::Project)?;
         match build(context) {
             Ok(()) => {
-                state.publish(None);
-                println!("PLIEGO dev: rebuilt");
+                let after = match load_verified_graph(&root) {
+                    Ok(graph) => graph,
+                    Err(error) => {
+                        eprintln!("PLIEGO[PLG-ART-001] rebuilt graph is invalid: {error}");
+                        state.publish(Some(error), HmrUpdate::reload());
+                        continue;
+                    }
+                };
+                let generation = state.generation.load(Ordering::SeqCst) + 1;
+                let record =
+                    explain_rebuild(generation, changed_sources, current_graph.as_ref(), &after);
+                if let Err(error) = development::write_rebuild_record(&context.root, &record) {
+                    eprintln!("PLIEGO[PLG-ART-001] cannot persist rebuild cause: {error}");
+                }
+                state.publish(None, record.hmr.clone());
+                println!(
+                    "PLIEGO dev: rebuilt generation {generation} / {:?}",
+                    record.hmr.kind
+                );
+                current_graph = Some(after);
             }
             Err(error) => {
                 eprintln!("PLIEGO[PLG-BLD-001] dev rebuild failed: {error}");
-                state.publish(Some(error));
+                state.publish(Some(error), HmrUpdate::reload());
             }
         }
-        // Keep the pre-build snapshot so edits made during compilation trigger
-        // another pass instead of being silently absorbed.
-        previous = build_input;
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-struct FileStamp {
-    path: PathBuf,
-    modified: SystemTime,
-    bytes: u64,
-    sha256: [u8; 32],
+fn native_watcher(
+    _root: &Path,
+) -> Result<
+    (
+        mpsc::Receiver<Result<WatchEvent, notify::Error>>,
+        RecommendedWatcher,
+    ),
+    String,
+> {
+    let (sender, receiver) = mpsc::channel();
+    let watcher =
+        RecommendedWatcher::new(sender, WatchConfig::default().with_follow_symlinks(false))
+            .map_err(|error| format!("cannot initialize native filesystem watcher: {error}"))?;
+    Ok((receiver, watcher))
 }
 
-fn project_snapshot(root: &Path, output: &Path) -> Result<Vec<FileStamp>, String> {
-    let mut files = Vec::new();
-    collect_file_stamps(root, root, output, &mut files)?;
-    files.sort_by(|left, right| left.path.cmp(&right.path));
-    Ok(files)
-}
-
-fn collect_file_stamps(
+fn next_watch_changes(
+    events: &mpsc::Receiver<Result<WatchEvent, notify::Error>>,
     root: &Path,
-    directory: &Path,
     output: &Path,
-    files: &mut Vec<FileStamp>,
-) -> Result<(), String> {
-    let entries = fs::read_dir(directory)
-        .map_err(|error| format!("cannot read {}: {error}", directory.display()))?;
-    for entry in entries {
-        let entry = entry.map_err(|error| error.to_string())?;
-        let path = entry.path();
-        let relative = path.strip_prefix(root).map_err(|error| error.to_string())?;
-        // Publication coordination files are short-lived by design. Filter them by name before
-        // querying their type or metadata so a concurrent rename/removal cannot fail the snapshot.
-        if should_ignore_development_file(relative) {
-            continue;
-        }
-        let file_type = entry.file_type().map_err(|error| error.to_string())?;
-        if file_type.is_dir() {
-            if should_ignore_directory(relative, output) {
-                continue;
+) -> Result<BTreeSet<String>, String> {
+    let mut changed = BTreeSet::new();
+    loop {
+        let first = events
+            .recv()
+            .map_err(|_| "native filesystem watcher stopped unexpectedly".to_owned())?;
+        collect_watch_event(first, root, output, &mut changed)?;
+        loop {
+            match events.recv_timeout(Duration::from_millis(120)) {
+                Ok(event) => collect_watch_event(event, root, output, &mut changed)?,
+                Err(mpsc::RecvTimeoutError::Timeout) => break,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err("native filesystem watcher stopped unexpectedly".to_owned());
+                }
             }
-            collect_file_stamps(root, &path, output, files)?;
-        } else if file_type.is_file() {
-            let metadata = entry.metadata().map_err(|error| error.to_string())?;
-            files.push(FileStamp {
-                path: relative.to_path_buf(),
-                modified: metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
-                bytes: metadata.len(),
-                sha256: file_digest(&path)?,
-            });
         }
+        if !changed.is_empty() {
+            return Ok(changed);
+        }
+    }
+}
+
+fn collect_watch_event(
+    event: Result<WatchEvent, notify::Error>,
+    root: &Path,
+    output: &Path,
+    changed: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    let event = match event {
+        Ok(event) => event,
+        Err(error) => {
+            eprintln!("PLIEGO dev: filesystem watcher reported: {error}");
+            return Ok(());
+        }
+    };
+    if matches!(event.kind, notify::EventKind::Access(_)) {
+        return Ok(());
+    }
+    for path in event.paths {
+        collect_watch_path(path, root, output, changed)?;
     }
     Ok(())
 }
 
-fn file_digest(path: &Path) -> Result<[u8; 32], String> {
-    let mut file = fs::File::open(path)
-        .map_err(|error| format!("cannot open {} for fingerprinting: {error}", path.display()))?;
-    let mut digest = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer).map_err(|error| {
-            format!("cannot read {} for fingerprinting: {error}", path.display())
-        })?;
-        if read == 0 {
-            break;
-        }
-        digest.update(&buffer[..read]);
+fn collect_watch_path(
+    path: PathBuf,
+    root: &Path,
+    output: &Path,
+    changed: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    let path = if path.is_absolute() {
+        path
+    } else {
+        root.join(path)
+    };
+    let Ok(relative) = path.strip_prefix(root) else {
+        return Ok(());
+    };
+    if relative.as_os_str().is_empty()
+        || should_ignore_directory(relative, output)
+        || should_ignore_development_file(relative)
+    {
+        return Ok(());
     }
-    Ok(digest.finalize().into())
+    let relative = relative.to_str().ok_or_else(|| {
+        format!(
+            "changed project path is not valid UTF-8: {}",
+            relative.display()
+        )
+    })?;
+    changed.insert(relative.replace('\\', "/"));
+    Ok(())
 }
 
 fn should_ignore_directory(relative: &Path, output: &Path) -> bool {
@@ -2967,7 +3068,7 @@ fn respond(request: tiny_http::Request, root: &Path, state: Option<&DevState>) {
     let mut response = Response::from_data(bytes)
         .with_status_code(status)
         .with_header(Header::from_bytes("Content-Type", content_type).expect("valid header"));
-    if no_store {
+    if no_store || state.is_some() {
         response.add_header(Header::from_bytes("Cache-Control", "no-store").expect("valid header"));
     }
     let _ = request.respond(response);
@@ -3041,7 +3142,14 @@ fn respond_reload(request: tiny_http::Request, state: Option<&DevState>) {
     let body = if current == since {
         ": heartbeat\n\n".to_owned()
     } else {
-        format!("data: {current}\n\n")
+        let update = state.update();
+        let payload = serde_json::json!({
+            "generation": current,
+            "kind": update.kind,
+            "paths": update.paths,
+            "routes": update.routes,
+        });
+        format!("event: pliego\ndata: {payload}\n\n")
     };
     let response = Response::from_string(body)
         .with_header(
@@ -3097,13 +3205,7 @@ fn framework_error_document(
             )
         })
         .unwrap_or_default();
-    let reload = generation
-        .map(|generation| {
-            format!(
-                "<script data-pliego-reload>new EventSource('/_pliego/reload?since={generation}').onmessage=()=>location.reload()</script>"
-            )
-        })
-        .unwrap_or_default();
+    let reload = generation.map(live_reload_script).unwrap_or_default();
     format!(
         r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="generator" content="PliegoRS"><title>{code} / PliegoRS</title><style>:root{{color-scheme:dark;--ink:#eef0e8;--ground:#111310;--panel:#191c18;--line:#3b3f38;--muted:#a7aca3;--signal:#d6ff3f;--alert:#e95e52;--mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;--sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}*{{box-sizing:border-box}}body{{min-height:100vh;margin:0;color:var(--ink);background:var(--ground);font-family:var(--sans)}}main{{width:min(100% - 40px,1180px);min-height:100vh;margin:auto;padding:34px 0 72px;display:flex;flex-direction:column}}header{{display:flex;align-items:center;justify-content:space-between;gap:24px;padding-bottom:22px;border-bottom:1px solid var(--line);font:700 .72rem/1 var(--mono)}}.brand{{display:flex;align-items:center;gap:11px}}.mark{{width:24px;height:24px;border:6px solid var(--ink);border-right-color:transparent;position:relative}}.mark:after{{content:"";width:6px;height:6px;position:absolute;right:-10px;bottom:-10px;background:var(--alert)}}.code{{color:var(--alert)}}.intro{{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.5fr);gap:clamp(38px,8vw,120px);align-items:end;padding:clamp(72px,12vh,130px) 0 56px}}h1{{max-width:850px;margin:0;font-size:clamp(3rem,8vw,7rem);font-weight:560;line-height:.92;letter-spacing:0}}.intro p{{max-width:480px;margin:0;color:var(--muted);font-size:1rem;line-height:1.65}}.diagnostic{{border:1px solid var(--line);background:var(--panel)}}.diagnostic>div{{min-height:48px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);color:var(--muted);font:700 .66rem/1 var(--mono)}}.diagnostic>div span:first-child{{color:var(--signal)}}pre{{max-height:42vh;margin:0;padding:22px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:#d9ddd5;font:400 .78rem/1.65 var(--mono)}}footer{{display:flex;justify-content:space-between;gap:20px;margin-top:auto;padding-top:32px;color:var(--muted);font:700 .66rem/1.5 var(--mono)}}@media(max-width:720px){{main{{width:min(100% - 28px,1180px);padding-top:24px}}.intro{{grid-template-columns:1fr;padding:64px 0 38px}}h1{{font-size:clamp(2.9rem,15vw,5rem)}}footer{{flex-direction:column}}}}</style></head><body><main><header><div class="brand"><span class="mark" aria-hidden="true"></span><span>PLIEGORS / DEVELOPMENT</span></div><span class="code">{}</span></header><section class="intro"><h1>{}</h1><p>{}</p></section>{}<footer><span>PLIEGORS DIAGNOSTIC SURFACE</span><span>THE SERVER IS STILL RUNNING</span></footer></main>{}</body></html>"#,
         escape_html(code),
@@ -3142,9 +3244,7 @@ fn inject_live_reload(bytes: Vec<u8>, generation: u64) -> Vec<u8> {
         Ok(html) => html,
         Err(error) => return error.into_bytes(),
     };
-    let script = format!(
-        r#"<script data-pliego-reload>new EventSource('/_pliego/reload?since={generation}').onmessage=()=>location.reload()</script>"#
-    );
+    let script = live_reload_script(generation);
     if let Some(position) = html.rfind("</body>") {
         let mut output = String::with_capacity(html.len() + script.len());
         output.push_str(&html[..position]);
@@ -3154,6 +3254,12 @@ fn inject_live_reload(bytes: Vec<u8>, generation: u64) -> Vec<u8> {
     } else {
         (html + &script).into_bytes()
     }
+}
+
+fn live_reload_script(generation: u64) -> String {
+    format!(
+        r#"<script data-pliego-reload>(()=>{{const route=()=>location.pathname.endsWith('/')?location.pathname:location.pathname.replace(/\/index\.html$/,'/');const connect=g=>{{const stream=new EventSource('/_pliego/reload?since='+g);stream.addEventListener('pliego',async event=>{{stream.close();let update;try{{update=JSON.parse(event.data)}}catch(_){{location.reload();return}}try{{if(update.kind==='none'){{connect(update.generation);return}}if(update.kind==='css'){{for(const link of document.querySelectorAll('link[rel="stylesheet"]')){{const url=new URL(link.href,location.href);if(update.paths.includes(url.pathname)){{url.searchParams.set('pliego-hmr',update.generation);link.href=url.href}}}}document.dispatchEvent(new CustomEvent('pliego:css-hmr',{{detail:update}}));connect(update.generation);return}}if(update.kind==='content'&&update.routes.includes(route())){{const response=await fetch(location.href,{{cache:'no-store',headers:{{'X-Pliego-HMR':'1'}}}});if(!response.ok)throw new Error('content fetch failed');const next=new DOMParser().parseFromString(await response.text(),'text/html');if(!next.body)throw new Error('content body missing');document.body.dispatchEvent(new CustomEvent('pliego:scope-dispose',{{bubbles:true,detail:{{reason:'content-hmr'}}}}));document.title=next.title;document.body.replaceWith(next.body);document.dispatchEvent(new CustomEvent('pliego:content-hmr',{{detail:update}}));connect(update.generation);return}}if(update.kind==='content'){{connect(update.generation);return}}if(update.kind==='adapter'){{const signal=new CustomEvent('pliego:adapter-hmr',{{cancelable:true,detail:update}});document.dispatchEvent(signal);if(signal.defaultPrevented){{connect(update.generation);return}}}}location.reload()}}catch(_){{location.reload()}}}});}};connect({generation})}})()</script>"#
+    )
 }
 
 fn mime_for(path: &Path) -> &'static str {
@@ -3540,7 +3646,8 @@ mod tests {
     fn live_reload_is_injected_before_body_close() {
         let html = inject_live_reload(b"<html><body>Ready</body></html>".to_vec(), 7);
         let html = String::from_utf8(html).unwrap();
-        assert!(html.contains("/_pliego/reload?since=7"));
+        assert!(html.contains("/_pliego/reload?since="));
+        assert!(html.contains("connect(7)"));
         assert!(html.find("data-pliego-reload").unwrap() < html.find("</body>").unwrap());
     }
 
@@ -3558,9 +3665,10 @@ mod tests {
         assert!(html.contains("&lt;script&gt;"));
         assert!(!html.contains("<script>alert"));
         assert!(!html.contains('\u{1b}'));
-        assert!(html.contains("/_pliego/reload?since=0"));
+        assert!(html.contains("/_pliego/reload?since="));
+        assert!(html.contains("connect(0)"));
 
-        state.publish(None);
+        state.publish(None, HmrUpdate::reload());
         assert!(state.failure().is_none());
         assert_eq!(state.generation.load(Ordering::SeqCst), 1);
     }
@@ -3698,7 +3806,7 @@ mod tests {
     }
 
     #[test]
-    fn development_snapshot_tracks_nested_target_but_ignores_root_target() {
+    fn native_watch_paths_track_nested_target_but_ignore_generated_roots() {
         let root = std::env::temp_dir().join(format!(
             "pliego-watch-root-only-{}-{}",
             std::process::id(),
@@ -3707,51 +3815,29 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let nested = root.join("src/target/input.txt");
-        let generated = root.join("target/generated.txt");
-        fs::create_dir_all(nested.parent().unwrap()).unwrap();
-        fs::create_dir_all(generated.parent().unwrap()).unwrap();
-        fs::write(&nested, b"before").unwrap();
-        fs::write(&generated, b"before").unwrap();
-
-        let before = project_snapshot(&root, Path::new("dist")).unwrap();
-        assert!(
-            before
-                .iter()
-                .any(|file| file.path == Path::new("src/target/input.txt"))
-        );
-        assert!(
-            !before
-                .iter()
-                .any(|file| file.path == Path::new("target/generated.txt"))
-        );
-
-        fs::write(&nested, b"change").unwrap();
-        let nested_changed = project_snapshot(&root, Path::new("dist")).unwrap();
-        assert_ne!(nested_changed, before);
-
-        fs::write(&generated, b"change").unwrap();
-        let root_target_changed = project_snapshot(&root, Path::new("dist")).unwrap();
-        assert_eq!(root_target_changed, nested_changed);
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn development_fingerprint_detects_same_length_edits() {
-        let path = std::env::temp_dir().join(format!(
-            "pliego-watch-fingerprint-{}-{}.txt",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        fs::write(&path, b"before").unwrap();
-        let before = file_digest(&path).unwrap();
-        fs::write(&path, b"change").unwrap();
-        let after = file_digest(&path).unwrap();
-        let _ = fs::remove_file(path);
-        assert_ne!(before, after);
+        let mut changed = BTreeSet::new();
+        collect_watch_path(
+            root.join("src/target/input.txt"),
+            &root,
+            Path::new("dist"),
+            &mut changed,
+        )
+        .unwrap();
+        collect_watch_path(
+            root.join("target/generated.txt"),
+            &root,
+            Path::new("dist"),
+            &mut changed,
+        )
+        .unwrap();
+        collect_watch_path(
+            root.join("dist/index.html"),
+            &root,
+            Path::new("dist"),
+            &mut changed,
+        )
+        .unwrap();
+        assert_eq!(changed, BTreeSet::from(["src/target/input.txt".to_owned()]));
     }
 
     #[test]
