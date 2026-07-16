@@ -174,7 +174,7 @@ for (const hook of ["data-engine-lab", "data-pipeline", "data-hero-carousel"]) {
 for (const asset of ["/media/pliegors/fold-hero.webp", "/media/pliegors/ledger-wide.webp"]) {
   if (!homeHtml.includes(asset)) failures.push(`home: missing authored brand asset ${asset}`);
 }
-for (const statement of ["R0-R7", "public release"]) {
+for (const statement of ["R0-R7", "public preview"]) {
   if (!homeHtml.toLowerCase().includes(statement.toLowerCase())) failures.push(`home: missing current release statement ${statement}`);
 }
 

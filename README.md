@@ -19,6 +19,7 @@
   <a href="https://github.com/celiumsai/pliegors/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/celiumsai/pliegors"></a>
   <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/crates/l/pliego-cli.svg"></a>
   <a href="https://doc.rust-lang.org/stable/releases.html"><img alt="rustc 1.85+" src="https://img.shields.io/badge/rustc-1.85%2B-b7410e.svg"></a>
+  <img alt="Public preview" src="https://img.shields.io/badge/status-public_preview-d8ff2f.svg">
 </p>
 
 PliegoRS folds append-only event logs into interfaces. State is projected from
@@ -27,7 +28,7 @@ the same result. Useful HTML is emitted first; Rust/WASM resumes only the
 behavior the document needs. Mature browser libraries such as GSAP, Lenis, and
 Three.js remain JavaScript behind explicit lifecycle adapters.
 
-The current public release is `0.0.1`. PliegoRS is pre-1.0 software: the
+The current public preview release is `0.0.1`. PliegoRS is pre-1.0 software: the
 documented contracts are deliberate, while APIs may still evolve between minor
 releases.
 

@@ -1,6 +1,6 @@
 # Distribution and release
 
-**Status:** `0.0.1` is the first public PliegoRS release. The repository,
+**Status:** `0.0.1` is the first PliegoRS public preview release. The repository,
 crates.io packages, signed GitHub Release, and `pliegors.dev` documentation are
 the public surfaces for the same version.
 
@@ -42,7 +42,8 @@ replaces registry requirements with local path dependencies.
 The crates.io publication order follows the dependency graph. Independent
 crates publish first; `pliego-cli` publishes last. The guarded
 `scripts/publish-crates.mjs` command checks package contents, the 10 MB registry
-limit, exact internal requirements, repository state, and registry convergence.
+limit, exact internal requirements, repository state, registry convergence, and
+the server-provided backoff deadline when crates.io rate-limits new packages.
 Authentication comes from the ephemeral `CARGO_REGISTRY_TOKEN` environment
 variable or Cargo's local credential store after an explicit `cargo login`. The
 token is never passed on the command line or stored in the repository; a local
