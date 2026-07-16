@@ -667,6 +667,7 @@ name = "pliegors-site-client"
 version = "0.0.1"
 dependencies = [
  "js-sys",
+ "pliego-dom",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",

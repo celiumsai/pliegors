@@ -35,7 +35,8 @@ fn stage_index_after_key(current: usize, count: usize, key: &str) -> Option<usiz
 mod browser {
     use super::{next_index, normalize_search, stage_index_after_key};
     use js_sys::Array;
-    use std::cell::Cell;
+    use pliego_dom::MountScope;
+    use std::cell::{Cell, RefCell};
     use std::rc::Rc;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::prelude::*;
@@ -47,8 +48,22 @@ mod browser {
 
     const THEME_KEY: &str = "pliegors:theme:v1";
 
+    thread_local! {
+        static CLIENT_SCOPE: RefCell<Option<MountScope>> = const { RefCell::new(None) };
+    }
+
     #[wasm_bindgen(start)]
     pub fn start() {
+        let installed = CLIENT_SCOPE.with(|slot| {
+            if slot.borrow().is_some() {
+                return false;
+            }
+            *slot.borrow_mut() = Some(MountScope::new());
+            true
+        });
+        if !installed {
+            return;
+        }
         init_theme();
         init_menu();
         init_progress();
@@ -91,7 +106,23 @@ mod browser {
         target
             .add_event_listener_with_callback(event, closure.as_ref().unchecked_ref())
             .expect("event listener");
-        closure.forget();
+        let target = target.clone();
+        let event = event.to_owned();
+        own_cleanup(move || {
+            target
+                .remove_event_listener_with_callback(&event, closure.as_ref().unchecked_ref())
+                .ok();
+        });
+    }
+
+    fn own_cleanup(cleanup: impl FnOnce() + 'static) {
+        CLIENT_SCOPE.with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .expect("site client lifecycle scope")
+                .on_cleanup(cleanup)
+                .expect("register site client cleanup");
+        });
     }
 
     fn prefers_dark() -> bool {
@@ -341,11 +372,26 @@ mod browser {
         if let Ok(observer) =
             IntersectionObserver::new_with_options(callback.as_ref().unchecked_ref(), &options)
         {
-            for target in targets {
-                observer.observe(&target);
+            for target in &targets {
+                observer.observe(target);
             }
-            callback.forget();
-            std::mem::forget(observer);
+            let observed = targets.clone();
+            if let Ok(Some(query)) = window().match_media("(prefers-reduced-motion: reduce)") {
+                let observer_for_motion = observer.clone();
+                let query_state = query.clone();
+                listen(query.unchecked_ref(), "change", move |_| {
+                    if query_state.matches() {
+                        observer_for_motion.disconnect();
+                        for target in &observed {
+                            target.class_list().add_1("is-visible").ok();
+                        }
+                    }
+                });
+            }
+            own_cleanup(move || {
+                observer.disconnect();
+                drop(callback);
+            });
         }
     }
 
@@ -356,12 +402,13 @@ mod browser {
                 continue;
             }
             let index = Rc::new(Cell::new(0usize));
-            let user_paused = Rc::new(Cell::new(prefers_reduced_motion()));
+            let user_paused = Rc::new(Cell::new(false));
+            let motion_paused = Rc::new(Cell::new(prefers_reduced_motion()));
             let hover_paused = Rc::new(Cell::new(false));
             let focus_paused = Rc::new(Cell::new(false));
             carousel
                 .class_list()
-                .toggle_with_force("is-paused", user_paused.get())
+                .toggle_with_force("is-paused", user_paused.get() || motion_paused.get())
                 .ok();
             let show: Rc<dyn Fn(i32)> = {
                 let carousel = carousel.clone();
@@ -415,6 +462,7 @@ mod browser {
             }
             if let Some(button) = carousel.query_selector("[data-hero-pause]").ok().flatten() {
                 let user_paused = user_paused.clone();
+                let motion_paused = motion_paused.clone();
                 let carousel = carousel.clone();
                 let control = button.clone();
                 control
@@ -435,7 +483,7 @@ mod browser {
                     user_paused.set(!user_paused.get());
                     carousel
                         .class_list()
-                        .toggle_with_force("is-paused", user_paused.get())
+                        .toggle_with_force("is-paused", user_paused.get() || motion_paused.get())
                         .ok();
                     control
                         .set_attribute(
@@ -459,10 +507,12 @@ mod browser {
                 .unwrap_or(6200);
             let show_interval = show.clone();
             let user_paused_interval = user_paused.clone();
+            let motion_paused_interval = motion_paused.clone();
             let hover_paused_interval = hover_paused.clone();
             let focus_paused_interval = focus_paused.clone();
             let closure = Closure::<dyn FnMut()>::new(move || {
                 if !user_paused_interval.get()
+                    && !motion_paused_interval.get()
                     && !hover_paused_interval.get()
                     && !focus_paused_interval.get()
                     && !document_hidden()
@@ -470,13 +520,31 @@ mod browser {
                     show_interval(1);
                 }
             });
-            window()
+            if let Ok(interval_handle) = window()
                 .set_interval_with_callback_and_timeout_and_arguments_0(
                     closure.as_ref().unchecked_ref(),
                     interval,
                 )
-                .ok();
-            closure.forget();
+            {
+                own_cleanup(move || {
+                    window().clear_interval_with_handle(interval_handle);
+                    drop(closure);
+                });
+            }
+
+            if let Ok(Some(query)) = window().match_media("(prefers-reduced-motion: reduce)") {
+                let carousel = carousel.clone();
+                let motion_paused = motion_paused.clone();
+                let user_paused = user_paused.clone();
+                let query_state = query.clone();
+                listen(query.unchecked_ref(), "change", move |_| {
+                    motion_paused.set(query_state.matches());
+                    carousel
+                        .class_list()
+                        .toggle_with_force("is-paused", user_paused.get() || motion_paused.get())
+                        .ok();
+                });
+            }
 
             let enter_paused = hover_paused.clone();
             listen(carousel.unchecked_ref(), "pointerenter", move |_| {
@@ -656,8 +724,19 @@ mod browser {
                 for step in steps.iter() {
                     observer.observe(step);
                 }
-                callback.forget();
-                std::mem::forget(observer);
+                if let Ok(Some(query)) = window().match_media("(prefers-reduced-motion: reduce)") {
+                    let observer_for_motion = observer.clone();
+                    let query_state = query.clone();
+                    listen(query.unchecked_ref(), "change", move |_| {
+                        if query_state.matches() {
+                            observer_for_motion.disconnect();
+                        }
+                    });
+                }
+                own_cleanup(move || {
+                    observer.disconnect();
+                    drop(callback);
+                });
             }
         }
     }
