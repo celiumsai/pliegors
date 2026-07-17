@@ -101,6 +101,15 @@ pliego check
 pliego dev
 ```
 
+Projects that use PliegoCSS can install its CLI separately and run the optional delegated check:
+
+```sh
+cargo install --locked --path ../PliegoCSS/crates/pliego-cssc
+pliego css check --seed
+```
+
+PliegoRS invokes `pliego-cssc`; it does not embed the PliegoCSS compiler.
+
 Linux production binaries and macOS/Windows development binaries are also
 published in the [GitHub Release](https://github.com/celiumsai/pliegors/releases/tag/v0.0.1).
 Download installers to disk and verify the signed release bundle before running

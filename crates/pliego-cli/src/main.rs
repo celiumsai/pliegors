@@ -469,6 +469,14 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
         print_templates();
         return Ok(());
     }
+    if command == "css" {
+        let css_arguments = parse_css_command(arguments.collect())
+            .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
+        let context =
+            load_context().map_err(|error| CliFailure::new(FailureKind::Project, error))?;
+        return css_check(&context, css_arguments)
+            .map_err(|error| CliFailure::new(FailureKind::Check, error));
+    }
 
     if !matches!(
         command.as_str(),
@@ -516,8 +524,51 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 
 fn print_help() {
     println!(
-        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego check\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
+        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\n`pliego css check` delegates to the separately installed `pliego-cssc` executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );
+}
+
+fn parse_css_command(arguments: Vec<String>) -> Result<Vec<String>, String> {
+    let mut arguments = arguments.into_iter();
+    match arguments.next().as_deref() {
+        Some("check") => Ok(arguments.collect()),
+        _ => Err("usage: pliego css check [pliego-cssc check options]".to_owned()),
+    }
+}
+
+fn css_check(context: &Context, arguments: Vec<String>) -> Result<(), String> {
+    validate_reproducible_command_context(context)?;
+    let arguments = css_check_arguments(arguments);
+    let program = std::env::var_os("PLIEGO_CSSC")
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "pliego-cssc".into());
+    let directory = command_working_directory(&context.root)?;
+    let status = Command::new(&program)
+        .arg("check")
+        .args(&arguments)
+        .current_dir(directory)
+        .status()
+        .map_err(|error| {
+            format!(
+                "required tool `{}` is unavailable: {error}; install PliegoCSS with `cargo install --locked --path crates/pliego-cssc`",
+                Path::new(&program).display()
+            )
+        })?;
+    if !status.success() {
+        return Err(format!("pliego-cssc check exited with {status}"));
+    }
+    println!("PLIEGO css check: delegated to pliego-cssc");
+    Ok(())
+}
+
+fn css_check_arguments(mut arguments: Vec<String>) -> Vec<String> {
+    if !arguments
+        .iter()
+        .any(|argument| argument == "--source" || argument.starts_with("--source="))
+    {
+        arguments.splice(0..0, ["--source".to_owned(), "src".to_owned()]);
+    }
+    arguments
 }
 
 fn print_templates() {
@@ -3384,6 +3435,26 @@ fn mime_for(path: &Path) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn css_delegation_defaults_to_src_without_overriding_explicit_sources() {
+        assert_eq!(
+            css_check_arguments(vec!["--seed".to_owned()]),
+            ["--source", "src", "--seed"]
+        );
+        assert_eq!(
+            css_check_arguments(vec!["--source=styles".to_owned(), "--seed".to_owned()]),
+            ["--source=styles", "--seed"]
+        );
+        assert_eq!(
+            css_check_arguments(vec![
+                "--source".to_owned(),
+                "styles".to_owned(),
+                "--seed".to_owned(),
+            ]),
+            ["--source", "styles", "--seed"]
+        );
+    }
 
     #[test]
     fn preview_serves_plain_text_with_a_text_mime_type() {
