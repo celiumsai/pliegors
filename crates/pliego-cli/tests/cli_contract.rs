@@ -42,6 +42,17 @@ fn unknown_command_is_usage_even_outside_a_project() {
 }
 
 #[test]
+fn malformed_css_delegation_is_usage_even_outside_a_project() {
+    for arguments in [&["css"][..], &["css", "lint"][..]] {
+        let output = pliego(arguments, &std::env::temp_dir());
+        assert_eq!(output.status.code(), Some(2));
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains("PLG-ARG-001"));
+        assert!(stderr.contains("pliego css check"));
+    }
+}
+
+#[test]
 fn json_diagnostics_have_a_stable_machine_contract() {
     let output = pliego(
         &["unknown-command", "--diagnostic-format", "json"],

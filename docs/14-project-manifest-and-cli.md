@@ -58,6 +58,14 @@ site package exposes a binary, and validates an optional client's `cdylib`,
 `wasm32-unknown-unknown` target, and `wasm-bindgen` installation. It produces no
 site output.
 
+`pliego css check [pliego-cssc check options]` optionally delegates application CSS validation to
+the separately installed `pliego-cssc` executable. PliegoRS does not link PliegoCSS crates or
+duplicate its compiler. The wrapper runs from the canonical project root and inserts
+`--source src` only when no explicit `--source` option is present. Install the tool from an exact
+PliegoCSS checkout with `cargo install --locked --path crates/pliego-cssc`; `PLIEGO_CSSC` may select
+an exact executable for pinned automation. The delegated process owns CSS diagnostics and a
+non-zero child status fails with the stable Pliego check exit category.
+
 `pliego build` executes this pipeline:
 
 1. Validate the canonical project root, current `pliego.toml`, environment, and
