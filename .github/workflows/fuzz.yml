@@ -44,7 +44,7 @@ jobs:
         run: rustup toolchain install "$PLIEGORS_FUZZ_TOOLCHAIN" --profile minimal
 
       - name: Install pinned cargo-fuzz
-        run: cargo install cargo-fuzz --version "$CARGO_FUZZ_VERSION" --locked
+        run: cargo +"$PLIEGORS_FUZZ_TOOLCHAIN" install cargo-fuzz --version "$CARGO_FUZZ_VERSION" --locked
 
       - name: Run deterministic fuzz smoke
         run: sh scripts/run-fuzz.sh

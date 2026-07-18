@@ -48,7 +48,7 @@ does not upload the archive; inspect it before attaching it to an issue.
 
 ```sh
 pliego upgrade --check
-pliego upgrade --check --target 0.0.1 --format json
+pliego upgrade --check --target 0.0.2 --format json
 ```
 
 The default target is the running CLI version. The command validates the strict
@@ -63,4 +63,3 @@ manifest and reads `Cargo.lock`, then reports one state:
 The check compares manifest and lockfile bytes before returning and fails if an
 unexpected mutation occurred. It never writes an upgrade. Installing a target
 CLI and applying migration guidance are separate, deliberate actions.
-
