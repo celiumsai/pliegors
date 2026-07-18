@@ -23,6 +23,20 @@ for (const file of schemaFiles) {
 }
 
 const fixtureRoot = path.join(root, "fixtures", "opensdk", "browser-component");
+const browserFrameworkGateSource = await readFile(
+  path.join(root, "scripts", "check-opensdk-browser-frameworks.mjs"),
+  "utf8",
+);
+assert.match(
+  browserFrameworkGateSource,
+  /response\.end\("Internal Server Error"\)/u,
+  "browser conformance server must return a generic internal error",
+);
+assert.doesNotMatch(
+  browserFrameworkGateSource,
+  /response\.end\(String\(error\)\)/u,
+  "browser conformance server must not expose internal exception details",
+);
 const manifestPath = path.join(fixtureRoot, "pliego-extension.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 validate("https://pliegors.dev/schemas/pliego.sdk-extension.schema.json", manifest, manifestPath);

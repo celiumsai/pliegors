@@ -19,6 +19,11 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   can use Wasmtime `36.0.8`, the first compatible patch line that resolves the
   RustSec advisories affecting the original `34.0.2` prototype.
 
+### Security
+
+- Prevent the OpenSDK browser conformance server from exposing internal
+  exception details in HTTP 500 responses.
+
 ## 0.0.2 - 2026-07-18
 
 ### Added
