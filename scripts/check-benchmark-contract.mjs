@@ -22,7 +22,27 @@ for (const file of files) {
 const schema = JSON.parse(await readFile(path.join(root, 'schemas', 'pliego.benchmark-report.schema.json'), 'utf8'));
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 addFormats(ajv);
-assert.equal(typeof ajv.compile(schema), 'function');
+const validate = ajv.compile(schema);
+assert.equal(typeof validate, 'function');
+
+const baselinePath = path.join(root, 'benchmarks', 'baselines', 'p8-888b892.json');
+const baseline = JSON.parse(await readFile(baselinePath, 'utf8'));
+assert.equal(validate(baseline), true, `invalid published P8 baseline: ${ajv.errorsText(validate.errors)}`);
+assert.equal(baseline.revision, '888b8929951c724b3b5146073897918779c539d1');
+assert.equal(baseline.sourceTreeDirty, false);
+for (const metric of ['cleanColdBuildMs', 'noChangeWarmMs', 'contentOnlyMs', 'cssOnlyMs', 'rustViewMs']) {
+  const values = baseline.build.rawObservations.map((observation) => observation[metric]);
+  assert.deepEqual(baseline.build.summary[metric], nearestRankSummary(values, 'Ms'));
+}
+assert.deepEqual(
+  baseline.browser.updateSummary.perUpdateUs,
+  nearestRankSummary(baseline.browser.rawObservations.map((observation) => observation.perUpdateUs), 'Us'),
+);
+const memoryTail = baseline.browser.memory.rawObservations.slice(-3).map((observation) => observation.linearMemoryBytes);
+const observedPlateau = memoryTail.length === 3
+  && memoryTail.every((value) => value === memoryTail[0])
+  && baseline.browser.memory.rawObservations.every((observation) => observation.domChildNodes === 0);
+assert.equal(baseline.browser.memory.plateau, observedPlateau);
 
 const [buildSource, browserSource, mergeSource] = await Promise.all(files.map((file) => readFile(path.join(root, file), 'utf8')));
 for (const metric of ['cleanColdBuildMs', 'noChangeWarmMs', 'contentOnlyMs', 'cssOnlyMs', 'rustViewMs']) {
@@ -38,3 +58,15 @@ assert.match(mergeSource, /nearest-rank/u);
 assert.match(mergeSource, /competitor benchmarks/u);
 
 console.log('P8 benchmark contract PASS: build mutations, browser apply, memory plateau, and clean-revision evidence');
+
+function nearestRankSummary(values, suffix) {
+  const ordered = [...values].sort((left, right) => left - right);
+  return {
+    [`p50${suffix}`]: round(ordered[Math.ceil(ordered.length * 0.50) - 1]),
+    [`p95${suffix}`]: round(ordered[Math.ceil(ordered.length * 0.95) - 1]),
+  };
+}
+
+function round(value) {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}

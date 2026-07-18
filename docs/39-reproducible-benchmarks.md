@@ -114,3 +114,27 @@ used for the build and browser sections, and each section records its own CPU,
 memory, storage declaration, runtime versions, cache policy, and limitations.
 Results from another commit, machine, browser, power state, or cache policy are
 a different experiment and must not be combined with this report.
+
+## Published local baseline
+
+The first complete [P8 baseline](../benchmarks/baselines/p8-888b892.json) is
+bound to clean revision `888b8929951c724b3b5146073897918779c539d1`. Build
+samples ran in Debian 13 on WSL2 with Rust 1.85.0, Node 20.19.2, an Intel Core
+Ultra 9 285H, 16 logical CPUs, 16 GB exposed memory, and an NVMe SSD through the
+WSL2 filesystem. Browser samples ran on Windows x64 with Chrome 150.0.7871.128,
+Node 24.16.0, the same CPU, 32 GB host memory, and an NVMe SSD.
+
+| Observation | p50 | p95 |
+| --- | ---: | ---: |
+| clean cold build | 11,455.060 ms | 14,946.898 ms |
+| no-change warm build | 1,715.485 ms | 1,979.736 ms |
+| content-only build | 1,690.088 ms | 2,473.570 ms |
+| CSS-only build | 2,185.710 ms | 2,727.206 ms |
+| Rust-view build | 2,173.469 ms | 2,808.250 ms |
+| browser apply per update | 1.300 us | 2.300 us |
+
+Across the recorded 500 through 3,500 lifecycle cycles, WASM linear memory
+remained at 1,179,648 bytes and every observation had zero residual DOM child
+nodes. Power and thermal state were not controlled or measured. These values
+are a local baseline for regression detection, not a release-candidate matrix
+or a claim about other machines.

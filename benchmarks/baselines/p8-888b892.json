@@ -1,0 +1,381 @@
+{
+  "contract": "dev.pliegors.p8-benchmark-report/v1",
+  "revision": "888b8929951c724b3b5146073897918779c539d1",
+  "sourceTreeDirty": false,
+  "createdAt": "2026-07-18T17:45:30.339Z",
+  "percentileMethod": "nearest-rank",
+  "methodologyDocument": "docs/39-reproducible-benchmarks.md",
+  "build": {
+    "contract": "dev.pliegors.p8-build-benchmark/v1",
+    "revision": "888b8929951c724b3b5146073897918779c539d1",
+    "sourceTreeDirty": false,
+    "createdAt": "2026-07-18T17:41:07.755Z",
+    "completedAt": "2026-07-18T17:45:15.054Z",
+    "sampleCount": 10,
+    "percentileMethod": "nearest-rank",
+    "environment": {
+      "platform": "linux",
+      "architecture": "x64",
+      "osRelease": "6.18.33.1-microsoft-standard-WSL2",
+      "cpuModel": "Intel(R) Core(TM) Ultra 9 285H",
+      "logicalCpuCount": 16,
+      "totalMemoryBytes": 16502116352,
+      "storageClass": "NVMe SSD (WSL2 virtualized filesystem)",
+      "node": "v20.19.2",
+      "rustc": "rustc 1.85.0 (4d91de4e4 2025-02-17)\nbinary: rustc\ncommit-hash: 4d91de4e48198da2e33413efdcd9cd2cc0c46688\ncommit-date: 2025-02-17\nhost: x86_64-unknown-linux-gnu\nrelease: 1.85.0\nLLVM version: 19.1.7",
+      "cargo": "cargo 1.85.0 (d73d2caf9 2024-12-31)\nrelease: 1.85.0\ncommit-hash: d73d2caf9e41a39daf2a8d6ce60ec80bf354d2a7\ncommit-date: 2024-12-31\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.8.1 (sys:0.19.0 vendored)\nlibcurl: 8.9.0-DEV (sys:0.4.74+curl-8.9.0 vendored ssl:OpenSSL/1.1.1w)\nssl: OpenSSL 1.1.1w  11 Sep 2023\nos: Debian 13.0.0 [64-bit]",
+      "powerAndThermalState": "not controlled or measured"
+    },
+    "fixture": {
+      "project": "examples/content-collections-pliegors",
+      "topology": "standalone copy with local path dependencies to the measured revision",
+      "dependencyResolution": "Cargo.lock generated before every timed sample"
+    },
+    "cachePolicy": {
+      "releaseCli": "built once outside timed regions",
+      "cleanColdBuild": "fresh project and empty Cargo target directory per sample",
+      "subsequentBuilds": "same target and project, in declared mutation order",
+      "cargoRegistryAndGit": "host caches retained and reported as an explicit limitation"
+    },
+    "measuredCommand": "pliego build",
+    "mutationOrder": [
+      "none/fresh target",
+      "none/warm target",
+      "Markdown content",
+      "included CSS",
+      "Rust view source"
+    ],
+    "rawObservations": [
+      {
+        "sample": 1,
+        "cleanColdBuildMs": 13562.066,
+        "noChangeWarmMs": 1715.485,
+        "contentOnlyMs": 1832.682,
+        "cssOnlyMs": 2355.563,
+        "rustViewMs": 2442.009
+      },
+      {
+        "sample": 2,
+        "cleanColdBuildMs": 13798.219,
+        "noChangeWarmMs": 1898.214,
+        "contentOnlyMs": 1982.585,
+        "cssOnlyMs": 2727.206,
+        "rustViewMs": 2808.25
+      },
+      {
+        "sample": 3,
+        "cleanColdBuildMs": 14618.929,
+        "noChangeWarmMs": 1979.736,
+        "contentOnlyMs": 2473.57,
+        "cssOnlyMs": 2401.527,
+        "rustViewMs": 2398.618
+      },
+      {
+        "sample": 4,
+        "cleanColdBuildMs": 14946.898,
+        "noChangeWarmMs": 1871.735,
+        "contentOnlyMs": 2048.916,
+        "cssOnlyMs": 2560.229,
+        "rustViewMs": 2393.571
+      },
+      {
+        "sample": 5,
+        "cleanColdBuildMs": 13916.045,
+        "noChangeWarmMs": 1862.721,
+        "contentOnlyMs": 1835.1,
+        "cssOnlyMs": 2365.707,
+        "rustViewMs": 2173.469
+      },
+      {
+        "sample": 6,
+        "cleanColdBuildMs": 9766.901,
+        "noChangeWarmMs": 1731.274,
+        "contentOnlyMs": 1520.208,
+        "cssOnlyMs": 1825.64,
+        "rustViewMs": 1762.744
+      },
+      {
+        "sample": 7,
+        "cleanColdBuildMs": 10735.932,
+        "noChangeWarmMs": 1519.22,
+        "contentOnlyMs": 1690.088,
+        "cssOnlyMs": 2020.982,
+        "rustViewMs": 2120.032
+      },
+      {
+        "sample": 8,
+        "cleanColdBuildMs": 9870.092,
+        "noChangeWarmMs": 1504.841,
+        "contentOnlyMs": 1554.702,
+        "cssOnlyMs": 1852.196,
+        "rustViewMs": 2027.218
+      },
+      {
+        "sample": 9,
+        "cleanColdBuildMs": 11455.06,
+        "noChangeWarmMs": 1421.018,
+        "contentOnlyMs": 1604.188,
+        "cssOnlyMs": 1934.485,
+        "rustViewMs": 2078.904
+      },
+      {
+        "sample": 10,
+        "cleanColdBuildMs": 10482.776,
+        "noChangeWarmMs": 1366.484,
+        "contentOnlyMs": 1640.552,
+        "cssOnlyMs": 2185.71,
+        "rustViewMs": 2462.347
+      }
+    ],
+    "summary": {
+      "cleanColdBuildMs": {
+        "p50Ms": 11455.06,
+        "p95Ms": 14946.898
+      },
+      "noChangeWarmMs": {
+        "p50Ms": 1715.485,
+        "p95Ms": 1979.736
+      },
+      "contentOnlyMs": {
+        "p50Ms": 1690.088,
+        "p95Ms": 2473.57
+      },
+      "cssOnlyMs": {
+        "p50Ms": 2185.71,
+        "p95Ms": 2727.206
+      },
+      "rustViewMs": {
+        "p50Ms": 2173.469,
+        "p95Ms": 2808.25
+      }
+    },
+    "limitations": [
+      "Results apply only to the recorded revision, hardware, operating system, toolchain, and cache policy.",
+      "The clean build retains host Cargo registry and Git caches; it clears only the project build target.",
+      "No competitor framework is measured or compared by this report."
+    ]
+  },
+  "browser": {
+    "contract": "dev.pliegors.p8-browser-benchmark/v1",
+    "revision": "888b8929951c724b3b5146073897918779c539d1",
+    "sourceTreeDirty": false,
+    "createdAt": "2026-07-18T17:40:59.398Z",
+    "percentileMethod": "nearest-rank",
+    "browser": {
+      "product": "Chrome/150.0.7871.128",
+      "revision": "@81891e5ca708047763816c778216799ef14c66cb",
+      "protocolVersion": "1.3",
+      "javascriptVersion": "15.0.1240245",
+      "executable": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "launchFlags": [
+        "--headless=new",
+        "--remote-debugging-port=0",
+        "--no-first-run",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--disable-default-apps",
+        "--disable-extensions",
+        "--disable-sync",
+        "--metrics-recording-only",
+        "about:blank"
+      ]
+    },
+    "host": {
+      "platform": "win32",
+      "architecture": "x64",
+      "osRelease": "10.0.26200",
+      "cpuModel": "Intel(R) Core(TM) Ultra 9 285H",
+      "logicalCpuCount": 16,
+      "totalMemoryBytes": 33820106752,
+      "storageClass": "NVMe SSD",
+      "node": "v24.16.0",
+      "powerAndThermalState": "not controlled or measured"
+    },
+    "browserEnvironment": {
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/150.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 16,
+      "deviceMemoryGiB": 32,
+      "language": "en-US",
+      "crossOriginIsolated": false,
+      "devicePixelRatio": 1
+    },
+    "settings": {
+      "samples": 20,
+      "updatesPerSample": 1000,
+      "updateWarmup": 250,
+      "plateauBatches": 6,
+      "plateauBatchCycles": 500
+    },
+    "updateSummary": {
+      "totalMs": {
+        "p50Ms": 1.3,
+        "p95Ms": 2.3
+      },
+      "perUpdateUs": {
+        "p50Us": 1.3,
+        "p95Us": 2.3
+      }
+    },
+    "rawObservations": [
+      {
+        "sample": 1,
+        "totalMs": 3.5,
+        "perUpdateUs": 3.5
+      },
+      {
+        "sample": 2,
+        "totalMs": 2.2000000178813934,
+        "perUpdateUs": 2.2000000178813934
+      },
+      {
+        "sample": 3,
+        "totalMs": 1.7999999821186066,
+        "perUpdateUs": 1.7999999821186066
+      },
+      {
+        "sample": 4,
+        "totalMs": 2.300000011920929,
+        "perUpdateUs": 2.300000011920929
+      },
+      {
+        "sample": 5,
+        "totalMs": 1.5,
+        "perUpdateUs": 1.5
+      },
+      {
+        "sample": 6,
+        "totalMs": 2.2000000178813934,
+        "perUpdateUs": 2.2000000178813934
+      },
+      {
+        "sample": 7,
+        "totalMs": 1.199999988079071,
+        "perUpdateUs": 1.199999988079071
+      },
+      {
+        "sample": 8,
+        "totalMs": 1.9000000059604645,
+        "perUpdateUs": 1.9000000059604645
+      },
+      {
+        "sample": 9,
+        "totalMs": 1.0999999940395355,
+        "perUpdateUs": 1.0999999940395355
+      },
+      {
+        "sample": 10,
+        "totalMs": 1.2000000178813934,
+        "perUpdateUs": 1.2000000178813934
+      },
+      {
+        "sample": 11,
+        "totalMs": 1.2999999821186066,
+        "perUpdateUs": 1.2999999821186066
+      },
+      {
+        "sample": 12,
+        "totalMs": 1.100000023841858,
+        "perUpdateUs": 1.100000023841858
+      },
+      {
+        "sample": 13,
+        "totalMs": 1.199999988079071,
+        "perUpdateUs": 1.199999988079071
+      },
+      {
+        "sample": 14,
+        "totalMs": 1.9000000059604645,
+        "perUpdateUs": 1.9000000059604645
+      },
+      {
+        "sample": 15,
+        "totalMs": 1.2999999821186066,
+        "perUpdateUs": 1.2999999821186066
+      },
+      {
+        "sample": 16,
+        "totalMs": 1.0999999940395355,
+        "perUpdateUs": 1.0999999940395355
+      },
+      {
+        "sample": 17,
+        "totalMs": 2.0999999940395355,
+        "perUpdateUs": 2.0999999940395355
+      },
+      {
+        "sample": 18,
+        "totalMs": 1.5999999940395355,
+        "perUpdateUs": 1.5999999940395355
+      },
+      {
+        "sample": 19,
+        "totalMs": 1.0999999940395355,
+        "perUpdateUs": 1.0999999940395355
+      },
+      {
+        "sample": 20,
+        "totalMs": 1,
+        "perUpdateUs": 1
+      }
+    ],
+    "memory": {
+      "plateauWarmupCycles": 500,
+      "plateauBatchCycles": 500,
+      "rawObservations": [
+        {
+          "completedCycles": 500,
+          "linearMemoryBytes": 1179648,
+          "domChildNodes": 0
+        },
+        {
+          "completedCycles": 1000,
+          "linearMemoryBytes": 1179648,
+          "domChildNodes": 0
+        },
+        {
+          "completedCycles": 1500,
+          "linearMemoryBytes": 1179648,
+          "domChildNodes": 0
+        },
+        {
+          "completedCycles": 2000,
+          "linearMemoryBytes": 1179648,
+          "domChildNodes": 0
+        },
+        {
+          "completedCycles": 2500,
+          "linearMemoryBytes": 1179648,
+          "domChildNodes": 0
+        },
+        {
+          "completedCycles": 3000,
+          "linearMemoryBytes": 1179648,
+          "domChildNodes": 0
+        },
+        {
+          "completedCycles": 3500,
+          "linearMemoryBytes": 1179648,
+          "domChildNodes": 0
+        }
+      ],
+      "plateau": true,
+      "criterion": "last three WebAssembly.Memory byte lengths equal and zero DOM child residue in every observation"
+    },
+    "limitations": [
+      "The synchronous signal loop measures PliegoRS DOM apply work and JavaScript-to-WASM call overhead in this browser.",
+      "WebAssembly linear memory is page-granular and may retain freed pages; plateau is not a heap object census.",
+      "Headless browser timing applies only to the recorded browser, host, settings, and revision.",
+      "No competitor framework is measured or compared by this report."
+    ]
+  },
+  "conclusions": {
+    "memoryPlateauObserved": true,
+    "evidenceScope": "Recorded observations for one revision and the declared environments; not a universal performance guarantee.",
+    "competitiveComparison": "none"
+  },
+  "limitations": [
+    "The two report sections may be captured on different operating systems and are interpreted independently.",
+    "Raw observations are authoritative; p50 and p95 are nearest-rank summaries.",
+    "This report does not contain or imply competitor benchmarks."
+  ]
+}
