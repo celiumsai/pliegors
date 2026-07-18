@@ -150,9 +150,9 @@ const server = createServer(async (request, response) => {
     }
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.end(html);
-  } catch (error) {
+  } catch {
     response.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
-    response.end(String(error));
+    response.end("Internal Server Error");
   }
 });
 const port = await listen(server);
