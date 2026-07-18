@@ -1,0 +1,5 @@
+key = "docs-telemetry"
+title = { en = "Voluntary telemetry | PliegoRS", es = "Telemetría voluntaria | PliegoRS" }
+description = { en = "Control PliegoRS disabled-by-default local telemetry, inspect its exact allowlist, export it without upload, and delete it under user control.", es = "Controla la telemetría local desactivada por defecto de PliegoRS, inspecciona su allowlist exacta, expórtala sin upload y elimínala bajo control del usuario." }
+image = "/media/pliegors/security-trust.webp"
+imageAlt = { en = "The bounded PliegoRS telemetry contract", es = "El contrato limitado de telemetría de PliegoRS" }

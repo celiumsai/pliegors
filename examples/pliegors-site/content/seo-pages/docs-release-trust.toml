@@ -1,0 +1,5 @@
+key = "docs-release-trust"
+title = { en = "Release trust | PliegoRS", es = "Confianza de releases | PliegoRS" }
+description = { en = "Verify PliegoRS deterministic release archives, signatures, SBOM, provenance, Sigstore identity, and release-only promotion evidence.", es = "Verifica archives deterministas, firmas, SBOM, provenance, identidad Sigstore y evidencia de promoción de releases de PliegoRS." }
+image = "/media/pliegors/security-trust.webp"
+imageAlt = { en = "The PliegoRS release trust plane", es = "El plano de confianza de releases de PliegoRS" }

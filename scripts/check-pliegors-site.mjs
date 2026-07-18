@@ -24,7 +24,10 @@ const routes = [
   "/docs/dom-lifecycle",
   "/docs/assets",
   "/docs/artifact-trust",
+  "/docs/release-trust",
+  "/docs/performance-evidence",
   "/docs/errors-and-diagnostics",
+  "/docs/telemetry",
   "/docs/build-and-deploy",
   "/docs/crate-reference",
   "/docs/licensing",
@@ -181,13 +184,17 @@ for (const statement of ["R0-R7", "public preview"]) {
 const docsHtml = await readFile(path.join(root, "docs/index.html"), "utf8").catch(() => "");
 const docsDocument = parse(docsHtml);
 const docsItems = elements(docsDocument, "a").filter((node) => attribute(node, "data-docs-item") === "");
-if (docsItems.length !== 18) failures.push(`docs index: expected 18 topics, found ${docsItems.length}`);
+if (docsItems.length !== 21) failures.push(`docs index: expected 21 topics, found ${docsItems.length}`);
 
 const cliSource = await readFile(path.join(repository, "crates/pliego-cli/src/main.rs"), "utf8");
 const cliGuide = await readFile(path.join(root, "docs/cli/index.html"), "utf8").catch(() => "");
 for (const command of [
   "pliego new <path>",
   "pliego templates",
+  "pliego doctor",
+  "pliego report --bundle",
+  "pliego upgrade --check",
+  "pliego telemetry <status|enable|preview|export|disable>",
   "pliego check",
   "pliego build",
   "pliego dev",
