@@ -203,6 +203,8 @@ jobs:
       - name: Smoke test Unix installer lifecycle
         if: matrix.replica == 1 && runner.os != 'Windows'
         shell: bash
+        env:
+          PLIEGORS_INSTALLER_ALLOW_UNSEALED: "1"
         run: |
           set -euo pipefail
           directory='${{ steps.package.outputs.directory }}'
@@ -218,6 +220,8 @@ jobs:
       - name: Smoke test Windows installer lifecycle
         if: matrix.replica == 1 && runner.os == 'Windows'
         shell: pwsh
+        env:
+          PLIEGORS_INSTALLER_ALLOW_UNSEALED: "1"
         run: |
           $directory = '${{ steps.package.outputs.directory }}'
           $installRoot = 'target/installer-smoke'

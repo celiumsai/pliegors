@@ -99,8 +99,10 @@ for (const contract of [
   'create-supply-chain-attestations.mjs', 'verify-supply-chain-attestations.mjs',
   'ATTESTATIONS.sigstore.json', 'cosign sign-blob', 'cosign verify-blob',
   'https://token.actions.githubusercontent.com', 'id-token: write',
+  'PLIEGORS_INSTALLER_ALLOW_UNSEALED',
   'gh release create', '--target "$GITHUB_SHA"', '--draft', '--prerelease', '--latest=false',
 ]) assert.ok(release.includes(contract), `release candidate contract lacks ${contract}`);
+assert.equal((release.match(/PLIEGORS_INSTALLER_ALLOW_UNSEALED/g) ?? []).length, 2, 'unsealed installer bypass must exist only in replica smoke steps');
 assert.doesNotMatch(release, /PliegoRS v0\.0\.1|--version 0\.0\.1/u, 'release notes must use the requested exact version');
 assert.ok(release.includes("github.ref == 'refs/heads/main'"), 'draft mode must be restricted to main');
 assert.equal(
@@ -315,6 +317,9 @@ for (const [name, source] of Object.entries(installerSources)) {
   assert.match(source, /channel latest/iu, `${name} installer must expose the explicit latest channel`);
   assert.ok(source.includes('.sha256'), `${name} installer must fetch a checksum sidecar`);
   assert.match(source, /sha256 mismatch/iu, `${name} installer must fail on checksum mismatch`);
+  assert.match(source, /Verified Ed25519 release manifest/iu, `${name} installer must verify the signed manifest internally`);
+  assert.ok(source.includes('97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250'), `${name} installer release fingerprint drift`);
+  assert.ok(source.includes('RELEASE-MANIFEST.json.sig'), `${name} installer lacks detached signature verification`);
   assert.doesNotMatch(source, /api\.github\.com|latest\.txt|dl\.pliego\.run/iu);
 }
 

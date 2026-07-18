@@ -2,7 +2,8 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -38,6 +39,9 @@ test('installers require an explicit GitHub release selector', async () => {
     assert.match(source, /\.sha256/u);
     assert.match(source, /\[0-9a-f\]\{64\}|\[0-9a-f\]\{64\}/iu);
     assert.match(source, /sha256 mismatch/iu);
+    assert.match(source, /Ed25519 release verification/iu);
+    assert.match(source, /97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250/u);
+    assert.match(source, /RELEASE-MANIFEST\.json\.sig/u);
   }
 
   assert.match(shell, /releases\/download"/u);
@@ -88,7 +92,93 @@ test('Windows installer is x64-only and verifies before extraction', async () =>
   assert.match(source, /Unsupported Windows architecture/u);
   assert.match(source, /x86_64-pc-windows-msvc/u);
   assert.ok(source.indexOf('$actual -ne $expected') < source.indexOf('Expand-Archive'));
+  assert.ok(source.indexOf('Invoke-SealedSelectionVerification -Directory') < source.indexOf('Expand-Archive'));
 });
+
+test('Unix installer verifies the sealed selection before extraction', async () => {
+  const source = await readFile(path.join(root, 'scripts', 'install.sh'), 'utf8');
+  assert.ok(source.indexOf('verify_sealed_selection "$tmp"') < source.indexOf('unzip -q'));
+});
+
+async function createTamperedSignedFixture(archive) {
+  const fixture = await mkdtemp(path.join(tmpdir(), 'pliegors-sealed-installer-'));
+  const archivePath = path.join(fixture, archive);
+  const bytes = Buffer.from('not the archive authorized by the signed manifest');
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  await Promise.all([
+    writeFile(archivePath, bytes),
+    writeFile(`${archivePath}.sha256`, `${sha256}  ${archive}`),
+    copyFile(
+      path.join(root, 'docs', 'evidence', 'r6', 'RELEASE-MANIFEST.json'),
+      path.join(fixture, 'RELEASE-MANIFEST.json'),
+    ),
+    copyFile(
+      path.join(root, 'docs', 'evidence', 'r6', 'RELEASE-MANIFEST.json.sig'),
+      path.join(fixture, 'RELEASE-MANIFEST.json.sig'),
+    ),
+    copyFile(
+      path.join(root, 'keys', 'pliegors-candidate-release.pub.pem'),
+      path.join(fixture, 'PLIEGORS-CANDIDATE-RELEASE.pub.pem'),
+    ),
+  ]);
+  return { fixture, archivePath };
+}
+
+test(
+  'Unix installer rejects a checksum-consistent archive not authorized by the signed manifest',
+  { skip: process.platform === 'win32' },
+  async () => {
+    const { fixture, archivePath } = await createTamperedSignedFixture(
+      'pliego-x86_64-unknown-linux-gnu.zip',
+    );
+    try {
+      const result = spawnSync(
+        'sh',
+        [path.join(root, 'scripts', 'install.sh'), '--archive', archivePath, '--version', '0.0.1'],
+        { encoding: 'utf8' },
+      );
+      assert.notEqual(result.status, 0);
+      assert.match(`${result.stdout}\n${result.stderr}`, /signed release asset mismatch/iu);
+    } finally {
+      await rm(fixture, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'PowerShell installer rejects a checksum-consistent archive not authorized by the signed manifest',
+  { skip: process.platform !== 'win32' },
+  async () => {
+    const { fixture, archivePath } = await createTamperedSignedFixture(
+      'pliego-x86_64-pc-windows-msvc.zip',
+    );
+    try {
+      const result = spawnSync(
+        'pwsh.exe',
+        [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          path.join(root, 'scripts', 'install.ps1'),
+          '-ArchivePath',
+          archivePath,
+          '-Version',
+          '0.0.1',
+          '-InstallDir',
+          path.join(fixture, 'install'),
+        ],
+        { encoding: 'utf8' },
+      );
+      assert.notEqual(result.status, 0);
+      assert.match(`${result.stdout}\n${result.stderr}`, /signed release asset mismatch/iu);
+    } finally {
+      await rm(fixture, { recursive: true, force: true });
+    }
+  },
+);
 
 test(
   'PowerShell installer fails closed on a checksum mismatch',
@@ -116,7 +206,10 @@ test(
           '-InstallDir',
           installDir,
         ],
-        { encoding: 'utf8' },
+        {
+          encoding: 'utf8',
+          env: { ...process.env, PLIEGORS_INSTALLER_ALLOW_UNSEALED: '1' },
+        },
       );
 
       assert.notEqual(result.status, 0);

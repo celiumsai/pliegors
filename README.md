@@ -117,8 +117,10 @@ CSS and remains independent of any CSS toolchain.
 
 Linux production binaries and macOS/Windows development binaries are also
 published in the [GitHub Release](https://github.com/celiumsai/pliegors/releases/tag/v0.0.1).
-Download installers to disk and verify the signed release bundle before running
-them; never pipe a network response directly into a shell. See the
+Installers require Node.js and verify their selected payload against the signed
+release manifest before extraction. Download installers to disk and verify the
+complete release bundle before running them; never pipe a network response
+directly into a shell. See the
 [distribution guide](docs/27-distribution-and-release.md).
 
 ## Local development
