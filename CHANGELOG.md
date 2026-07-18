@@ -2,14 +2,26 @@
 
 # Changelog
 
+All notable PliegoRS changes are recorded here. The project follows Semantic
+Versioning. Before 1.0, minor releases may contain breaking API changes.
+
 ## Unreleased
+
+### Added
 
 - Add the OpenSDK `0.1.0-preview.1` contracts, conformance CLI, typed Wasmtime
   Component host, effect broker, multilang/browser/tooling fixtures, and
   compatibility matrix.
+
+### Changed
+
 - Raise the next-release MSRV from Rust `1.85.0` to `1.86.0` so the OpenSDK host
   can use Wasmtime `36.0.8`, the first compatible patch line that resolves the
   RustSec advisories affecting the original `34.0.2` prototype.
+
+## 0.0.2 - 2026-07-18
+
+### Added
 
 - Add default-disabled, identifier-free voluntary funnel telemetry with exact
   local preview/export, a 64-event bound, no network collector, and complete
@@ -17,8 +29,6 @@
 - Add a signed release-only golden runner and exact matrix validator for Linux
   x64/ARM64, macOS x64/ARM64, Windows, Unicode, long paths, a pinned container,
   and required WSL2 promotion evidence.
-- Make release ZIPs and the signed framework source archive byte-reproducible,
-  and require one release-manifest digest across candidate and draft evidence.
 - Add clean-revision P8 benchmark harnesses for cold and incremental builds,
   real browser DOM application, lifecycle memory plateau, raw observations,
   atomic same-environment resume, nearest-rank summaries, and schema-validated
@@ -26,12 +36,8 @@
 - Add a separate P8 attestation package with a pinned CycloneDX SBOM,
   SLSA-compatible provenance, exact-set verification, and keyless Sigstore
   identity, while preserving the existing Ed25519 release bundle.
-- Make both installers verify the Ed25519 manifest, pinned public-key
-  fingerprint, selected archive, and signed sidecar before extraction.
 - Add six maintained libFuzzer targets with reviewed corpora and bounded CI for
   routes, manifests, event JSON, snapshots, DOM adoption, and adapters.
-- Make canary, beta, and stable release channels explicit in the manual release
-  workflow, enforce prerelease tag semantics, and generate version-neutral notes.
 - Add `pliego doctor` with versioned human/JSON checks for the CLI, Rust
   toolchain, project manifest, lockfile, package alignment, and WASM tools.
 - Add deterministic, local-only `pliego report --bundle` archives with an exact
@@ -42,11 +48,22 @@
   stability tiers, release channels, compatibility scope, and telemetry policy.
 - Add the audited P8 trust and adoption contract for CLI diagnostics, release
   identity, adversarial validation, benchmarks, and clean-machine evidence.
+
+### Changed
+
+- Make release ZIPs and the signed framework source archive byte-reproducible,
+  and require one release-manifest digest across candidate and draft evidence.
+- Make canary, beta, and stable release channels explicit in the manual release
+  workflow, enforce prerelease tag semantics, and generate version-neutral notes.
 - Mark delegated PliegoCSS interoperability experimental and paused rather than
   part of the supported quickstart.
 
-All notable PliegoRS changes are recorded here. The project follows Semantic
-Versioning. Before 1.0, minor releases may contain breaking API changes.
+### Security
+
+- Make both installers verify the Ed25519 manifest, pinned public-key
+  fingerprint, selected archive, and signed sidecar before extraction.
+- Require a complete nine-environment promotion matrix, including registry-based
+  WSL2 evidence, before a stable GitHub Release draft can be created.
 
 ## 0.0.1 - 2026-07-16
 
@@ -98,3 +115,7 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   contracts.
 - Static preview delivery serves `security.txt` as UTF-8 plain text and keeps
   its disclosure metadata available under `/.well-known/security.txt`.
+
+[Unreleased]: https://github.com/celiumsai/pliegors/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/celiumsai/pliegors/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/celiumsai/pliegors/releases/tag/v0.0.1
