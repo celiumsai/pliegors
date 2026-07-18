@@ -6,6 +6,10 @@
 
 - Add `pliego doctor` with versioned human/JSON checks for the CLI, Rust
   toolchain, project manifest, lockfile, package alignment, and WASM tools.
+- Add deterministic, local-only `pliego report --bundle` archives with an exact
+  manifest, redacted diagnostics, dependency digests, and an omission ledger.
+- Add read-only `pliego upgrade --check` compatibility reports for an explicit
+  target version without editing manifests or lockfiles.
 - Define the five-pillar product constitution, open/closed repository boundary,
   stability tiers, release channels, compatibility scope, and telemetry policy.
 - Add the audited P8 trust and adoption contract for CLI diagnostics, release

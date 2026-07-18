@@ -101,6 +101,15 @@ pliego check
 pliego dev
 ```
 
+Diagnose an environment, create a redacted local reproduction archive, and
+check exact package alignment without modifying the project:
+
+```sh
+pliego doctor
+pliego report --bundle
+pliego upgrade --check
+```
+
 The delegated `pliego css check` surface is experimental interoperability with a
 separately installed executable. PliegoCSS research is paused, is not published,
 and is not part of the supported PliegoRS quickstart. PliegoRS accepts standard
@@ -152,6 +161,7 @@ npm run check:site
 - [Candidate distribution contract](docs/33-candidate-distribution-contract.md)
 - [Product constitution and stability policy](docs/34-product-constitution.md)
 - [P8 trust and adoption contract](docs/35-p8-trust-and-adoption-contract.md)
+- [Diagnostics, reproduction reports, and upgrade checks](docs/36-diagnostics-reports-and-upgrades.md)
 - [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
 - [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)
 - [R4 acceptance evidence](docs/evidence/r4-dom-lifecycle.md)
