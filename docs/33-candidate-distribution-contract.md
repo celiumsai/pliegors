@@ -49,11 +49,15 @@ the PE timestamp and debug identity differ between builders and the candidate
 must fail.
 
 Each job uploads a ZIP, sidecar, and canonical build metadata. The seal job
-downloads all ten uploaded replicas before it trusts or signs anything. The two
-binary hashes for each target must be identical. ZIP hashes may differ because
-the current archiver retains container timestamps; replica 1 is selected
-deterministically and both archive hashes remain recorded. R6's reproducibility
-claim is exact binary-byte equality, not deterministic ZIP bytes.
+downloads all ten uploaded replicas before it trusts or signs anything. For the
+accepted `0.0.1` R6 evidence, binary hashes had to match while ZIP hashes could
+differ because the archiver retained container timestamps; replica 1 was
+selected deterministically. That paragraph is a historical claim about R6.
+
+P8 supersedes the packaging rule for future candidates. A repository-owned ZIP
+writer now sorts paths, fixes metadata, preserves only declared modes, and must
+produce identical archive bytes across both native replicas. The seal rejects
+either binary or archive hash disagreement.
 
 ## Signed exact set
 
@@ -68,7 +72,8 @@ support drift, and binary disagreement. It emits one exact unsigned set:
 - the candidate public key.
 
 Only after that exact set exists does `create-release-manifest.mjs` hash the 15
-primary assets and write `RELEASE-MANIFEST.json`. The canonical bytes bind the
+historical R6 primary assets and write `RELEASE-MANIFEST.json`. The canonical
+bytes bind the
 version, tag, source commit, source-date epoch, roles, byte sizes, SHA-256
 digests, two-replica policy, Ed25519 key ID, and public-key fingerprint.
 
@@ -88,6 +93,15 @@ and hashes, five ordered targets, two matching binary hashes per target, exact
 sidecars, and selection of replica 1. Unknown files are failures, not ignored
 extensions.
 
+For P8 and later, the primary exact set has 17 assets: the historical 15 plus
+the deterministic `pliegors-source.tar.gz` and signed
+`run-golden-path.mjs`. The source archive is built twice from the exact Git
+revision with timestamp-neutral gzip metadata, rejects tracked symlinks, and
+must compare byte for byte before assembly. The complete bundle additionally
+contains the public key, manifest, and detached signature. The current
+verifier enforces this expanded set; the committed R6 evidence remains an
+immutable record validated by its historical checks.
+
 ## Installer and golden path
 
 Replica 1 for every target executes the native installer lifecycle:
@@ -96,12 +110,12 @@ Replica 1 for every target executes the native installer lifecycle:
 install -> execute -> install again -> rollback -> execute -> uninstall
 ```
 
-The distribution-only golden job checks out no framework source. It downloads
-only the sealed artifact, verifies the signed complete bundle against the fixed
-fingerprint, installs the Linux x64 archive, and confirms `pliego 0.0.1`. The
-installed CLI then scaffolds without `--framework-path`; all first-party Cargo
-dependencies must use the exact public crates.io version, with no Git or path
-dependency. The job completes:
+The accepted R6 distribution-only golden job checked out no framework source.
+It downloaded only the sealed artifact, verified the signed complete bundle
+against the fixed fingerprint, installed the Linux x64 archive, and confirmed
+`pliego 0.0.1`. The installed CLI then scaffolded without
+`--framework-path`; all first-party Cargo dependencies used the exact public
+crates.io version, with no Git or path dependency. The job completed:
 
 ```text
 pliego check
@@ -114,6 +128,12 @@ uninstall
 
 No binary or framework checkout from the workflow workspace participates in
 that application path.
+
+P8 replaces this single row with the
+[release-only golden environment matrix](40-release-only-golden-matrix.md).
+Eight hosted environments plus required physical WSL2 evidence exercise the
+signed runner, deterministic release bytes, candidate-source bootstrap, and
+registry-only draft promotion.
 
 ## Candidate versus public release
 

@@ -18,7 +18,7 @@ remain mandatory regression gates.
 | P8-A04 | Installer signature verification, SBOM, SLSA provenance, and Sigstore identity | SBOM, SLSA-compatible provenance, exact attestation manifest, Sigstore workflow, and local tamper tests are implemented; installer verification and hosted-candidate proof remain open | Tamper tests and a sealed release candidate where every artifact is covered |
 | P8-A05 | Fuzz, property, and adversarial suites for trust boundaries | Six maintained targets, reviewed seed corpora, bounded CI smoke, and reproducible long-run instructions are implemented; hosted CI evidence remains open | [Fuzzing contract](38-fuzzing-and-adversarial-testing.md), local WSL2 smoke, and hosted candidate run |
 | P8-A06 | Reproducible cold/warm/content/CSS/Rust-view/browser-apply/memory benchmarks | The [versioned P8 harness and published local baseline](39-reproducible-benchmarks.md) include raw observations, nearest-rank summaries, hardware, schema validation, a clean-tree guard, and honest scope; candidate matrix evidence remains open | Clean same-revision build/browser reports merged and sealed with the candidate |
-| P8-A07 | Release-only golden paths on Windows, macOS, Linux, WSL, container, Unicode, and long paths | Five release targets and several Unicode/WSL fixtures exist; the complete environment matrix is not one gate | Matrix report bound to the candidate commit and exact release bytes |
+| P8-A07 | Release-only golden paths on Windows, macOS, Linux, WSL, container, Unicode, and long paths | The [signed eight-host matrix, deterministic release bytes, and required WSL2 promotion report](40-release-only-golden-matrix.md) are implemented; hosted candidate and physical WSL2 proof remain open | Matrix report bound to one candidate commit, release-manifest digest, and exact release bytes |
 | P8-A08 | Telemetry disabled by default and voluntary funnel report | No framework/CLI telemetry exists; no opt-in funnel reporter exists | Network-denial test, documented schema, local preview, explicit consent, and deletion path |
 
 No row becomes complete from inspection alone. The final evidence file must link
@@ -122,6 +122,13 @@ The matrix includes Linux x64, Linux ARM64, macOS x64/ARM64, Windows x64, WSL2,
 a pinned Linux container, a Unicode workspace, and a platform-appropriate long
 path workspace. Unsupported host limitations are explicit results, not skipped
 successes.
+
+Candidate mode may use only the signed same-revision source archive before an
+exact crates version exists. Draft mode must use the exact crates.io graph. A
+draft additionally requires a WSL2 registry-mode report whose signed
+release-manifest digest equals all eight hosted reports. The normative
+environment, source, determinism, and promotion rules are defined in the
+[release-only golden matrix contract](40-release-only-golden-matrix.md).
 
 ## Telemetry acceptance
 

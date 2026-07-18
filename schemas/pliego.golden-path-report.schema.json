@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.golden-path-report.schema.json",
+  "title": "PliegoRS P8 golden path report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "revision",
+    "environmentId",
+    "target",
+    "scenario",
+    "dependencySource",
+    "createdAt",
+    "completedAt",
+    "host",
+    "workspace",
+    "cliSha256",
+    "releaseManifestSha256",
+    "reproductionBundleSha256",
+    "steps",
+    "passed",
+    "failure"
+  ],
+  "properties": {
+    "contract": { "const": "dev.pliegors.p8-golden-path/v1" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$" },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "environmentId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "target": {
+      "enum": [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu"
+      ]
+    },
+    "scenario": { "enum": ["standard", "unicode", "long-path"] },
+    "dependencySource": { "enum": ["candidate-source", "registry"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "architecture", "osRelease", "cpuModel", "logicalCpuCount", "totalMemoryBytes", "node", "rustc", "cargo"],
+      "properties": {
+        "platform": { "enum": ["linux", "darwin", "win32"] },
+        "architecture": { "enum": ["x64", "arm64"] },
+        "osRelease": { "type": "string", "minLength": 1 },
+        "cpuModel": { "type": "string", "minLength": 1 },
+        "logicalCpuCount": { "type": "integer", "minimum": 1 },
+        "totalMemoryBytes": { "type": "integer", "minimum": 1 },
+        "node": { "type": "string", "minLength": 1 },
+        "rustc": { "type": "string", "minLength": 1 },
+        "cargo": { "type": "string", "minLength": 1 }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pathLength", "containsUnicode", "exceedsLegacyWindowsMaxPath"],
+      "properties": {
+        "pathLength": { "type": "integer", "minimum": 1 },
+        "containsUnicode": { "type": "boolean" },
+        "exceedsLegacyWindowsMaxPath": { "type": "boolean" }
+      }
+    },
+    "cliSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "releaseManifestSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "reproductionBundleSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "durationMs"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+          "status": { "enum": ["pass", "fail"] },
+          "durationMs": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "passed": { "type": "boolean" },
+    "failure": { "type": ["string", "null"] }
+  }
+}

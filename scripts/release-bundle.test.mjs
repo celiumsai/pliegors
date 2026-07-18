@@ -22,6 +22,7 @@ import {
   RELEASE_MANIFEST_SCHEMA,
   REPRODUCIBILITY_SCHEMA,
   SIGNATURE_NAME,
+  SOURCE_ARCHIVE_NAME,
   TARGETS,
   archiveName,
   assetRole,
@@ -63,7 +64,7 @@ async function writeSignedFixture() {
       })),
     });
   }
-  for (const name of ['install.ps1', 'install.sh', 'release-bundle-lib.mjs', 'verify-release-bundle.mjs']) {
+  for (const name of ['install.ps1', 'install.sh', 'run-golden-path.mjs', 'release-bundle-lib.mjs', SOURCE_ARCHIVE_NAME, 'verify-release-bundle.mjs']) {
     await writeFile(path.join(directory, name), `fixture:${name}\n`);
   }
   await writeFile(
@@ -139,16 +140,18 @@ test('bundle verifier rejects changed bytes, unexpected files, and replica drift
   }
 });
 
-test('candidate assembler requires two byte-reproducible builds per target', async () => {
+test('candidate assembler requires byte-reproducible binaries and archives per target', async () => {
   const temporary = await temporaryDirectory();
   const input = path.join(temporary, 'input');
   const output = path.join(temporary, 'output');
   const publicKeyPath = path.join(temporary, 'public.pem');
+  const sourceArchivePath = path.join(temporary, SOURCE_ARCHIVE_NAME);
   const { publicKey } = generateKeyPairSync('ed25519');
   const commit = 'e'.repeat(40);
   try {
     await mkdir(input);
     await writeFile(publicKeyPath, publicKey.export({ type: 'spki', format: 'pem' }));
+    await writeFile(sourceArchivePath, 'source archive fixture');
     for (const target of TARGETS) {
       const binaryFile = await writeTemporaryBytes(
         temporary,
@@ -161,7 +164,7 @@ test('candidate assembler requires two byte-reproducible builds per target', asy
         await mkdir(directory);
         const archive = archiveName(target.target);
         const archivePath = path.join(directory, archive);
-        await writeFile(archivePath, `archive:${target.target}:${replica}`);
+        await writeFile(archivePath, `archive:${target.target}`);
         const archiveSha256 = await sha256File(archivePath);
         const archiveBytes = (await readFile(archivePath)).length;
         await writeFile(path.join(directory, `${archive}.sha256`), `${archiveSha256}  ${archive}`);
@@ -190,6 +193,7 @@ test('candidate assembler requires two byte-reproducible builds per target', asy
         '--output', output,
         '--source', root,
         '--public-key', publicKeyPath,
+        '--source-archive', sourceArchivePath,
         '--version', '0.0.1',
         '--commit', commit,
       ],
@@ -200,6 +204,35 @@ test('candidate assembler requires two byte-reproducible builds per target', asy
     const reproducibility = JSON.parse(await readFile(path.join(output, 'REPRODUCIBILITY.json'), 'utf8'));
     assert.equal(reproducibility.targets.length, 5);
     assert.ok(reproducibility.targets.every((target) => target.replicas.length === 2));
+
+    const changedTarget = TARGETS[0].target;
+    const changedDirectory = path.join(input, `${changedTarget}-2`);
+    const changedArchive = archiveName(changedTarget);
+    const changedArchivePath = path.join(changedDirectory, changedArchive);
+    await writeFile(changedArchivePath, 'checksum-consistent but different archive');
+    const changedHash = await sha256File(changedArchivePath);
+    await writeFile(path.join(changedDirectory, `${changedArchive}.sha256`), `${changedHash}  ${changedArchive}`);
+    const changedMetadataPath = path.join(changedDirectory, 'CANDIDATE-METADATA.json');
+    const changedMetadata = JSON.parse(await readFile(changedMetadataPath, 'utf8'));
+    changedMetadata.archiveSha256 = changedHash;
+    changedMetadata.archiveBytes = (await readFile(changedArchivePath)).length;
+    await writeFile(changedMetadataPath, canonicalJson(changedMetadata));
+    const rejected = spawnSync(
+      process.execPath,
+      [
+        'scripts/assemble-release-candidate.mjs',
+        '--input', input,
+        '--output', path.join(temporary, 'rejected-output'),
+        '--source', root,
+        '--source-archive', sourceArchivePath,
+        '--public-key', publicKeyPath,
+        '--version', '0.0.1',
+        '--commit', commit,
+      ],
+      { cwd: root, encoding: 'utf8' },
+    );
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /archive is not byte-reproducible/u);
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }

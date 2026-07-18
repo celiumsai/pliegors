@@ -147,6 +147,7 @@ cargo clippy --target wasm32-unknown-unknown --locked -p pliegors-site-client -p
 npm ci
 npm run check:benchmarks
 npm run check:fuzz
+npm run check:golden-path
 npm run check:docs
 npm run check:distribution
 npm run check:phase-1
@@ -169,6 +170,7 @@ npm run check:site
 - [Supply-chain attestations](docs/37-supply-chain-attestations.md)
 - [Fuzzing and adversarial testing](docs/38-fuzzing-and-adversarial-testing.md)
 - [Reproducible benchmarks](docs/39-reproducible-benchmarks.md)
+- [Release-only golden environment matrix](docs/40-release-only-golden-matrix.md)
 - [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
 - [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)
 - [R4 acceptance evidence](docs/evidence/r4-dom-lifecycle.md)

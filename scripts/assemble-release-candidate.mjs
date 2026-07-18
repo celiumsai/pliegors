@@ -7,6 +7,7 @@ import {
   BUILD_METADATA_SCHEMA,
   CANDIDATE_PUBLIC_KEY_NAME,
   REPRODUCIBILITY_SCHEMA,
+  SOURCE_ARCHIVE_NAME,
   TARGETS,
   archiveName,
   assertRegularFile,
@@ -109,9 +110,10 @@ async function main() {
     '--output',
     '--public-key',
     '--source',
+    '--source-archive',
     '--version',
   ]);
-  for (const required of ['--commit', '--input', '--output', '--public-key', '--source', '--version']) {
+  for (const required of ['--commit', '--input', '--output', '--public-key', '--source', '--source-archive', '--version']) {
     if (!args[required]) throw new Error(`${required} is required`);
   }
   const version = requireSemver(args['--version']);
@@ -119,12 +121,15 @@ async function main() {
   const input = path.resolve(args['--input']);
   const output = path.resolve(args['--output']);
   const source = path.resolve(args['--source']);
+  const sourceArchive = path.resolve(args['--source-archive']);
   const publicKey = path.resolve(args['--public-key']);
   if (output === input || output.startsWith(`${input}${path.sep}`)) {
     throw new Error('output must be disjoint from candidate input');
   }
   await assertEmptyOutput(output);
   await assertRegularFile(publicKey, 'candidate public key');
+  const sourceArchiveStat = await assertRegularFile(sourceArchive, SOURCE_ARCHIVE_NAME);
+  if (sourceArchiveStat.size > 100 * 1024 * 1024) throw new Error('source archive exceeds 100 MiB');
 
   const metadataPaths = await findMetadataFiles(input);
   if (metadataPaths.length !== TARGETS.length * 2) {
@@ -141,6 +146,9 @@ async function main() {
     }
     if (replicas[0].binarySha256 !== replicas[1].binarySha256) {
       throw new Error(`target ${target.target} is not binary reproducible`);
+    }
+    if (replicas[0].archiveSha256 !== replicas[1].archiveSha256) {
+      throw new Error(`target ${target.target} archive is not byte-reproducible`);
     }
     const selected = replicas[0];
     await copyFile(selected.archivePath, path.join(output, selected.archive));
@@ -161,6 +169,7 @@ async function main() {
   const sourceFiles = [
     ['scripts/install.ps1', 'install.ps1'],
     ['scripts/install.sh', 'install.sh'],
+    ['scripts/run-golden-path.mjs', 'run-golden-path.mjs'],
     ['scripts/release-bundle-lib.mjs', 'release-bundle-lib.mjs'],
     ['scripts/verify-release-bundle.mjs', 'verify-release-bundle.mjs'],
   ];
@@ -169,6 +178,7 @@ async function main() {
     await assertRegularFile(file, relative);
     await copyFile(file, path.join(output, name));
   }
+  await copyFile(sourceArchive, path.join(output, SOURCE_ARCHIVE_NAME));
   await copyFile(publicKey, path.join(output, CANDIDATE_PUBLIC_KEY_NAME));
   await writeFile(
     path.join(output, 'REPRODUCIBILITY.json'),
@@ -183,8 +193,10 @@ async function main() {
       ...TARGETS.flatMap(({ target }) => [archiveName(target), `${archiveName(target)}.sha256`]),
       'install.ps1',
       'install.sh',
+      'run-golden-path.mjs',
       'release-bundle-lib.mjs',
       'REPRODUCIBILITY.json',
+      SOURCE_ARCHIVE_NAME,
       'verify-release-bundle.mjs',
       CANDIDATE_PUBLIC_KEY_NAME,
     ],
