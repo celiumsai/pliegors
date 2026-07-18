@@ -2,6 +2,7 @@
 
 use serde_json::Value;
 use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -111,6 +112,104 @@ fn malformed_doctor_options_are_usage_errors() {
     let output = pliego(&["doctor", "--format", "yaml"], &std::env::temp_dir());
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("PLG-ARG-001"));
+}
+
+fn write_trust_fixture(destination: &std::path::Path, version: &str) {
+    fs::create_dir_all(destination).unwrap();
+    fs::write(
+        destination.join("pliego.toml"),
+        "[project]\nid = \"trust-fixture\"\nname = \"Trust Fixture\"\nsite_package = \"trust-fixture\"\noutput = \"target/site\"\n",
+    )
+    .unwrap();
+    fs::write(
+        destination.join("Cargo.lock"),
+        format!(
+            "version = 4\n\n[[package]]\nname = \"pliego-ssg\"\nversion = \"{version}\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"0000000000000000000000000000000000000000000000000000000000000000\"\n"
+        ),
+    )
+    .unwrap();
+}
+
+#[test]
+fn report_bundle_is_deterministic_bounded_and_excludes_project_secrets() {
+    let destination = temporary_directory("report-bundle");
+    write_trust_fixture(&destination, env!("CARGO_PKG_VERSION"));
+    fs::create_dir_all(destination.join("src")).unwrap();
+    fs::write(
+        destination.join("src/private.rs"),
+        "const SECRET: &str = \"PLIEGO_TEST_SECRET_6f32\";",
+    )
+    .unwrap();
+    fs::write(destination.join(".env"), "TOKEN=PLIEGO_TEST_SECRET_6f32").unwrap();
+    let first = destination.join("first.tar");
+    let second = destination.join("second.tar");
+    for output in [&first, &second] {
+        let result = pliego(
+            &["report", "--bundle", "--output", output.to_str().unwrap()],
+            &destination,
+        );
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+    assert_eq!(fs::read(&first).unwrap(), fs::read(&second).unwrap());
+    let bytes = fs::read(&first).unwrap();
+    assert!(!String::from_utf8_lossy(&bytes).contains("PLIEGO_TEST_SECRET_6f32"));
+    let mut archive = tar::Archive::new(bytes.as_slice());
+    let mut entries = Vec::new();
+    for entry in archive.entries().unwrap() {
+        let mut entry = entry.unwrap();
+        let path = entry.path().unwrap().to_string_lossy().replace('\\', "/");
+        let mut body = Vec::new();
+        entry.read_to_end(&mut body).unwrap();
+        entries.push((path, body));
+    }
+    assert!(entries.iter().any(|(path, _)| path == "MANIFEST.json"));
+    assert!(entries.iter().any(|(path, _)| path == "report/doctor.json"));
+    assert!(entries.iter().any(|(path, _)| path == "report/pliego.toml"));
+    assert!(
+        !entries
+            .iter()
+            .any(|(path, _)| path.contains("private.rs") || path.contains(".env"))
+    );
+    fs::remove_dir_all(destination).unwrap();
+}
+
+#[test]
+fn upgrade_check_is_read_only_and_reports_exact_alignment() {
+    let destination = temporary_directory("upgrade-check");
+    write_trust_fixture(&destination, env!("CARGO_PKG_VERSION"));
+    let manifest = fs::read(destination.join("pliego.toml")).unwrap();
+    let lock = fs::read(destination.join("Cargo.lock")).unwrap();
+    let output = pliego(&["upgrade", "--check", "--format", "json"], &destination);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["status"], "compatible");
+    assert_eq!(fs::read(destination.join("pliego.toml")).unwrap(), manifest);
+    assert_eq!(fs::read(destination.join("Cargo.lock")).unwrap(), lock);
+    fs::remove_dir_all(destination).unwrap();
+}
+
+#[test]
+fn upgrade_check_blocks_a_target_cli_that_is_not_running() {
+    let destination = temporary_directory("upgrade-target");
+    write_trust_fixture(&destination, env!("CARGO_PKG_VERSION"));
+    let output = pliego(
+        &[
+            "upgrade", "--check", "--target", "0.0.2", "--format", "json",
+        ],
+        &destination,
+    );
+    assert_eq!(output.status.code(), Some(1));
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["status"], "blocked");
+    fs::remove_dir_all(destination).unwrap();
 }
 
 #[test]

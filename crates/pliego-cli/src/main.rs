@@ -493,6 +493,32 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
             ))
         };
     }
+    if command == "report" {
+        let options = trust::parse_report_options(arguments.collect())
+            .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
+        let output = trust::create_report(options)
+            .map_err(|error| CliFailure::new(FailureKind::Artifact, error))?;
+        println!("PLIEGO report bundle: {}", output.display());
+        return Ok(());
+    }
+    if command == "upgrade" {
+        let options = trust::parse_upgrade_options(arguments.collect())
+            .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
+        let format = options.format;
+        let report = trust::check_upgrade(&options)
+            .map_err(|error| CliFailure::new(FailureKind::Doctor, error))?;
+        report
+            .print(format)
+            .map_err(|error| CliFailure::new(FailureKind::Doctor, error))?;
+        return if report.succeeded() {
+            Ok(())
+        } else {
+            Err(CliFailure::new(
+                FailureKind::Doctor,
+                "upgrade check requires attention; no files were changed".to_owned(),
+            ))
+        };
+    }
     if command == "css" {
         let css_arguments = parse_css_command(arguments.collect())
             .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
@@ -548,7 +574,7 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 
 fn print_help() {
     println!(
-        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
+        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport and upgrade checks are local and never upload or mutate project files.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );
 }
 
