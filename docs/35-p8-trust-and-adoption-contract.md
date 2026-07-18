@@ -19,7 +19,7 @@ remain mandatory regression gates.
 | P8-A05 | Fuzz, property, and adversarial suites for trust boundaries | Six maintained targets, reviewed seed corpora, bounded CI smoke, and reproducible long-run instructions are implemented; hosted CI evidence remains open | [Fuzzing contract](38-fuzzing-and-adversarial-testing.md), local WSL2 smoke, and hosted candidate run |
 | P8-A06 | Reproducible cold/warm/content/CSS/Rust-view/browser-apply/memory benchmarks | The [versioned P8 harness and published local baseline](39-reproducible-benchmarks.md) include raw observations, nearest-rank summaries, hardware, schema validation, a clean-tree guard, and honest scope; candidate matrix evidence remains open | Clean same-revision build/browser reports merged and sealed with the candidate |
 | P8-A07 | Release-only golden paths on Windows, macOS, Linux, WSL, container, Unicode, and long paths | The [signed eight-host matrix, deterministic release bytes, and required WSL2 promotion report](40-release-only-golden-matrix.md) are implemented; hosted candidate and physical WSL2 proof remain open | Matrix report bound to one candidate commit, release-manifest digest, and exact release bytes |
-| P8-A08 | Telemetry disabled by default and voluntary funnel report | No framework/CLI telemetry exists; no opt-in funnel reporter exists | Network-denial test, documented schema, local preview, explicit consent, and deletion path |
+| P8-A08 | Telemetry disabled by default and voluntary funnel report | [Explicit local consent, bounded funnel events, preview/export, schema, network-denial tests, and deletion](41-voluntary-telemetry.md) are implemented; hosted release-only proof remains open | Default-disabled golden path plus local lifecycle, proxy-denial, redaction, bounds, and schema evidence |
 
 No row becomes complete from inspection alone. The final evidence file must link
 commands, fixtures, raw outputs, runner identities, and the exact candidate.
@@ -134,13 +134,18 @@ environment, source, determinism, and promotion rules are defined in the
 
 The zero-telemetry path is release-blocking. With reporting disabled, the CLI
 must perform no framework-owned network request during the local golden path.
-Opt-in reporting, once implemented, requires a deliberate command or config
-change, a local event preview, a versioned event allowlist, bounded storage,
-retry limits, redaction tests, and `pliego telemetry disable --delete-local`.
+The P8 reporter requires a deliberate command, local preview, versioned event
+allowlist, bounded storage, redaction tests, and
+`pliego telemetry disable --delete-local`. It exports a local report only; no
+collector, endpoint, background uploader, or retry queue exists. A future
+network submission surface requires a new policy version and bounded retries.
 
 The initial funnel is limited to `install`, `new`, `check`, `dev`, and `build`.
 It is unsuitable for billing, identity, or project analytics and must not be
 implemented as a hidden prerequisite for Pliego.run.
+
+The normative privacy and command contract is the
+[voluntary telemetry policy](41-voluntary-telemetry.md).
 
 ## Exit gate
 

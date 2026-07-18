@@ -49,6 +49,8 @@ releases.
 - `pliego new`, `check`, `build`, native-event `dev`, `preview`, `inspect`,
   `why artifact`, `why-rebuilt`, causal graphs, typed HMR, and maintained
   replayable default, minimal, editorial, and cinematic starters;
+- default-disabled, identifier-free voluntary funnel telemetry with local
+  preview, explicit export, a 64-event bound, and complete deletion;
 - a five-target, two-replica release pipeline with a signed exact-set
   manifest and a distribution-only golden path;
 - an independently committed external flagship that exercises durable events,
@@ -108,6 +110,7 @@ check exact package alignment without modifying the project:
 pliego doctor
 pliego report --bundle
 pliego upgrade --check
+pliego telemetry status
 ```
 
 The delegated `pliego css check` surface is experimental interoperability with a
@@ -148,6 +151,7 @@ npm ci
 npm run check:benchmarks
 npm run check:fuzz
 npm run check:golden-path
+npm run check:telemetry
 npm run check:docs
 npm run check:distribution
 npm run check:phase-1
@@ -171,6 +175,7 @@ npm run check:site
 - [Fuzzing and adversarial testing](docs/38-fuzzing-and-adversarial-testing.md)
 - [Reproducible benchmarks](docs/39-reproducible-benchmarks.md)
 - [Release-only golden environment matrix](docs/40-release-only-golden-matrix.md)
+- [Voluntary telemetry and local funnel report](docs/41-voluntary-telemetry.md)
 - [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
 - [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)
 - [R4 acceptance evidence](docs/evidence/r4-dom-lifecycle.md)

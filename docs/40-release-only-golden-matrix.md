@@ -14,9 +14,10 @@ The signed `run-golden-path.mjs` asset executes this ordered contract:
 
 ```text
 verify release -> extract signed source when required -> install -> version
--> global doctor -> new -> check -> cargo test -> dev HTTP smoke -> build
+-> prove telemetry disabled -> global doctor -> new -> check -> cargo test
+-> dev HTTP smoke -> build
 -> inspect -> why artifact -> report --bundle -> upgrade --check
--> project doctor -> uninstall
+-> project doctor -> prove telemetry still disabled -> uninstall
 ```
 
 Every step records pass/fail and duration in a canonical

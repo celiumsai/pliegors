@@ -33,7 +33,7 @@ if (process.argv.length === 2) {
   const checked = spawnSync(process.execPath, ['--check', path.join(root, 'scripts', 'run-golden-path.mjs')], { encoding: 'utf8', windowsHide: true });
   assert.equal(checked.status, 0, checked.stderr);
   const runner = await readFile(path.join(root, 'scripts', 'run-golden-path.mjs'), 'utf8');
-  for (const command of ['doctor-global', 'cargo-test', 'dev-smoke', 'report-bundle', 'upgrade-check', 'doctor-project', 'uninstall']) {
+  for (const command of ['telemetry-default-before', 'doctor-global', 'cargo-test', 'dev-smoke', 'report-bundle', 'upgrade-check', 'doctor-project', 'telemetry-default-after', 'uninstall']) {
     assert.match(runner, new RegExp(`step\\('${command}'`, 'u'));
   }
   assert.match(runner, /candidate-source/u);
@@ -126,8 +126,9 @@ function requiredSteps(source) {
   return [
     'verify-release-bundle',
     ...(source === 'candidate-source' ? ['extract-signed-source'] : []),
-    'install', 'version', 'doctor-global', 'new', 'check', 'cargo-test', 'dev-smoke',
-    'build', 'inspect', 'why-artifact', 'report-bundle', 'upgrade-check', 'doctor-project', 'uninstall',
+    'install', 'version', 'telemetry-default-before', 'doctor-global', 'new', 'check',
+    'cargo-test', 'dev-smoke', 'build', 'inspect', 'why-artifact', 'report-bundle',
+    'upgrade-check', 'doctor-project', 'telemetry-default-after', 'uninstall',
   ];
 }
 

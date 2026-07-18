@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- Add default-disabled, identifier-free voluntary funnel telemetry with exact
+  local preview/export, a 64-event bound, no network collector, and complete
+  disable/delete controls.
 - Add a signed release-only golden runner and exact matrix validator for Linux
   x64/ARM64, macOS x64/ARM64, Windows, Unicode, long paths, a pinned container,
   and required WSL2 promotion evidence.
