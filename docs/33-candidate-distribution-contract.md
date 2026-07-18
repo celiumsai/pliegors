@@ -117,9 +117,12 @@ that application path.
 
 ## Candidate versus public release
 
-The network installers validate archive SHA-256 sidecars; they do not
-independently verify the Ed25519 bundle. The high-assurance path therefore
-downloads and verifies the whole release before executing an installer.
+The network installers validate archive SHA-256 sidecars and independently
+verify the selected archive against the canonical Ed25519 manifest and fixed
+public-key fingerprint before extraction. They require Node.js for this
+verification. Because an installer cannot establish its own authenticity, the
+high-assurance bootstrap path still downloads and verifies the complete bundle
+before executing that installer.
 
 For `0.0.1`, `pliegors.dev/security/` is the independent fingerprint bootstrap
 surface and the final draft is reviewed over the exact sealed bytes. Linux is

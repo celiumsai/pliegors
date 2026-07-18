@@ -151,14 +151,17 @@ sh ./install.sh \
 
 Network selection is always explicit: `--version <semver>` / `-Version`, or
 the deliberate mutable opt-in `--channel latest` / `-Channel latest`. Omitting
-both fails. Installers validate the selected target and archive checksum before
-writing to `$PLIEGO_HOME/bin`, defaulting to `~/.pliego/bin`. They retain one
-rollback binary and support `--rollback` / `-Rollback` and `--uninstall` /
-`-Uninstall`.
+both fails. Installers require Node.js, validate the selected target and archive
+checksum, pin the published key fingerprint, verify the canonical Ed25519
+manifest, and require the selected archive plus sidecar to match that signed
+manifest before extraction. They then write to `$PLIEGO_HOME/bin`, defaulting
+to `~/.pliego/bin`. They retain one rollback binary and support `--rollback` /
+`-Rollback` and `--uninstall` / `-Uninstall`.
 
-Installers do not yet verify the detached Ed25519 signature internally. The
-full-bundle procedure above is the high-assurance path. Documentation never
-pipes a network response directly into a shell.
+This internal verification authenticates the payload after a genuine PliegoRS
+installer has started; it cannot authenticate a substituted installer against
+itself. The full-bundle procedure above remains the high-assurance bootstrap
+path. Documentation never pipes a network response directly into a shell.
 
 The normative build behavior remains in the
 [candidate distribution contract](33-candidate-distribution-contract.md), with
