@@ -54,6 +54,17 @@ the maintained default:
 node scripts/measure-p8-builds.mjs
 ```
 
+Each completed build sample is checkpointed with the revision, requested sample
+count, and exact environment record. After an external interruption, resume
+only that matching experiment:
+
+```sh
+PLIEGORS_BENCH_RESUME=1 node scripts/measure-p8-builds.mjs
+```
+
+The command refuses a checkpoint from another commit, sample count, or
+environment. A successful final report removes the checkpoint.
+
 Build the browser fixture on a Unix-like host:
 
 ```sh

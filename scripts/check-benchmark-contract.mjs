@@ -30,6 +30,8 @@ for (const metric of ['cleanColdBuildMs', 'noChangeWarmMs', 'contentOnlyMs', 'cs
   assert.match(mergeSource, new RegExp(metric, 'u'));
 }
 assert.match(buildSource, /refusing benchmark evidence from a dirty tree/u);
+assert.match(buildSource, /writeJsonAtomic/u);
+assert.match(buildSource, /checkpoint does not match this revision, sample count, or environment/u);
 assert.match(browserSource, /run_browser_benchmark/u);
 assert.match(browserSource, /memory\.plateau/u);
 assert.match(mergeSource, /nearest-rank/u);

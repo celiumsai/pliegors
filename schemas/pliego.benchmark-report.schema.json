@@ -67,12 +67,13 @@
     },
     "build": {
       "type": "object",
-      "required": ["contract", "revision", "sourceTreeDirty", "createdAt", "sampleCount", "percentileMethod", "environment", "cachePolicy", "rawObservations", "summary", "limitations"],
+      "required": ["contract", "revision", "sourceTreeDirty", "createdAt", "completedAt", "sampleCount", "percentileMethod", "environment", "cachePolicy", "rawObservations", "summary", "limitations"],
       "properties": {
         "contract": { "const": "dev.pliegors.p8-build-benchmark/v1" },
         "revision": { "$ref": "#/$defs/revision" },
         "sourceTreeDirty": { "const": false },
         "createdAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
         "sampleCount": { "type": "integer", "minimum": 5 },
         "percentileMethod": { "const": "nearest-rank" },
         "environment": { "type": "object" },

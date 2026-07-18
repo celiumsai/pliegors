@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawn, spawnSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const samples = parseInteger(process.argv[2] ?? '10', 'samples', 1, 100);
 const requestedOutput = process.argv[3] ?? 'target/benchmarks/p8-build.json';
 const output = path.resolve(root, requestedOutput);
+const partialOutput = `${output}.partial`;
 const revision = commandText('git', ['rev-parse', '--verify', 'HEAD'], root);
 const dirty = commandText('git', ['status', '--porcelain', '--untracked-files=normal'], root) !== '';
 
@@ -23,14 +24,19 @@ if (dirty && process.env.PLIEGORS_ALLOW_DIRTY_BENCH !== '1') {
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'pliegors-p8-build-'));
 const cliTarget = path.join(temporary, 'cli-target');
 const cli = path.join(cliTarget, 'release', process.platform === 'win32' ? 'pliego.exe' : 'pliego');
-const observations = [];
+const environment = environmentReport();
+const resumed = process.env.PLIEGORS_BENCH_RESUME === '1'
+  ? await loadPartial(partialOutput, revision, samples, environment)
+  : { createdAt: new Date().toISOString(), observations: [] };
+if (process.env.PLIEGORS_BENCH_RESUME !== '1') await rm(partialOutput, { force: true });
+const observations = resumed.observations;
 
 try {
   await run('cargo', ['build', '--manifest-path', path.join(root, 'Cargo.toml'), '-p', 'pliego-cli', '--release', '--locked'], root, {
     CARGO_TARGET_DIR: cliTarget,
   });
 
-  for (let sample = 1; sample <= samples; sample += 1) {
+  for (let sample = observations.length + 1; sample <= samples; sample += 1) {
     const workspace = path.join(temporary, `sample-${sample}`, 'workspace');
     const project = path.join(workspace, 'examples', 'content-collections-pliegors');
     await createFixture(workspace, project);
@@ -49,6 +55,14 @@ try {
     await append(path.join(project, 'src', 'components.rs'), `\nconst _BENCHMARK_RUST_VIEW_${sample}: &str = \"sample-${sample}\";\n`);
     observation.rustViewMs = await timedBuild(cli, project);
     observations.push(observation);
+    await writeJsonAtomic(partialOutput, {
+      contract: 'dev.pliegors.p8-build-benchmark-partial/v1',
+      revision,
+      requestedSamples: samples,
+      createdAt: resumed.createdAt,
+      environment,
+      rawObservations: observations,
+    });
     process.stdout.write(`sample ${String(sample).padStart(2, '0')}/${String(samples).padStart(2, '0')}: ${formatObservation(observation)}\n`);
   }
 
@@ -58,10 +72,11 @@ try {
     contract: 'dev.pliegors.p8-build-benchmark/v1',
     revision,
     sourceTreeDirty: dirty,
-    createdAt: new Date().toISOString(),
+    createdAt: resumed.createdAt,
+    completedAt: new Date().toISOString(),
     sampleCount: samples,
     percentileMethod: 'nearest-rank',
-    environment: environmentReport(),
+    environment,
     fixture: {
       project: 'examples/content-collections-pliegors',
       topology: 'standalone copy with local path dependencies to the measured revision',
@@ -85,6 +100,7 @@ try {
   };
   await mkdir(path.dirname(output), { recursive: true });
   await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  await rm(partialOutput, { force: true });
   process.stdout.write(`build benchmark: ${output}\n`);
 } finally {
   await rm(temporary, { recursive: true, force: true });
@@ -124,6 +140,40 @@ async function run(command, args, cwd, extraEnvironment = {}) {
 
 function bounded(current, chunk) {
   return `${current}${chunk.toString('utf8')}`.slice(-16_384);
+}
+
+async function loadPartial(file, expectedRevision, expectedSamples, expectedEnvironment) {
+  let partial;
+  try {
+    partial = JSON.parse(await readFile(file, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { createdAt: new Date().toISOString(), observations: [] };
+    throw new Error(`cannot read benchmark checkpoint: ${error}`);
+  }
+  if (partial.contract !== 'dev.pliegors.p8-build-benchmark-partial/v1'
+    || partial.revision !== expectedRevision
+    || partial.requestedSamples !== expectedSamples
+    || JSON.stringify(partial.environment) !== JSON.stringify(expectedEnvironment)
+    || !Array.isArray(partial.rawObservations)
+    || partial.rawObservations.length > expectedSamples
+    || typeof partial.createdAt !== 'string'
+    || !partial.rawObservations.every(validCheckpointObservation)) {
+    throw new Error('benchmark checkpoint does not match this revision, sample count, or environment');
+  }
+  return { createdAt: partial.createdAt, observations: partial.rawObservations };
+}
+
+function validCheckpointObservation(observation, index) {
+  const metrics = ['cleanColdBuildMs', 'noChangeWarmMs', 'contentOnlyMs', 'cssOnlyMs', 'rustViewMs'];
+  return observation?.sample === index + 1
+    && metrics.every((metric) => Number.isFinite(observation[metric]) && observation[metric] >= 0);
+}
+
+async function writeJsonAtomic(file, value) {
+  await mkdir(path.dirname(file), { recursive: true });
+  const temporaryFile = `${file}.tmp`;
+  await writeFile(temporaryFile, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  await rename(temporaryFile, file);
 }
 
 async function timedBuild(cliPath, project) {
