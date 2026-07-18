@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- Add a separate P8 attestation package with a pinned CycloneDX SBOM,
+  SLSA-compatible provenance, exact-set verification, and keyless Sigstore
+  identity, while preserving the existing Ed25519 release bundle.
 - Make canary, beta, and stable release channels explicit in the manual release
   workflow, enforce prerelease tag semantics, and generate version-neutral notes.
 - Add `pliego doctor` with versioned human/JSON checks for the CLI, Rust

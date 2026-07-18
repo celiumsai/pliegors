@@ -100,6 +100,12 @@ job with `contents: write`, and it can create but never publish or mutate a
 release. Candidate mode is the `canary` channel. A draft selects `beta` or
 `stable`; beta requires a prerelease tag and stable rejects one.
 
+After sealing, a separate least-privilege job creates the CycloneDX SBOM,
+SLSA-compatible provenance, exact attestation manifest, and keyless Sigstore
+bundle. The distribution-only golden path verifies both the original Ed25519
+bundle and the [supply-chain attestation package](37-supply-chain-attestations.md)
+without a source checkout. A draft uploads both exact sets.
+
 ## Verify the complete bundle
 
 SHA-256 sidecars detect corruption but do not independently establish who
