@@ -32,3 +32,7 @@ separate secure exchange has been agreed.
 PliegoRS is provided under Apache-2.0 without a support SLA or warranty. A
 future commercial support policy, if any, will be published separately and will
 not change the rights granted by the open-source license.
+
+Release-channel and compatibility windows are defined in the
+[product constitution](docs/34-product-constitution.md). Before `1.0`, only the
+latest stable-channel preview and `main` are promised security fixes.

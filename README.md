@@ -101,14 +101,10 @@ pliego check
 pliego dev
 ```
 
-Projects that use PliegoCSS can install its CLI separately and run the optional delegated check:
-
-```sh
-cargo install --locked --path ../PliegoCSS/crates/pliego-cssc
-pliego css check --seed
-```
-
-PliegoRS invokes `pliego-cssc`; it does not embed the PliegoCSS compiler.
+The delegated `pliego css check` surface is experimental interoperability with a
+separately installed executable. PliegoCSS research is paused, is not published,
+and is not part of the supported PliegoRS quickstart. PliegoRS accepts standard
+CSS and remains independent of any CSS toolchain.
 
 Linux production binaries and macOS/Windows development binaries are also
 published in the [GitHub Release](https://github.com/celiumsai/pliegors/releases/tag/v0.0.1).
@@ -154,6 +150,8 @@ npm run check:site
 - [DOM lifecycle contract](docs/31-dom-lifecycle-contract.md)
 - [Golden developer experience contract](docs/32-golden-developer-experience.md)
 - [Candidate distribution contract](docs/33-candidate-distribution-contract.md)
+- [Product constitution and stability policy](docs/34-product-constitution.md)
+- [P8 trust and adoption contract](docs/35-p8-trust-and-adoption-contract.md)
 - [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
 - [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)
 - [R4 acceptance evidence](docs/evidence/r4-dom-lifecycle.md)

@@ -1,8 +1,8 @@
 # PliegoRS execution backlog
 
-**Updated:** 2026-07-16
-**Objective:** reach a verified release candidate by closing trust and lifecycle
-gates before adding broad framework surface.
+**Updated:** 2026-07-18
+**Objective:** preserve R0-R7 as regression gates and close P8 trust and adoption
+before adding broad OpenSDK or server-runtime surface.
 
 The normative hardening sequence is defined in
 [`28-hardening-roadmap.md`](28-hardening-roadmap.md). A task is complete only
@@ -21,6 +21,11 @@ candidate.
 | 6 | R5 Golden developer experience | Complete | [Contract](32-golden-developer-experience.md) and [committed evidence](evidence/r5-golden-developer-experience.md) cover replayable scaffolding, receipt-bound causal graphs, native watching, typed HMR, why commands, structured diagnostics, and measured first-app p50/p95. |
 | 7 | R6 Candidate distribution | Complete | [Contract](33-candidate-distribution-contract.md) and [committed evidence](evidence/r6-candidate-distribution.md) cover five targets, two native replicas, exact binary hashes, a final Ed25519 manifest, installer lifecycles, and a distribution-only golden path. |
 | 8 | R7 External flagship | Complete | [Committed R7 evidence](evidence/r7-external-flagship.md) covers Cairn, an independent durable human-agent decision dossier built only from the accepted candidate, with replay, forks, effects, receipts, provenance, audit, selective sync, tamper rejection, and browser acceptance. |
+| 9 | P8 Trust and adoption | In progress | [P8 contract and audited baseline](35-p8-trust-and-adoption-contract.md) cover product stability, CLI diagnostics, release identity, adversarial suites, benchmarks, clean environments, and opt-in-only telemetry. |
+
+The [product constitution](34-product-constitution.md) governs admission of all
+work after R7. P9 OpenSDK follows P8; it does not displace unfinished trust,
+diagnostic, release, or measurement gates.
 
 ## Already implemented foundations
 
@@ -45,3 +50,6 @@ These foundations are not substitutes for the R0-R7 evidence gates.
 - No promise of a total global event order.
 - No hash presented as provenance without authority and verification context.
 - No broad server-framework expansion before reactive safety and artifact trust.
+- No Pliego.run control-plane, billing, dashboard, or infrastructure code in this
+  open-source repository.
+- No PliegoCSS release or required integration while that project is paused.

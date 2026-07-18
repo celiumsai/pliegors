@@ -20,6 +20,11 @@ authority. A GitHub release exists only when its tag and non-draft release
 record agree. A Rust package exists only when crates.io reports that exact
 package version with this repository as its source.
 
+Canary, beta, and stable promotion semantics, API stability tiers, MSRV, browser
+scope, and pre-1.0 support are normative in the
+[product constitution](34-product-constitution.md). A stable distribution
+channel does not imply that a preview API has reached the `stable` API tier.
+
 ## Install from crates.io
 
 The normal developer installation is:
