@@ -9,6 +9,7 @@ use notify::{
     Config as WatchConfig, Event as WatchEvent, RecommendedWatcher, RecursiveMode, Watcher,
 };
 use serde::Deserialize;
+#[cfg(windows)]
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -1564,7 +1565,7 @@ fn command_working_directory(directory: &Path) -> Result<PathBuf, String> {
         if conventional.as_os_str().encode_wide().count() >= 260 {
             return Ok(extended);
         }
-        return Ok(conventional);
+        Ok(conventional)
     }
     #[cfg(not(windows))]
     Ok(directory.to_owned())
@@ -1611,40 +1612,33 @@ fn configure_cargo_command(command: &mut Command, project_root: &Path) -> Result
     Ok(())
 }
 
+#[cfg(windows)]
 fn automatic_cargo_target_directory(project_root: &Path) -> Result<Option<PathBuf>, String> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::ffi::OsStrExt;
+    use std::os::windows::ffi::OsStrExt;
 
-        if !command_working_directory(project_root)?
-            .to_str()
-            .is_some_and(|value| value.starts_with(r"\\?\"))
-        {
-            return Ok(None);
-        }
-        let identity = project_root.to_str().ok_or_else(|| {
-            format!(
-                "project root is not valid UTF-8: {}",
-                project_root.display()
-            )
-        })?;
-        let digest = format!("{:x}", Sha256::digest(identity.as_bytes()));
-        let target = std::env::temp_dir()
-            .join("pliegors-cargo-targets")
-            .join(&digest[..24]);
-        if target.as_os_str().encode_wide().count() > 120 {
-            return Err(format!(
-                "automatic Windows Cargo target path is too long: {}; set CARGO_TARGET_DIR to a trusted short directory",
-                target.display()
-            ));
-        }
-        return Ok(Some(target));
-    }
-    #[cfg(not(windows))]
+    if !command_working_directory(project_root)?
+        .to_str()
+        .is_some_and(|value| value.starts_with(r"\\?\"))
     {
-        let _ = project_root;
-        Ok(None)
+        return Ok(None);
     }
+    let identity = project_root.to_str().ok_or_else(|| {
+        format!(
+            "project root is not valid UTF-8: {}",
+            project_root.display()
+        )
+    })?;
+    let digest = format!("{:x}", Sha256::digest(identity.as_bytes()));
+    let target = std::env::temp_dir()
+        .join("pliegors-cargo-targets")
+        .join(&digest[..24]);
+    if target.as_os_str().encode_wide().count() > 120 {
+        return Err(format!(
+            "automatic Windows Cargo target path is too long: {}; set CARGO_TARGET_DIR to a trusted short directory",
+            target.display()
+        ));
+    }
+    Ok(Some(target))
 }
 
 fn build(context: &Context) -> Result<(), String> {
