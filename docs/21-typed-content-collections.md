@@ -198,7 +198,7 @@ schemas. Two loads produce identical ID order and this fixture-contract digest:
 ```
 
 The package gate includes 7 unit tests, 15 integration tests, one doctest,
-Clippy with warnings denied, and rustdoc with warnings denied on Rust 1.85.
+Clippy with warnings denied, and rustdoc with warnings denied on Rust 1.86.
 `serde-saphyr` is pinned to `0.0.11`: later inspected releases require language
 or standard-library features newer than the declared PliegoRS MSRV.
 

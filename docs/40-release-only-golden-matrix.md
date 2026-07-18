@@ -53,10 +53,10 @@ Eight clean GitHub-hosted rows run in parallel:
 | `windows-x64` | Windows 2025 x64 | standard |
 | `windows-unicode` | Windows 2025 x64 | non-ASCII path |
 | `windows-long-path` | Windows 2025 x64 | path longer than 260 characters |
-| `container-linux-x64` | pinned Rust 1.85 Debian container | standard |
+| `container-linux-x64` | pinned Rust 1.86 Debian container | standard |
 
 The container image is digest-pinned to
-`rust:1.85.0-slim-bookworm@sha256:1829c432be4a592f3021501334d3fcca24f238432b13306a4e62669dec538e52`.
+`rust:1.86.0-slim-bookworm@sha256:57d415bbd61ce11e2d5f73de068103c7bd9f3188dc132c97cef4a8f62989e944`.
 The Linux x64 release binary is built twice on Ubuntu 22.04 and then executed
 inside that Debian bookworm container. This prevents a newer hosted glibc from
 becoming an undeclared runtime requirement. Linux ARM64 is built on the

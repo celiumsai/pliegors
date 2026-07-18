@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0
+package pliego:component@0.1.0;
+
+interface descriptor {
+  record browser-component {
+    tag-name: string,
+    module: string,
+    capabilities: list<string>,
+    observed-attributes: list<string>,
+    supports-update: bool,
+    supports-hmr: bool,
+  }
+
+  describe: func() -> browser-component;
+}
+
+world browser-extension {
+  export descriptor;
+}

@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: Apache-2.0
+package pliego:manifest@0.1.0;
+
+interface descriptor {
+  enum plane {
+    build,
+    server,
+    browser,
+    tooling,
+  }
+
+  enum determinism {
+    pure,
+    recorded-effect,
+    native-trusted,
+  }
+
+  record identity {
+    namespace: string,
+    name: string,
+    version: string,
+    digest: string,
+  }
+
+  record extension-descriptor {
+    identity: identity,
+    plane: plane,
+    api-version: string,
+    host-version: string,
+    determinism: determinism,
+    capabilities: list<string>,
+  }
+
+  describe: func() -> extension-descriptor;
+}
+
+world extension {
+  export descriptor;
+}

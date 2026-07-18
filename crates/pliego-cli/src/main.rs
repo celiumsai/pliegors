@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod development;
+mod sdk;
 mod telemetry;
 mod trust;
 
@@ -127,6 +128,7 @@ enum FailureKind {
     Build,
     Artifact,
     Server,
+    Sdk,
 }
 
 impl FailureKind {
@@ -140,6 +142,7 @@ impl FailureKind {
             Self::Build => 5,
             Self::Artifact => 6,
             Self::Server => 7,
+            Self::Sdk => 9,
         }
     }
 
@@ -154,6 +157,7 @@ impl FailureKind {
             Self::Build => "build",
             Self::Artifact => "artifact",
             Self::Server => "server",
+            Self::Sdk => "sdk",
         }
     }
 
@@ -168,6 +172,7 @@ impl FailureKind {
             Self::Build => "PLG-BLD-001",
             Self::Artifact => "PLG-ART-001",
             Self::Server => "PLG-SRV-001",
+            Self::Sdk => "PLG-SDK-001",
         }
     }
 
@@ -195,6 +200,9 @@ impl FailureKind {
             }
             Self::Server => {
                 "Choose an available port and confirm the output directory is readable."
+            }
+            Self::Sdk => {
+                "Fix the extension manifest, component bytes, compatibility, or capability grants, then rerun `pliego sdk check`."
             }
         }
     }
@@ -535,6 +543,19 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
         return css_check(&context, css_arguments)
             .map_err(|error| CliFailure::new(FailureKind::Check, error));
     }
+    if command == "sdk" {
+        return sdk::run(arguments.collect()).map_err(|error| {
+            let (usage, message) = error.into_parts();
+            CliFailure::new(
+                if usage {
+                    FailureKind::Usage
+                } else {
+                    FailureKind::Sdk
+                },
+                message,
+            )
+        });
+    }
 
     if !matches!(
         command.as_str(),
@@ -590,7 +611,7 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 
 fn print_help() {
     println!(
-        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego telemetry <status|enable|preview|export|disable> [options]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport, upgrade checks, and voluntary telemetry exports are local and never upload project data.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
+        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego telemetry <status|enable|preview|export|disable> [options]\n  pliego sdk <check|test> <manifest> [--input <transform.json>] [--grant <capability>] [--feature <id>] [--format <human|json>]\n  pliego sdk compatibility [--format <human|json>]\n  pliego sdk tooling-host --protocol <pliego|mcp> [--feature <id>]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport, SDK admission, upgrade checks, and voluntary telemetry exports are local and never upload project data.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );
 }
 
@@ -4119,6 +4140,7 @@ mod tests {
         assert_eq!(FailureKind::Build.code(), 5);
         assert_eq!(FailureKind::Artifact.code(), 6);
         assert_eq!(FailureKind::Server.code(), 7);
+        assert_eq!(FailureKind::Sdk.code(), 9);
     }
 
     #[test]

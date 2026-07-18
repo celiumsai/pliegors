@@ -12,7 +12,7 @@ assert.ok(['--check', '--publish'].includes(mode), 'usage: publish-crates.mjs --
 const layers = [
   [
     'pliego-artifact', 'pliego-assets', 'pliego-content', 'pliego-inspect',
-    'pliego-log', 'pliego-macros', 'pliego-reactive', 'pliego-starters',
+    'pliego-log', 'pliego-macros', 'pliego-reactive', 'pliego-sdk', 'pliego-starters',
   ],
   ['pliego-dom', 'pliego-fold', 'pliego-hyphae'],
   ['pliego-adapters', 'pliego-resume', 'pliego-ssg'],
@@ -34,10 +34,15 @@ assert.deepEqual(
 
 for (const name of ordered) {
   const pkg = packages.get(name);
-  assert.equal(pkg.version, version, `${name} version drift`);
   assert.deepEqual(pkg.publish, ['crates-io'], `${name} registry allowlist`);
   for (const dependency of pkg.dependencies.filter((item) => item.name.startsWith('pliego-'))) {
-    assert.equal(dependency.req, `=${version}`, `${name} -> ${dependency.name} must be exact`);
+    const dependencyPackage = packages.get(dependency.name);
+    assert.ok(dependencyPackage, `${name} -> ${dependency.name} workspace package`);
+    assert.equal(
+      dependency.req,
+      `=${dependencyPackage.version}`,
+      `${name} -> ${dependency.name} must be exact`,
+    );
     assert.ok(dependency.path, `${name} -> ${dependency.name} must retain a workspace path`);
   }
 }
@@ -55,19 +60,38 @@ if (mode === '--check') {
       console.log(`defer ${name}: first-party dependencies are not indexed yet`);
       continue;
     }
+    if (name === 'pliego-sdk') assertPackagedOpenSdkWit();
     runLive('cargo', ['package', '--locked', '--allow-dirty', '--no-verify', '-p', name]);
-    const archive = path.join(root, 'target', 'package', `${name}-${version}.crate`);
+    const archive = path.join(root, 'target', 'package', `${name}-${pkg.version}.crate`);
     const bytes = statSync(archive).size;
     assert.ok(bytes <= 10_000_000, `${name} package exceeds the crates.io 10 MB limit`);
-    console.log(`package ${name}: ${bytes} bytes`);
+    console.log(`package ${name} ${pkg.version}: ${bytes} bytes`);
     runLive('cargo', ['publish', '--dry-run', '--locked', '--allow-dirty', '-p', name]);
     checked += 1;
   }
   console.log(
     `Crates publication check PASS: ${checked} package(s) verified, ` +
-    `${deferred} dependency-gated package(s) deferred @ ${version}`,
+    `${deferred} dependency-gated package(s) deferred across ` +
+    `${new Set(ordered.map((name) => packages.get(name).version)).size} version family/families`,
   );
   process.exit(0);
+}
+
+function assertPackagedOpenSdkWit() {
+  const packagedWit = run('cargo', ['package', '--list', '--allow-dirty', '-p', 'pliego-sdk'])
+    .split(/\r?\n/u)
+    .map((file) => file.replaceAll('\\', '/'))
+    .filter((file) => file.endsWith('.wit'))
+    .toSorted();
+  assert.deepEqual(packagedWit, [
+    'wit/build/build.wit',
+    'wit/component/component.wit',
+    'wit/deploy/deploy.wit',
+    'wit/diagnostics/diagnostics.wit',
+    'wit/effects/effects.wit',
+    'wit/http/http.wit',
+    'wit/manifest/manifest.wit',
+  ], 'pliego-sdk package must contain the complete normative WIT surface');
 }
 
 assert.equal(process.env.PLIEGORS_PUBLISH_CONFIRMATION, `publish:v${version}`, 'publication confirmation mismatch');
@@ -81,6 +105,10 @@ assert.equal(
   run('git', ['rev-parse', 'HEAD']).trim(),
   run('git', ['rev-parse', 'origin/main']).trim(),
   'main must equal origin/main',
+);
+assert.ok(
+  ordered.every((name) => packages.get(name).version === version),
+  'publication requires every framework crate to share the confirmed CLI version',
 );
 
 for (const name of ordered) {

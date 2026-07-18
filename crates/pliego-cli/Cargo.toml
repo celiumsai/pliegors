@@ -19,7 +19,10 @@ name = "pliego"
 path = "src/main.rs"
 
 [dependencies]
+cap-fs-ext = "=4.0.2"
+cap-std = "=4.0.2"
 pliego-artifact = { workspace = true }
+pliego-sdk = { workspace = true, features = ["runtime"] }
 pliego-starters = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: Apache-2.0
+package pliego:effects@0.1.0;
+
+interface broker {
+  record effect-request {
+    capability: string,
+    operation: string,
+    payload: list<u8>,
+  }
+
+  record effect-response {
+    payload: list<u8>,
+    receipt-json: string,
+  }
+
+  record effect-failure {
+    message: string,
+    receipt-json: option<string>,
+  }
+
+  execute: func(request: effect-request) -> result<effect-response, effect-failure>;
+}
+
+world recorded-effect {
+  import broker;
+}

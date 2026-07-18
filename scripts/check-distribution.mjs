@@ -19,23 +19,35 @@ const crates = metadata.packages
 const expected = [
   'pliego-adapters', 'pliego-artifact', 'pliego-assets', 'pliego-cli', 'pliego-content', 'pliego-dom',
   'pliego-fold', 'pliego-hyphae', 'pliego-inspect', 'pliego-log', 'pliego-macros',
-  'pliego-reactive', 'pliego-resume', 'pliego-ssg', 'pliego-starters',
+  'pliego-reactive', 'pliego-resume', 'pliego-sdk', 'pliego-ssg', 'pliego-starters',
 ].sort();
 assert.deepEqual(crates.map((pkg) => pkg.name), expected);
+const packagesByName = new Map(crates.map((pkg) => [pkg.name, pkg]));
 
 for (const pkg of crates) {
-  assert.equal(pkg.version, workspaceVersion, `${pkg.name} version drift`);
+  if (pkg.name === 'pliego-sdk') {
+    assert.match(pkg.version, /^0\.1\.0-preview\.\d+$/u, 'pliego-sdk preview version');
+  } else {
+    assert.equal(pkg.version, workspaceVersion, `${pkg.name} version drift`);
+  }
   assert.equal(pkg.license, 'Apache-2.0', `${pkg.name} license`);
   assert.equal(pkg.repository, 'https://github.com/celiumsai/pliegors', `${pkg.name} repository`);
   assert.equal(pkg.homepage, 'https://pliegors.dev', `${pkg.name} homepage`);
-  assert.equal(pkg.rust_version, '1.85', `${pkg.name} rust-version`);
+  assert.equal(pkg.rust_version, '1.86', `${pkg.name} rust-version`);
   assert.ok(pkg.description?.trim(), `${pkg.name} description`);
   assert.deepEqual(pkg.publish, ['crates-io'], `${pkg.name} registry allowlist`);
-  assert.ok(pkg.readme?.replaceAll('\\', '/').endsWith('/README.md'), `${pkg.name} readme`);
+  const readme = pkg.readme && path.resolve(path.dirname(pkg.manifest_path), pkg.readme);
+  assert.ok(readme && path.basename(readme) === 'README.md' && existsSync(readme), `${pkg.name} readme`);
   for (const dependency of pkg.dependencies.filter((item) => item.name.startsWith('pliego-'))) {
+    const dependencyPackage = packagesByName.get(dependency.name);
+    assert.ok(dependencyPackage, `${pkg.name} -> ${dependency.name} workspace package`);
     assert.ok(dependency.path, `${pkg.name} -> ${dependency.name} workspace path`);
     assert.equal(dependency.source, null, `${pkg.name} -> ${dependency.name} registry source`);
-    assert.equal(dependency.req, `=${workspaceVersion}`, `${pkg.name} -> ${dependency.name} version`);
+    assert.equal(
+      dependency.req,
+      `=${dependencyPackage.version}`,
+      `${pkg.name} -> ${dependency.name} version`,
+    );
   }
 }
 
@@ -393,6 +405,7 @@ assert.ok(!cli.includes('git = \\\"{PLIEGORS_SOURCE_REPOSITORY}'), 'released sta
 assert.equal(existsSync(path.join(root, 'crates/pliego-cli/build.rs')), false, 'CLI must build from crates.io without Git metadata');
 
 console.log(
-  `Distribution contract PASS: ${crates.length} crates.io packages @ ${workspaceVersion}, ` +
+  `Distribution contract PASS: ${crates.length} crates.io packages across ` +
+  `${[...new Set(crates.map((pkg) => pkg.version))].sort().join(', ')}, ` +
   '5 targets x 2 replicas, signed release candidate, and gated manual draft',
 );

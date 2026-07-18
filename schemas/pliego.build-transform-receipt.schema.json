@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.build-transform-receipt.schema.json",
+  "title": "PliegoRS build transform execution receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "extension",
+    "extensionDigest",
+    "inputSha256",
+    "outputSha256",
+    "fuelLimit",
+    "fuelConsumed",
+    "memoryLimitBytes",
+    "outputLimitBytes"
+  ],
+  "properties": {
+    "schema": { "const": "dev.pliegors.build-transform-receipt/v1" },
+    "extension": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "extensionDigest": { "$ref": "#/$defs/digest" },
+    "inputSha256": { "$ref": "#/$defs/digest" },
+    "outputSha256": {
+      "$ref": "#/$defs/digest",
+      "description": "SHA-256 of length-prefixed media type, body bytes, and diagnostics JSON."
+    },
+    "fuelLimit": { "type": "integer", "minimum": 1 },
+    "fuelConsumed": { "type": "integer", "minimum": 0 },
+    "memoryLimitBytes": { "type": "integer", "minimum": 65536 },
+    "outputLimitBytes": { "type": "integer", "minimum": 1 }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

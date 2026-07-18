@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: Apache-2.0
+package pliego:diagnostics@0.1.0;
+
+interface sink {
+  enum severity {
+    error,
+    warning,
+    information,
+    hint,
+  }
+
+  record span {
+    file: string,
+    start-line: u32,
+    start-column: u32,
+    end-line: u32,
+    end-column: u32,
+  }
+
+  record diagnostic {
+    code: string,
+    severity: severity,
+    message: string,
+    help: option<string>,
+    span: option<span>,
+  }
+
+  emit: func(diagnostic: diagnostic);
+}
+
+world diagnostic-producer {
+  import sink;
+}

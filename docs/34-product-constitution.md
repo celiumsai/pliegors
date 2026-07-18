@@ -83,8 +83,8 @@ Promotion reuses already sealed bytes; it never rebuilds a candidate in place.
   Before `1.0`, an incompatible public change increments the minor version and
   includes migration guidance. Patch releases do not deliberately break a
   documented contract.
-- **MSRV:** Rust `1.85` is the current minimum and the exact release toolchain is
-  `1.85.0`. Raising the MSRV requires a versioned decision, changelog entry, and
+- **MSRV:** Rust `1.86` is the current minimum and the exact release toolchain is
+  `1.86.0`. Raising the MSRV requires a versioned decision, changelog entry, and
   clean-machine evidence.
 - **Operating systems:** Linux x64 and ARM64 are production release targets.
   macOS x64/ARM64 and Windows x64 are development targets. The exact artifact

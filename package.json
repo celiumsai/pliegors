@@ -12,6 +12,13 @@
     "check:email-worker": "npm --prefix workers/pliegors-email run check",
     "check:fuzz": "node scripts/check-fuzz-contract.mjs",
     "check:golden-path": "node scripts/check-golden-matrix.mjs",
+    "check:opensdk": "node scripts/check-opensdk-contract.mjs",
+    "check:opensdk:multilang": "node scripts/check-opensdk-multilang.mjs",
+    "check:opensdk:browser-frameworks": "node scripts/check-opensdk-browser-frameworks.mjs",
+    "check:opensdk:tooling": "node scripts/check-opensdk-tooling.mjs",
+    "check:opensdk:component-runtime": "node scripts/check-opensdk-component-runtime.mjs",
+    "check:opensdk:all": "npm run check:opensdk && npm run check:opensdk:component-runtime && npm run check:opensdk:multilang && npm run check:opensdk:browser-frameworks && npm run check:opensdk:tooling",
+    "build:opensdk:rust-component": "node scripts/build-opensdk-rust-component.mjs",
     "check:telemetry": "node scripts/check-telemetry-contract.mjs",
     "check:site": "node scripts/check-pliegors-site.mjs examples/pliegors-site/target/site",
     "check:site-deployment": "npm --prefix workers/pliegors-site run check",
@@ -30,6 +37,11 @@
     "esbuild": "^0.28.1",
     "gsap": "^3.13.0",
     "lenis": "^1.3.23",
-    "parse5": "^8.0.0"
+    "lit": "3.3.3",
+    "parse5": "^8.0.0",
+    "playwright-core": "1.61.1",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "svelte": "5.56.6"
   }
 }

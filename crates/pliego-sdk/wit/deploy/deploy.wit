@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: Apache-2.0
+package pliego:deploy@0.1.0;
+
+interface output {
+  record asset {
+    path: string,
+    digest: string,
+    media-type: string,
+    bytes: u64,
+  }
+
+  record route {
+    pattern: string,
+    kind: string,
+    entrypoint: option<string>,
+  }
+
+  record build-output {
+    schema: string,
+    assets: list<asset>,
+    routes: list<route>,
+    permissions: list<string>,
+  }
+
+  validate: func(output: build-output) -> result<_, string>;
+}
+
+world deployment-adapter {
+  import output;
+}
