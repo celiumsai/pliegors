@@ -7,8 +7,10 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-const USAGE: &str = "\
-pliego-inspect 0.0.1
+const USAGE: &str = concat!(
+    "pliego-inspect ",
+    env!("CARGO_PKG_VERSION"),
+    "
 
 USAGE:
   pliego-inspect inspect <manifest> [--asset-root <dir>] [--format human|json]
@@ -20,7 +22,8 @@ EXIT CODES:
   0  valid manifest or baseline; enforced budgets pass
   1  contract violation or enforced budget failure
   2  invalid command, unreadable input, or malformed JSON
-";
+"
+);
 
 #[derive(Debug, Clone, Copy)]
 enum OutputFormat {
