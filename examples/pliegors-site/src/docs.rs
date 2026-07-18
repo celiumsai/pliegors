@@ -38,8 +38,8 @@ pub const TOPICS: &[DocTopic] = &[
         group_es: "Inicio",
         title_en: "CLI reference",
         title_es: "Referencia del CLI",
-        summary_en: "Use new, check, build, dev, preview, inspect, templates, and machine-readable diagnostics.",
-        summary_es: "Usa new, check, build, dev, preview, inspect, templates y diagnósticos legibles por máquinas.",
+        summary_en: "Use the project, diagnostics, upgrade, release-inspection, and voluntary telemetry command surfaces.",
+        summary_es: "Usa las superficies de proyecto, diagnóstico, upgrade, inspección de releases y telemetría voluntaria.",
     },
     DocTopic {
         slug: "developer-loop",
@@ -141,6 +141,24 @@ pub const TOPICS: &[DocTopic] = &[
         summary_es: "Entiende namespaces portables, captura exacta de fuentes, publicación por staging, recibos de build, grafos causales y verificación fail-closed.",
     },
     DocTopic {
+        slug: "release-trust",
+        group_en: "Delivery",
+        group_es: "Entrega",
+        title_en: "Release trust",
+        title_es: "Confianza de releases",
+        summary_en: "Verify deterministic archives, signatures, attestations, provenance, and release-only promotion evidence.",
+        summary_es: "Verifica archives deterministas, firmas, attestations, provenance y evidencia de promoción exclusiva del release.",
+    },
+    DocTopic {
+        slug: "performance-evidence",
+        group_en: "Operate",
+        group_es: "Operación",
+        title_en: "Performance evidence",
+        title_es: "Evidencia de rendimiento",
+        summary_en: "Reproduce benchmark observations, read their hardware context, and keep measurements separate from claims.",
+        summary_es: "Reproduce observaciones de benchmarks, lee su contexto de hardware y separa mediciones de afirmaciones.",
+    },
+    DocTopic {
         slug: "errors-and-diagnostics",
         group_en: "Operate",
         group_es: "Operación",
@@ -148,6 +166,15 @@ pub const TOPICS: &[DocTopic] = &[
         title_es: "Errores y diagnósticos",
         summary_en: "Read stable PLG codes, browser build failures, JSON diagnostics, exit codes, and recovery actions.",
         summary_es: "Interpreta códigos PLG estables, fallos de build en navegador, diagnósticos JSON, códigos de salida y recuperación.",
+    },
+    DocTopic {
+        slug: "telemetry",
+        group_en: "Operate",
+        group_es: "Operación",
+        title_en: "Voluntary telemetry",
+        title_es: "Telemetría voluntaria",
+        summary_en: "Control a disabled-by-default, local-only usage journal with an exact field allowlist and user-owned deletion.",
+        summary_es: "Controla un journal de uso local, desactivado por defecto, con allowlist exacta y eliminación controlada por el usuario.",
     },
     DocTopic {
         slug: "build-and-deploy",
@@ -287,7 +314,10 @@ pub fn article(locale: Locale, slug: &str) -> Result<View, String> {
         "dom-lifecycle" => dom_lifecycle(locale),
         "assets" => adaptive_assets(locale),
         "artifact-trust" => artifact_trust(locale),
+        "release-trust" => release_trust(locale),
+        "performance-evidence" => performance_evidence(locale),
         "errors-and-diagnostics" => errors_and_diagnostics(locale),
+        "telemetry" => telemetry(locale),
         "build-and-deploy" => build_and_deploy(locale),
         "crate-reference" => crate_reference(locale),
         "licensing" => licensing(locale),
@@ -868,6 +898,64 @@ fn artifact_trust(locale: Locale) -> View {
     ].into_view()
 }
 
+fn release_trust(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "bytes", "Start with the exact release bytes", "Comienza por los bytes exactos del release", vec![
+            paragraph(locale, "A release is an exact set, not a download page. PliegoRS publishes deterministic platform archives, a deterministic source archive, SHA-256 checksums, a signed manifest, offline verifiers, and bounded reproduction instructions. Missing and extra files are failures.", "Un release es un conjunto exacto, no una página de descargas. PliegoRS publica archives deterministas por plataforma, un archive fuente determinista, checksums SHA-256, un manifest firmado, verificadores offline e instrucciones limitadas de reproducción. Los archivos faltantes y adicionales son fallos."),
+            code_block(locale, "shell", "node verify-release-bundle.mjs --dir ."),
+        ]),
+        doc_section(locale, "signatures", "Separate continuity from hosted identity", "Separa continuidad de identidad alojada", vec![
+            definition_list(locale, &[
+                ("Ed25519", "Project-controlled continuity signature over the exact primary release set", "Firma de continuidad controlada por el proyecto sobre el conjunto primario exacto del release"),
+                ("Sigstore", "Keyless GitHub OIDC evidence for attestations and golden-matrix output", "Evidencia keyless de GitHub OIDC para attestations y salida de la matriz golden"),
+                ("SHA-256", "Content identity checked before any installer or runner executes", "Identidad de contenido verificada antes de ejecutar cualquier instalador o runner"),
+            ]),
+            note(locale, "Independent mechanisms", "The hosted identity does not replace the project continuity key, and neither signature makes unreviewed source trustworthy by itself.", "Mecanismos independientes", "La identidad alojada no reemplaza la clave de continuidad del proyecto y ninguna firma vuelve confiable por sí sola una fuente no revisada."),
+        ]),
+        doc_section(locale, "attestations", "Inspect SBOM and provenance", "Inspecciona SBOM y provenance", vec![
+            paragraph(locale, "Every promoted candidate carries a normalized CycloneDX SBOM and an in-toto Statement using the SLSA provenance v1 predicate. The offline verifier binds both documents to the exact release manifest and rejects substitution, drift, missing subjects, and extra package files.", "Cada candidato promovido contiene un SBOM CycloneDX normalizado y un Statement in-toto que usa el predicate SLSA provenance v1. El verificador offline vincula ambos documentos al manifest exacto del release y rechaza sustitución, drift, subjects faltantes y archivos adicionales."),
+            note(locale, "Claim boundary", "A SLSA-compatible statement is not a claimed SLSA build level. A level requires its complete hosted, isolation, distribution, and independent-verification requirements.", "Límite de afirmación", "Un statement compatible con SLSA no equivale a afirmar un nivel SLSA. Un nivel exige sus requisitos completos de hosting, aislamiento, distribución y verificación independiente."),
+        ]),
+        doc_section(locale, "promotion", "Promote only release evidence", "Promueve sólo evidencia del release", vec![
+            steps(locale, &[
+                ("Candidate", "Build the signed bytes twice and exercise the signed runner on eight clean hosted environments.", "Candidato", "Construye dos veces los bytes firmados y ejercita el runner firmado en ocho entornos alojados limpios."),
+                ("Registry", "Publish the exact crate graph from the same clean revision, then exercise WSL2 against those registry packages.", "Registry", "Publica el grafo exacto de crates desde la misma revisión limpia y luego ejercita WSL2 contra esos paquetes del registry."),
+                ("Draft", "Rebuild the same revision, require one release-manifest digest across nine environments, and create a reviewable draft.", "Draft", "Recompila la misma revisión, exige un digest del manifest de release en nueve entornos y crea un draft revisable."),
+                ("Release", "Publish only after the exact-set, attestation, matrix, and operator review gates agree.", "Release", "Publica sólo cuando coincidan los gates de conjunto exacto, attestations, matriz y revisión del operador."),
+            ]),
+            link_list(locale, &[
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/37-supply-chain-attestations.md", "Supply-chain attestation contract", "Contrato de attestations de supply chain"),
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/40-release-only-golden-matrix.md", "Release-only golden matrix", "Matriz golden exclusiva del release"),
+            ]),
+        ]),
+    ].into_view()
+}
+
+fn performance_evidence(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "protocol", "Measure a declared experiment", "Mide un experimento declarado", vec![
+            paragraph(locale, "PliegoRS retains raw build and browser observations together with the exact revision, operating system, CPU, memory, storage declaration, Rust, Node, browser, sample count, cache policy, and known uncontrolled variables. p50 and p95 use nearest-rank without dropping outliers.", "PliegoRS conserva observaciones crudas de build y navegador junto con la revisión exacta, sistema operativo, CPU, memoria, storage declarado, Rust, Node, navegador, cantidad de muestras, política de cache y variables no controladas conocidas. p50 y p95 usan nearest-rank sin descartar outliers."),
+            definition_list(locale, &[
+                ("Build", "Clean cold, no-change warm, content-only, CSS-only, and Rust-view observations", "Observaciones cold limpio, warm sin cambios, sólo contenido, sólo CSS y vista Rust"),
+                ("Browser", "Signal updates, final DOM state, WASM linear memory, and mount/dispose residue", "Updates de signals, estado DOM final, memoria lineal WASM y residuo de mount/dispose"),
+            ]),
+        ]),
+        doc_section(locale, "reproduce", "Reproduce before comparing", "Reproduce antes de comparar", vec![
+            code_block(locale, "shell", "node scripts/measure-p8-builds.mjs\nsh scripts/build-browser-benchmark.sh\nnode scripts/measure-browser-benchmark.mjs\nnode scripts/merge-p8-benchmark-report.mjs\nnpm run check:benchmarks"),
+            paragraph(locale, "The merger requires both sections to name the same clean commit. A dirty smoke run may test the harness, but it is rejected as publishable evidence.", "El merger exige que ambas secciones nombren el mismo commit limpio. Un smoke run dirty puede probar el harness, pero se rechaza como evidencia publicable."),
+        ]),
+        doc_section(locale, "adversarial", "Pair speed with failure evidence", "Combina velocidad con evidencia de fallos", vec![
+            paragraph(locale, "Performance does not excuse unsafe parsing or unbounded work. Fuzz targets and adversarial suites exercise manifests, receipts, graphs, paths, release bundles, telemetry state, content limits, and state restoration independently from benchmark timing.", "El rendimiento no excusa parsing inseguro ni trabajo sin límites. Los fuzz targets y suites adversariales ejercitan manifests, receipts, grafos, paths, bundles de release, estado de telemetría, límites de contenido y restauración de estado de forma independiente al timing de benchmarks."),
+            link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/docs/38-fuzzing-and-adversarial-testing.md", "Fuzzing and adversarial testing", "Fuzzing y pruebas adversariales")]),
+        ]),
+        doc_section(locale, "interpret", "Keep observations inside their boundary", "Mantén las observaciones dentro de su límite", vec![
+            note(locale, "No universal benchmark claim", "A result describes one revision and environment. It is not a guarantee, a device budget, a competitor comparison, or evidence for another commit.", "Sin afirmación universal", "Un resultado describe una revisión y un entorno. No es una garantía, un presupuesto de dispositivo, una comparación con competidores ni evidencia para otro commit."),
+            paragraph(locale, "The published P8 local baseline is useful for regression detection because it preserves its raw samples and limitations. Hosted candidate evidence remains a separate release gate.", "El baseline local publicado de P8 sirve para detectar regresiones porque conserva sus muestras crudas y limitaciones. La evidencia del candidato alojado sigue siendo un gate de release separado."),
+            link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/docs/39-reproducible-benchmarks.md", "Benchmark protocol and current baseline", "Protocolo de benchmarks y baseline actual")]),
+        ]),
+    ].into_view()
+}
+
 fn errors_and_diagnostics(locale: Locale) -> View {
     vec![
         doc_section(locale, "browser", "Build failures in the browser", "Fallos de build en el navegador", vec![
@@ -894,6 +982,29 @@ fn errors_and_diagnostics(locale: Locale) -> View {
                 ("Save and observe", "The watcher rebuilds and the diagnostic page reloads without restarting pliego dev.", "Guarda y observa", "El watcher recompila y la página diagnóstica recarga sin reiniciar pliego dev."),
                 ("Verify production", "Run pliego build and pliego inspect after the development page is green.", "Verifica producción", "Ejecuta pliego build y pliego inspect después de que la página de desarrollo esté verde."),
             ]),
+        ]),
+    ].into_view()
+}
+
+fn telemetry(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "default", "Disabled means absent", "Desactivada significa ausente", vec![
+            paragraph(locale, "PliegoRS telemetry is disabled by default. Installation, scaffolding, checking, development, and building do not create telemetry state or make telemetry network requests. No environment variable, manifest, installer flag, or account can silently enable it.", "La telemetría de PliegoRS está desactivada por defecto. La instalación, scaffold, verificación, desarrollo y build no crean estado de telemetría ni realizan requests de telemetría. Ninguna variable de environment, manifest, flag del instalador o cuenta puede activarla silenciosamente."),
+            code_block(locale, "shell", "pliego telemetry status\npliego telemetry enable"),
+        ]),
+        doc_section(locale, "allowlist", "Exact bounded allowlist", "Allowlist exacta y limitada", vec![
+            paragraph(locale, "An enabled journal retains at most 64 events. Every event contains only a local sequence, one of install/new/check/dev/build, coarse Unix day, CLI version, operating-system platform, and CPU architecture.", "Un journal habilitado conserva como máximo 64 eventos. Cada evento contiene sólo una secuencia local, uno de install/new/check/dev/build, día Unix aproximado, versión del CLI, plataforma del sistema operativo y arquitectura de CPU."),
+            note(locale, "What is excluded", "There is no user or installation ID, IP, timestamp, path, project, template, route, command argument, source, environment value, error, dependency, hostname, username, or email.", "Lo que se excluye", "No hay ID de usuario o instalación, IP, timestamp, path, proyecto, template, route, argumento, source, valor de environment, error, dependencia, hostname, username ni email."),
+        ]),
+        doc_section(locale, "control", "Preview and export locally", "Previsualiza y exporta localmente", vec![
+            code_block(locale, "shell", "pliego telemetry preview\npliego telemetry preview --format json\npliego telemetry export --output ./pliegors-telemetry.json"),
+            paragraph(locale, "Preview shows the exact report shape. Export creates a new local file and refuses to overwrite an existing path. Neither command uploads data.", "Preview muestra la forma exacta del reporte. Export crea un archivo local nuevo y se niega a sobrescribir un path existente. Ningún comando sube datos."),
+        ]),
+        doc_section(locale, "delete", "Stop and delete under user control", "Detén y elimina bajo control del usuario", vec![
+            code_block(locale, "shell", "pliego telemetry disable\npliego telemetry disable --delete-local"),
+            paragraph(locale, "Disabling stops collection; --delete-local also removes the bounded local state. Re-enabling requires another deliberate command. Corrupt or unsupported state fails closed and cannot enable collection.", "Desactivar detiene la recolección; --delete-local también elimina el estado local limitado. Reactivar exige otro comando deliberado. Un estado corrupto o incompatible falla cerrado y no puede habilitar la recolección."),
+            note(locale, "No network collector", "P8 has no submit command, collector URL, API key, cookie, retry queue, or background process. A future collector requires a separate policy and cannot remotely activate existing clients.", "Sin collector de red", "P8 no tiene comando submit, URL de collector, API key, cookie, cola de reintentos ni proceso en background. Un collector futuro exige otra política y no puede activar remotamente clientes existentes."),
+            link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/docs/41-voluntary-telemetry.md", "Complete telemetry contract", "Contrato completo de telemetría")]),
         ]),
     ].into_view()
 }
@@ -1000,6 +1111,26 @@ fn command_table(locale: Locale) -> View {
             "pliego templates",
             "List maintained starter IDs and capabilities",
             "Lista IDs y capacidades de starters mantenidos",
+        ),
+        (
+            "pliego doctor",
+            "Diagnose global or project prerequisites with actionable checks",
+            "Diagnostica prerrequisitos globales o del proyecto con verificaciones accionables",
+        ),
+        (
+            "pliego report --bundle",
+            "Create a redacted local support bundle without uploading it",
+            "Crea un bundle local redactado de soporte sin subirlo",
+        ),
+        (
+            "pliego upgrade --check",
+            "Evaluate an explicit upgrade plan without modifying the project",
+            "Evalúa un plan explícito de upgrade sin modificar el proyecto",
+        ),
+        (
+            "pliego telemetry <status|enable|preview|export|disable>",
+            "Control the disabled-by-default local telemetry journal",
+            "Controla el journal local de telemetría desactivado por defecto",
         ),
         (
             "pliego check",
@@ -1244,11 +1375,29 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("receipt", "Receipt and graph", "Recibo y grafo"),
             ("publish", "Staged publication", "Publicación por staging"),
         ],
+        "release-trust" => vec![
+            ("bytes", "Exact release bytes", "Bytes exactos del release"),
+            ("signatures", "Signatures", "Firmas"),
+            ("attestations", "SBOM and provenance", "SBOM y provenance"),
+            ("promotion", "Promotion", "Promoción"),
+        ],
+        "performance-evidence" => vec![
+            ("protocol", "Measurement protocol", "Protocolo de medición"),
+            ("reproduce", "Reproduce", "Reproducir"),
+            ("adversarial", "Failure evidence", "Evidencia de fallos"),
+            ("interpret", "Interpretation", "Interpretación"),
+        ],
         "errors-and-diagnostics" => vec![
             ("browser", "Browser failures", "Fallos en navegador"),
             ("codes", "Diagnostic codes", "Códigos diagnósticos"),
             ("http", "HTTP failures", "Fallos HTTP"),
             ("recovery", "Recovery", "Recuperación"),
+        ],
+        "telemetry" => vec![
+            ("default", "Disabled by default", "Desactivada por defecto"),
+            ("allowlist", "Exact allowlist", "Allowlist exacta"),
+            ("control", "Preview and export", "Preview y export"),
+            ("delete", "Disable and delete", "Desactivar y eliminar"),
         ],
         "build-and-deploy" => vec![
             ("build", "Build", "Build"),
@@ -1297,7 +1446,7 @@ mod tests {
             assert!(article(Locale::Es, topic.slug).is_ok());
             assert!(outline(topic.slug).len() >= 4);
         }
-        assert_eq!(TOPICS.len(), 18);
+        assert_eq!(TOPICS.len(), 21);
     }
 
     #[test]

@@ -1,0 +1,5 @@
+key = "docs-performance-evidence"
+title = { en = "Performance evidence | PliegoRS", es = "Evidencia de rendimiento | PliegoRS" }
+description = { en = "Reproduce PliegoRS build and browser benchmarks, inspect raw observations and hardware context, and understand their explicit claim boundary.", es = "Reproduce benchmarks de build y navegador de PliegoRS, inspecciona observaciones crudas y contexto de hardware, y entiende su límite de afirmación." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "The PliegoRS evidence plane for reproducible measurements", es = "El plano de evidencia de PliegoRS para mediciones reproducibles" }

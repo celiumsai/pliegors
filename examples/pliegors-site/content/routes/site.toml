@@ -104,8 +104,26 @@ pageType = "web-page"
 robots = "index-follow"
 
 [[routes]]
+path = "/docs/release-trust"
+page = "docs-release-trust"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/performance-evidence"
+page = "docs-performance-evidence"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
 path = "/docs/errors-and-diagnostics"
 page = "docs-errors-and-diagnostics"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/telemetry"
+page = "docs-telemetry"
 pageType = "web-page"
 robots = "index-follow"
 
