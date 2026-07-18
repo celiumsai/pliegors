@@ -110,6 +110,19 @@ reserves Cargo's standard directories, built-in Rust targets, and the effective
 configured `build.target`; validation happens before compilation can write into
 a publication root.
 
+On Windows, a canonical project path beyond the legacy 260-character boundary
+keeps its original source and publication identity. Because MSVC cannot
+reliably link Cargo intermediates at that depth, PliegoRS assigns a bounded,
+project-derived target below the user's temporary directory unless
+`CARGO_TARGET_DIR` already names an explicit short location. The resolved
+directory still passes the same canonical, non-linked, and output-disjointness
+checks. Set `CARGO_TARGET_DIR` yourself when the temporary directory is not a
+trusted executable location or its resulting path would exceed 120 UTF-16 code
+units. On the Rust 1.85 MSRV, invoke PliegoRS from the project root when that
+root itself exceeds 260 characters; the CLI fails closed from deeper working
+directories because passing an extended `lpCurrentDirectory` to child tools is
+not reliable on that standard library.
+
 This is the only production publication path. `Site::build` requires the
 complete `BuildInvocation` delivered through `PLIEGO_BUILD_CONTEXT`; it fails
 before publication when that invocation is absent. The lower-level

@@ -9,6 +9,7 @@ use notify::{
     Config as WatchConfig, Event as WatchEvent, RecommendedWatcher, RecursiveMode, Watcher,
 };
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
@@ -614,11 +615,10 @@ fn css_check(context: &Context, arguments: Vec<String>) -> Result<(), String> {
     let program = std::env::var_os("PLIEGO_CSSC")
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| "pliego-cssc".into());
-    let directory = command_working_directory(&context.root)?;
-    let status = Command::new(&program)
-        .arg("check")
-        .args(&arguments)
-        .current_dir(directory)
+    let mut command = Command::new(&program);
+    command.arg("check").args(&arguments);
+    configure_command_working_directory(&mut command, &context.root)?;
+    let status = command
         .status()
         .map_err(|error| {
             format!(
@@ -1517,12 +1517,10 @@ fn require_command(directory: &Path, program: &str, arguments: &[&str]) -> Resul
 }
 
 fn command_output(directory: &Path, program: &str, arguments: &[&str]) -> Result<String, String> {
-    let directory = command_working_directory(directory)?;
-    let output = Command::new(program)
-        .args(arguments)
-        .current_dir(&directory)
-        .output()
-        .map_err(|error| error.to_string())?;
+    let mut command = Command::new(program);
+    command.args(arguments);
+    configure_command_working_directory(&mut command, directory)?;
+    let output = command.output().map_err(|error| error.to_string())?;
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
     } else {
@@ -1537,20 +1535,116 @@ fn command_output(directory: &Path, program: &str, arguments: &[&str]) -> Result
 fn command_working_directory(directory: &Path) -> Result<PathBuf, String> {
     #[cfg(windows)]
     {
+        use std::os::windows::ffi::OsStrExt;
+
         let value = directory.to_str().ok_or_else(|| {
             format!(
                 "command working directory is not valid UTF-8: {}",
                 directory.display()
             )
         })?;
-        if let Some(unc) = value.strip_prefix(r"\\?\UNC\") {
-            return Ok(PathBuf::from(format!(r"\\{unc}")));
+        let (conventional, extended) = if let Some(unc) = value.strip_prefix(r"\\?\UNC\") {
+            (PathBuf::from(format!(r"\\{unc}")), directory.to_owned())
+        } else if let Some(local) = value.strip_prefix(r"\\?\") {
+            (PathBuf::from(local), directory.to_owned())
+        } else if let Some(unc) = value.strip_prefix(r"\\") {
+            (
+                directory.to_owned(),
+                PathBuf::from(format!(r"\\?\UNC\{unc}")),
+            )
+        } else if directory.is_absolute() {
+            (directory.to_owned(), PathBuf::from(format!(r"\\?\{value}")))
+        } else {
+            return Ok(directory.to_owned());
+        };
+
+        // Traditional Win32 working directories are capped at MAX_PATH. Keep
+        // conventional paths for broad tool compatibility, but never discard
+        // the extended namespace when the conventional form would overflow.
+        if conventional.as_os_str().encode_wide().count() >= 260 {
+            return Ok(extended);
         }
-        if let Some(local) = value.strip_prefix(r"\\?\") {
-            return Ok(PathBuf::from(local));
-        }
+        return Ok(conventional);
     }
+    #[cfg(not(windows))]
     Ok(directory.to_owned())
+}
+
+fn configure_command_working_directory(
+    command: &mut Command,
+    directory: &Path,
+) -> Result<(), String> {
+    let directory = command_working_directory(directory)?;
+    #[cfg(windows)]
+    if directory
+        .to_str()
+        .is_some_and(|value| value.starts_with(r"\\?\"))
+    {
+        // Rust 1.85 cannot pass an extended-length lpCurrentDirectory to a
+        // child process. PliegoRS was launched from this directory, so let the
+        // child inherit it and preserve Cargo config and toolchain discovery.
+        let current = std::env::current_dir()
+            .and_then(|path| path.canonicalize())
+            .map_err(|error| format!("cannot verify the inherited working directory: {error}"))?;
+        if current != directory {
+            return Err(format!(
+                "Windows projects beyond 260 characters must run PliegoRS from the project root {}; current directory is {}",
+                directory.display(),
+                current.display()
+            ));
+        }
+        return Ok(());
+    }
+    command.current_dir(directory);
+    Ok(())
+}
+
+fn configure_cargo_command(command: &mut Command, project_root: &Path) -> Result<(), String> {
+    configure_command_working_directory(command, project_root)?;
+    #[cfg(windows)]
+    if std::env::var_os("CARGO_TARGET_DIR").is_none() {
+        let Some(target) = automatic_cargo_target_directory(project_root)? else {
+            return Ok(());
+        };
+        command.env("CARGO_TARGET_DIR", target);
+    }
+    Ok(())
+}
+
+fn automatic_cargo_target_directory(project_root: &Path) -> Result<Option<PathBuf>, String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+
+        if !command_working_directory(project_root)?
+            .to_str()
+            .is_some_and(|value| value.starts_with(r"\\?\"))
+        {
+            return Ok(None);
+        }
+        let identity = project_root.to_str().ok_or_else(|| {
+            format!(
+                "project root is not valid UTF-8: {}",
+                project_root.display()
+            )
+        })?;
+        let digest = format!("{:x}", Sha256::digest(identity.as_bytes()));
+        let target = std::env::temp_dir()
+            .join("pliegors-cargo-targets")
+            .join(&digest[..24]);
+        if target.as_os_str().encode_wide().count() > 120 {
+            return Err(format!(
+                "automatic Windows Cargo target path is too long: {}; set CARGO_TARGET_DIR to a trusted short directory",
+                target.display()
+            ));
+        }
+        return Ok(Some(target));
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = project_root;
+        Ok(None)
+    }
 }
 
 fn build(context: &Context) -> Result<(), String> {
@@ -1893,9 +1987,8 @@ fn cargo_metadata_with_lock_mode(root: &Path, locked: bool) -> Result<CargoMetad
     if locked {
         command.arg("--locked");
     }
-    let directory = command_working_directory(root)?;
+    configure_cargo_command(&mut command, root)?;
     let output = command
-        .current_dir(&directory)
         .output()
         .map_err(|error| format!("cannot run cargo metadata: {error}"))?;
     if !output.status.success() {
@@ -2597,13 +2690,16 @@ fn execute_with_environment(
     arguments: &[&str],
     environment: Option<(&str, &Path)>,
 ) -> Result<(), String> {
-    let directory = command_working_directory(root)?;
     let mut command = Command::new(program);
     command
         .args(arguments)
-        .current_dir(&directory)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if program == "cargo" {
+        configure_cargo_command(&mut command, root)?;
+    } else {
+        configure_command_working_directory(&mut command, root)?;
+    }
     if let Some((name, value)) = environment {
         command.env(name, value);
     }
@@ -3613,6 +3709,32 @@ mod tests {
             "tool discovery must run from the discovered project root"
         );
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn command_working_directory_preserves_long_path_namespace() {
+        let long = PathBuf::from(format!(r"C:\{}", "segment\\".repeat(40)));
+        let directory = command_working_directory(&long).unwrap();
+        assert!(
+            directory.to_string_lossy().starts_with(r"\\?\C:\"),
+            "long working directory lost its extended namespace: {}",
+            directory.display()
+        );
+
+        let short = PathBuf::from(r"\\?\C:\pliego\project");
+        assert_eq!(
+            command_working_directory(&short).unwrap(),
+            PathBuf::from(r"C:\pliego\project"),
+            "short working directories should retain conventional tool compatibility"
+        );
+
+        let target = automatic_cargo_target_directory(&long)
+            .unwrap()
+            .expect("long Windows projects require an automatic short Cargo target");
+        use std::os::windows::ffi::OsStrExt;
+        assert!(target.as_os_str().encode_wide().count() <= 120);
+        assert!(target.starts_with(std::env::temp_dir()));
     }
 
     #[test]
