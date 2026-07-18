@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Read;
 use std::net::TcpListener;
@@ -57,6 +58,76 @@ fn framework_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn opensdk_fixture(root: &std::path::Path, plane: &str) -> PathBuf {
+    fs::create_dir_all(root).unwrap();
+    let (entry_name, entry_kind, bytes, world, determinism, capabilities) = match plane {
+        "build" => (
+            "component.wasm",
+            "wasm-component",
+            vec![0x00, 0x61, 0x73, 0x6d, 0x0d, 0x00, 0x01, 0x00],
+            Some("pliego:build/transformer@0.1.0"),
+            "pure",
+            Vec::<&str>::new(),
+        ),
+        "browser" => (
+            "component.js",
+            "browser-esm",
+            b"customElements.define('pliego-test', class extends HTMLElement {});".to_vec(),
+            None,
+            "native-trusted",
+            vec!["dom"],
+        ),
+        other => panic!("unknown fixture plane {other}"),
+    };
+    fs::write(root.join(entry_name), &bytes).unwrap();
+    let mut entry = serde_json::json!({
+        "kind": entry_kind,
+        "path": entry_name,
+    });
+    if let Some(world) = world {
+        entry["world"] = Value::String(world.to_owned());
+    }
+    if plane == "browser" {
+        entry["customElement"] = Value::String("pliego-test".to_owned());
+    }
+    let manifest = serde_json::json!({
+        "schema": "dev.pliegors.sdk-extension/v1",
+        "apiVersion": "0.1.0-preview.1",
+        "hostVersion": ">=0.1.0-preview.1, <0.2.0",
+        "plane": plane,
+        "identity": {
+            "namespace": "celiums",
+            "name": format!("{plane}-fixture"),
+            "version": "0.1.0",
+            "digest": format!("sha256:{:x}", Sha256::digest(&bytes)),
+        },
+        "entry": entry,
+        "determinism": determinism,
+        "imports": [],
+        "exports": [],
+        "capabilities": capabilities,
+        "requiredFeatures": [],
+        "optionalFeatures": [],
+        "budgets": {
+            "cpuMs": 100,
+            "wallTimeMs": 500,
+            "memoryBytes": 16 * 1024 * 1024,
+            "outputBytes": 1024 * 1024,
+        },
+        "lifecycle": {
+            "init": true,
+            "update": false,
+            "suspend": false,
+            "resume": false,
+            "dispose": true,
+            "hmr": false,
+        },
+    });
+    let path = root.join("pliego-extension.json");
+    fs::write(&path, serde_json::to_vec_pretty(&manifest).unwrap()).unwrap();
+    path
+}
+
 #[test]
 fn unknown_command_is_usage_even_outside_a_project() {
     let output = pliego(&["unknown-command"], &std::env::temp_dir());
@@ -64,6 +135,131 @@ fn unknown_command_is_usage_even_outside_a_project() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("PLG-ARG-001"));
     assert!(stderr.contains("unknown command"));
+}
+
+#[test]
+fn sdk_check_and_test_admit_exact_component_bytes_outside_a_project() {
+    let root = temporary_directory("sdk-component");
+    let manifest = opensdk_fixture(&root, "build");
+    let check = pliego(
+        &[
+            "sdk",
+            "check",
+            manifest.to_str().unwrap(),
+            "--format",
+            "json",
+        ],
+        &root,
+    );
+    assert!(
+        check.status.success(),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let report: Value = serde_json::from_slice(&check.stdout).unwrap();
+    assert_eq!(report["contract"], "dev.pliegors.sdk-conformance/v1");
+    assert_eq!(report["level"], "admission");
+    assert_eq!(report["result"], "pass");
+    assert_eq!(
+        report["admission"]["grantedCapabilities"],
+        serde_json::json!([])
+    );
+
+    let test = pliego(
+        &["sdk", "test", manifest.to_str().unwrap(), "--format=json"],
+        &root,
+    );
+    assert!(
+        test.status.success(),
+        "{}",
+        String::from_utf8_lossy(&test.stderr)
+    );
+    let report: Value = serde_json::from_slice(&test.stdout).unwrap();
+    assert_eq!(report["level"], "component-instantiation");
+    assert_eq!(
+        report["componentHost"]["schema"],
+        "dev.pliegors.component-host/v1"
+    );
+    assert!(
+        report["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|check| check == "deterministic-admission")
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn sdk_capabilities_and_digests_fail_closed_before_execution() {
+    let root = temporary_directory("sdk-policy");
+    let manifest = opensdk_fixture(&root, "browser");
+    let denied = pliego(&["sdk", "check", manifest.to_str().unwrap()], &root);
+    assert_eq!(denied.status.code(), Some(9));
+    let stderr = String::from_utf8_lossy(&denied.stderr);
+    assert!(stderr.contains("PLG-SDK-001"));
+    assert!(stderr.contains("capability `dom` was not granted"));
+
+    let granted = pliego(
+        &["sdk", "check", manifest.to_str().unwrap(), "--grant", "dom"],
+        &root,
+    );
+    assert!(
+        granted.status.success(),
+        "{}",
+        String::from_utf8_lossy(&granted.stderr)
+    );
+    fs::write(root.join("component.js"), b"tampered").unwrap();
+    let tampered = pliego(&["sdk", "check", manifest.to_str().unwrap()], &root);
+    assert_eq!(tampered.status.code(), Some(9));
+    assert!(String::from_utf8_lossy(&tampered.stderr).contains("digest mismatch"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn sdk_entry_cannot_escape_through_an_intermediate_symlink() {
+    use std::os::unix::fs::symlink;
+
+    let root = temporary_directory("sdk-linked-ancestor");
+    let outside = temporary_directory("sdk-linked-outside");
+    let manifest_path = opensdk_fixture(&root, "build");
+    fs::create_dir_all(&outside).unwrap();
+    fs::copy(root.join("component.wasm"), outside.join("component.wasm")).unwrap();
+    symlink(&outside, root.join("linked")).unwrap();
+    let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+    manifest["entry"]["path"] = Value::String("linked/component.wasm".to_owned());
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    let result = pliego(&["sdk", "check", manifest_path.to_str().unwrap()], &root);
+    assert_eq!(result.status.code(), Some(9));
+    assert!(String::from_utf8_lossy(&result.stderr).contains("non-symlink"));
+
+    fs::remove_file(root.join("linked")).unwrap();
+    fs::remove_dir_all(root).unwrap();
+    fs::remove_dir_all(outside).unwrap();
+}
+
+#[test]
+fn sdk_compatibility_is_machine_readable_and_bound_to_the_public_source() {
+    let output = pliego(
+        &["sdk", "compatibility", "--format", "json"],
+        &std::env::temp_dir(),
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let matrix: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(matrix["contract"], "dev.pliegors.sdk-compatibility/v1");
+    assert_eq!(matrix["protocolVersion"], "0.1.0-preview.1");
+    assert_eq!(matrix["source"], "celiumsai/pliegors");
+    assert_eq!(matrix["deprecations"], serde_json::json!([]));
 }
 
 #[test]

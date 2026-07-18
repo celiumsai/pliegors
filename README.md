@@ -18,7 +18,7 @@
   <a href="https://docs.rs/pliego-cli"><img alt="docs.rs" src="https://img.shields.io/docsrs/pliego-cli"></a>
   <a href="https://github.com/celiumsai/pliegors/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/celiumsai/pliegors"></a>
   <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/crates/l/pliego-cli.svg"></a>
-  <a href="https://doc.rust-lang.org/stable/releases.html"><img alt="rustc 1.85+" src="https://img.shields.io/badge/rustc-1.85%2B-b7410e.svg"></a>
+  <a href="https://doc.rust-lang.org/stable/releases.html"><img alt="rustc 1.86+" src="https://img.shields.io/badge/rustc-1.86%2B-b7410e.svg"></a>
   <img alt="Public preview" src="https://img.shields.io/badge/status-public_preview-d8ff2f.svg">
 </p>
 
@@ -88,6 +88,7 @@ operation remains a separate system boundary.
 | `pliego-assets` | Adaptive media plans, budgets, and manifests |
 | `pliego-inspect` | Artifact integrity and budget inspection |
 | `pliego-hyphae` | Protocol v2 attestations, authority policy, and type-gated verified replay |
+| `pliego-sdk` | OpenSDK manifests, capability admission, Wasm Component runtime, effect receipts, and tooling protocols |
 | `pliego-starters` | Maintained embedded starter projects |
 | `pliego-cli` | Project creation, build, dev server, preview, and inspection |
 
@@ -111,6 +112,15 @@ pliego doctor
 pliego report --bundle
 pliego upgrade --check
 pliego telemetry status
+```
+
+Inspect the provider-neutral OpenSDK contract or validate an extension outside
+any project:
+
+```sh
+pliego sdk compatibility
+pliego sdk check path/to/pliego-extension.json --grant dom
+pliego sdk test path/to/pliego-extension.json --input path/to/transform.json
 ```
 
 The delegated `pliego css check` surface is experimental interoperability with a
@@ -152,6 +162,7 @@ npm run check:benchmarks
 npm run check:fuzz
 npm run check:golden-path
 npm run check:telemetry
+npm run check:opensdk:all
 npm run check:docs
 npm run check:distribution
 npm run check:phase-1
@@ -176,6 +187,14 @@ npm run check:site
 - [Reproducible benchmarks](docs/39-reproducible-benchmarks.md)
 - [Release-only golden environment matrix](docs/40-release-only-golden-matrix.md)
 - [Voluntary telemetry and local funnel report](docs/41-voluntary-telemetry.md)
+- [OpenSDK foundation and security model](docs/42-opensdk-foundation.md)
+- [Multilanguage conformance](docs/43-opensdk-multilang-conformance.md)
+- [Browser framework conformance](docs/44-browser-framework-conformance.md)
+- [JSON-RPC and MCP tooling protocol](docs/45-opensdk-tooling-protocol.md)
+- [Compatibility and deprecation policy](docs/46-opensdk-compatibility-and-deprecation.md)
+- [OpenSDK planes and capability RFC](docs/rfc/RFC-006-opensdk-planes-and-capabilities.md)
+- [Portable build output RFC](docs/rfc/RFC-007-pliego-build-output-contract.md)
+- [Wasmtime security-floor decision](docs/adr/ADR-006-opensdk-wasmtime-security-floor.md)
 - [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
 - [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)
 - [R4 acceptance evidence](docs/evidence/r4-dom-lifecycle.md)

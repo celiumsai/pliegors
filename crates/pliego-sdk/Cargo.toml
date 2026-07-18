@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-sdk"
+version = "0.1.0-preview.1"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["webassembly", "component-model", "plugins", "sdk", "sandbox"]
+categories = ["development-tools", "wasm"]
+description = "OpenSDK contracts, admission policy, and effect receipts for PliegoRS extensions."
+publish.workspace = true
+include = ["src/**", "wit/**", "README.md"]
+
+[features]
+default = []
+runtime = ["dep:psm", "dep:wasmtime"]
+
+[dependencies]
+semver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+wasmparser = { workspace = true }
+wit-parser = { workspace = true }
+wasmtime = { workspace = true, optional = true }
+psm = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+wat = "=1.233.0"
+wit-component = { version = "=0.233.0", features = ["dummy-module"] }

@@ -6,7 +6,7 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 manifest="$root/benchmarks/browser-apply/Cargo.toml"
 output="$root/target/benchmarks/browser-apply"
 target_dir=${PLIEGORS_BROWSER_BENCH_TARGET:-"$root/target/benchmarks/browser-cargo"}
-toolchain=${PLIEGORS_BENCH_TOOLCHAIN:-1.85.0}
+toolchain=${PLIEGORS_BENCH_TOOLCHAIN:-1.86.0}
 
 [ "$#" -eq 0 ] || {
   echo "usage: sh scripts/build-browser-benchmark.sh" >&2

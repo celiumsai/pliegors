@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- Add the OpenSDK `0.1.0-preview.1` contracts, conformance CLI, typed Wasmtime
+  Component host, effect broker, multilang/browser/tooling fixtures, and
+  compatibility matrix.
+- Raise the next-release MSRV from Rust `1.85.0` to `1.86.0` so the OpenSDK host
+  can use Wasmtime `36.0.8`, the first compatible patch line that resolves the
+  RustSec advisories affecting the original `34.0.2` prototype.
+
 - Add default-disabled, identifier-free voluntary funnel telemetry with exact
   local preview/export, a 64-event bound, no network collector, and complete
   disable/delete controls.

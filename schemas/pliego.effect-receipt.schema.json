@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.effect-receipt.schema.json",
+  "title": "PliegoRS brokered effect receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "sequence",
+    "outcome",
+    "capability",
+    "operation",
+    "inputSha256",
+    "outputSha256"
+  ],
+  "properties": {
+    "schema": { "const": "dev.pliegors.effect-receipt/v1" },
+    "sequence": { "type": "integer", "minimum": 1, "maximum": 4096 },
+    "outcome": { "enum": ["success", "error"] },
+    "capability": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "operation": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[!-~]{1,128}$" },
+    "inputSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "outputSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Digest of the success payload or executor failure value according to outcome."
+    }
+  }
+}

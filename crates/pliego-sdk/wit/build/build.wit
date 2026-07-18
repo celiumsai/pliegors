@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+package pliego:build@0.1.0;
+
+interface transform {
+  record transform-input {
+    path: string,
+    media-type: string,
+    bytes: list<u8>,
+    options-json: string,
+  }
+
+  record transform-output {
+    media-type: string,
+    bytes: list<u8>,
+    diagnostics-json: string,
+  }
+
+  apply: func(input: transform-input) -> result<transform-output, string>;
+}
+
+world transformer {
+  export transform;
+}

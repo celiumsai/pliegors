@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: Apache-2.0
+package pliego:http@0.1.0;
+
+interface handler {
+  record header {
+    name: string,
+    value: list<u8>,
+  }
+
+  record request {
+    method: string,
+    uri: string,
+    headers: list<header>,
+    body: list<u8>,
+  }
+
+  record response {
+    status: u16,
+    headers: list<header>,
+    body: list<u8>,
+  }
+
+  handle: func(request: request) -> result<response, string>;
+}
+
+world server-extension {
+  export handler;
+}

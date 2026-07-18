@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.sdk-extension.schema.json",
+  "title": "PliegoRS OpenSDK extension manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "apiVersion",
+    "hostVersion",
+    "plane",
+    "identity",
+    "entry",
+    "determinism",
+    "imports",
+    "exports",
+    "capabilities",
+    "requiredFeatures",
+    "optionalFeatures",
+    "budgets",
+    "lifecycle"
+  ],
+  "properties": {
+    "schema": { "const": "dev.pliegors.sdk-extension/v1" },
+    "apiVersion": { "const": "0.1.0-preview.1" },
+    "hostVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "plane": { "enum": ["build", "server", "browser", "tooling"] },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "name", "version", "digest"],
+      "properties": {
+        "namespace": { "$ref": "#/$defs/identifier" },
+        "name": { "$ref": "#/$defs/identifier" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path"],
+      "properties": {
+        "kind": { "enum": ["wasm-component", "browser-esm", "json-rpc-process"] },
+        "path": { "$ref": "#/$defs/path" },
+        "world": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "customElement": { "$ref": "#/$defs/customElement" }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "kind": { "const": "wasm-component" } }, "required": ["kind"] },
+          "then": { "type": "object", "required": ["world"], "properties": { "world": true, "customElement": false } }
+        },
+        {
+          "if": { "type": "object", "properties": { "kind": { "const": "browser-esm" } }, "required": ["kind"] },
+          "then": { "type": "object", "required": ["customElement"], "properties": { "world": false, "customElement": true } }
+        },
+        {
+          "if": { "type": "object", "properties": { "kind": { "const": "json-rpc-process" } }, "required": ["kind"] },
+          "then": { "type": "object", "properties": { "world": false, "customElement": false } }
+        }
+      ]
+    },
+    "determinism": { "enum": ["pure", "recorded-effect", "native-trusted"] },
+    "imports": { "$ref": "#/$defs/sortedStrings" },
+    "exports": { "$ref": "#/$defs/sortedStrings" },
+    "capabilities": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "filesystem-read",
+          "filesystem-write",
+          "network",
+          "environment",
+          "clock",
+          "random",
+          "http",
+          "effect-broker",
+          "dom",
+          "motion",
+          "smooth-scroll",
+          "audio",
+          "video",
+          "webgl",
+          "webgpu",
+          "high-frequency-raf"
+        ]
+      }
+    },
+    "requiredFeatures": { "$ref": "#/$defs/featureIds" },
+    "optionalFeatures": { "$ref": "#/$defs/featureIds" },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpuMs", "wallTimeMs", "memoryBytes", "outputBytes"],
+      "properties": {
+        "cpuMs": { "type": "integer", "minimum": 1, "maximum": 60000 },
+        "wallTimeMs": { "type": "integer", "minimum": 1, "maximum": 300000 },
+        "memoryBytes": { "type": "integer", "minimum": 65536, "maximum": 1073741824 },
+        "outputBytes": { "type": "integer", "minimum": 1, "maximum": 1073741824 }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["init", "update", "suspend", "resume", "dispose", "hmr"],
+      "properties": {
+        "init": { "const": true },
+        "update": { "type": "boolean" },
+        "suspend": { "type": "boolean" },
+        "resume": { "type": "boolean" },
+        "dispose": { "const": true },
+        "hmr": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "oneOf": [
+            { "type": "object", "properties": { "suspend": { "const": true }, "resume": { "const": true } } },
+            { "type": "object", "properties": { "suspend": { "const": false }, "resume": { "const": false } } }
+          ]
+        },
+        {
+          "if": { "type": "object", "properties": { "hmr": { "const": true } }, "required": ["hmr"] },
+          "then": { "type": "object", "properties": { "update": { "const": true } } }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "type": "object", "properties": { "plane": { "enum": ["build", "server"] } }, "required": ["plane"] },
+      "then": { "type": "object", "properties": { "entry": { "type": "object", "properties": { "kind": { "const": "wasm-component" } } } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "plane": { "const": "browser" } }, "required": ["plane"] },
+      "then": { "type": "object", "properties": { "entry": { "type": "object", "properties": { "kind": { "const": "browser-esm" } } } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "plane": { "const": "tooling" } }, "required": ["plane"] },
+      "then": { "type": "object", "properties": { "entry": { "type": "object", "properties": { "kind": { "const": "json-rpc-process" } } } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "determinism": { "const": "pure" } }, "required": ["determinism"] },
+      "then": { "type": "object", "properties": { "capabilities": { "type": "array", "maxItems": 0 } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "determinism": { "const": "recorded-effect" } }, "required": ["determinism"] },
+      "then": { "type": "object", "properties": { "capabilities": { "type": "array", "contains": { "const": "effect-broker" } } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "lifecycle": { "type": "object", "properties": { "hmr": { "const": true } }, "required": ["hmr"] } }, "required": ["lifecycle"] },
+      "then": { "type": "object", "properties": { "plane": { "const": "browser" } } }
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
+    },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[^\\\\]+$"
+    },
+    "customElement": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 128,
+      "pattern": "^(?!xml)(?!annotation-xml$)(?!color-profile$)(?!font-face(?:-(?:src|uri|format|name))?$)(?!missing-glyph$)[a-z][a-z0-9._]*-[a-z0-9._-]*$"
+    },
+    "sortedStrings": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "featureIds": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$" }
+    }
+  }
+}

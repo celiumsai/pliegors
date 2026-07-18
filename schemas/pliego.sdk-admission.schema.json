@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.sdk-admission.schema.json",
+  "title": "PliegoRS OpenSDK admission receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "extension",
+    "digest",
+    "hostVersion",
+    "apiVersion",
+    "grantedCapabilities",
+    "negotiatedFeatures"
+  ],
+  "properties": {
+    "schema": { "const": "dev.pliegors.sdk-admission/v1" },
+    "extension": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "hostVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "apiVersion": { "const": "0.1.0-preview.1" },
+    "grantedCapabilities": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "negotiatedFeatures": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/feature" }
+    }
+  },
+  "$defs": {
+    "capability": {
+      "enum": [
+        "filesystem-read",
+        "filesystem-write",
+        "network",
+        "environment",
+        "clock",
+        "random",
+        "http",
+        "effect-broker",
+        "dom",
+        "motion",
+        "smooth-scroll",
+        "audio",
+        "video",
+        "webgl",
+        "webgpu",
+        "high-frequency-raf"
+      ]
+    },
+    "feature": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
+    }
+  }
+}

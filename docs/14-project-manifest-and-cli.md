@@ -118,7 +118,7 @@ project-derived target below the user's temporary directory unless
 directory still passes the same canonical, non-linked, and output-disjointness
 checks. Set `CARGO_TARGET_DIR` yourself when the temporary directory is not a
 trusted executable location or its resulting path would exceed 120 UTF-16 code
-units. On the Rust 1.85 MSRV, invoke PliegoRS from the project root when that
+units. On the Rust 1.86 MSRV, invoke PliegoRS from the project root when that
 root itself exceeds 260 characters; the CLI fails closed from deeper working
 directories because passing an extended `lpCurrentDirectory` to child tools is
 not reliable on that standard library.

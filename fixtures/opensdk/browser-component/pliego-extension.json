@@ -1,0 +1,37 @@
+{
+  "schema": "dev.pliegors.sdk-extension/v1",
+  "apiVersion": "0.1.0-preview.1",
+  "hostVersion": ">=0.1.0-preview.1, <0.2.0",
+  "plane": "browser",
+  "identity": {
+    "namespace": "pliego",
+    "name": "browser-component-fixture",
+    "version": "0.1.0",
+    "digest": "sha256:a8d7f2e36b51ef23b157f7dd7c68a767adc114a2ba9c338e0b5d79db9b635093"
+  },
+  "entry": {
+    "kind": "browser-esm",
+    "path": "component.js",
+    "customElement": "pliego-status"
+  },
+  "determinism": "native-trusted",
+  "imports": [],
+  "exports": ["pliegoComponent"],
+  "capabilities": ["dom"],
+  "requiredFeatures": [],
+  "optionalFeatures": ["custom-elements-v1"],
+  "budgets": {
+    "cpuMs": 100,
+    "wallTimeMs": 500,
+    "memoryBytes": 16777216,
+    "outputBytes": 1048576
+  },
+  "lifecycle": {
+    "init": true,
+    "update": true,
+    "suspend": true,
+    "resume": true,
+    "dispose": true,
+    "hmr": true
+  }
+}
