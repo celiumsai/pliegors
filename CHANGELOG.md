@@ -6,7 +6,8 @@
 
 - Add clean-revision P8 benchmark harnesses for cold and incremental builds,
   real browser DOM application, lifecycle memory plateau, raw observations,
-  nearest-rank summaries, and schema-validated evidence merging.
+  atomic same-environment resume, nearest-rank summaries, and schema-validated
+  evidence merging.
 - Add a separate P8 attestation package with a pinned CycloneDX SBOM,
   SLSA-compatible provenance, exact-set verification, and keyless Sigstore
   identity, while preserving the existing Ed25519 release bundle.
