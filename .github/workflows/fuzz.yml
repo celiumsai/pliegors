@@ -1,0 +1,59 @@
+name: Fuzz smoke
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "crates/**"
+      - "fuzz/**"
+      - "scripts/run-fuzz.sh"
+      - ".github/workflows/fuzz.yml"
+  pull_request:
+    paths:
+      - "crates/**"
+      - "fuzz/**"
+      - "scripts/run-fuzz.sh"
+      - ".github/workflows/fuzz.yml"
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_FUZZ_VERSION: 0.13.2
+  FUZZ_RUNS: 512
+  FUZZ_SEED: 20260718
+  FUZZ_MAX_LEN: 65536
+  PLIEGORS_FUZZ_TOOLCHAIN: nightly-2026-06-26
+
+jobs:
+  trust_boundaries:
+    name: Six bounded trust-boundary targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install pinned nightly
+        run: rustup toolchain install "$PLIEGORS_FUZZ_TOOLCHAIN" --profile minimal
+
+      - name: Install pinned cargo-fuzz
+        run: cargo install cargo-fuzz --version "$CARGO_FUZZ_VERSION" --locked
+
+      - name: Run deterministic fuzz smoke
+        run: sh scripts/run-fuzz.sh
+
+      - name: Upload minimized failures
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pliegors-fuzz-${{ github.sha }}
+          path: fuzz/artifacts
+          if-no-files-found: ignore
+          retention-days: 14

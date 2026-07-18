@@ -1,0 +1,5 @@
+[project]
+id = "sample"
+name = "Sample"
+site_package = "sample-site"
+output = "target/site"

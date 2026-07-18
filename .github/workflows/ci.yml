@@ -92,6 +92,9 @@ jobs:
       - name: Check documentation links
         run: npm run check:docs
 
+      - name: Check maintained fuzz contract
+        run: npm run check:fuzz
+
       - name: Validate GitHub Actions workflows
         shell: bash
         run: |

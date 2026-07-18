@@ -9,6 +9,16 @@ updates:
       - dependencies
       - rust
 
+  - package-ecosystem: cargo
+    directory: /fuzz
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - rust
+      - security
+
   - package-ecosystem: npm
     directory: /
     schedule:

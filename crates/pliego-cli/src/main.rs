@@ -26,7 +26,14 @@ use pliego_artifact::{
     Ownership, PortablePath, ToolchainEvidence, capture_build_context_with_materials,
     verify_build_context_with_materials, verify_build_report, write_build_invocation,
 };
+use pliego_cli::project_manifest::{
+    ProjectManifest, generated_paths_overlap, parse_project_manifest, validate_generated_path,
+    validate_relative_path,
+};
 use pliego_starters as templates;
+
+#[cfg(test)]
+use pliego_cli::project_manifest::{Client, Project, validate_manifest};
 
 const PROJECT_FILE: &str = "pliego.toml";
 const SERVER_WORKERS: usize = 8;
@@ -40,30 +47,6 @@ static BUILD_CONTEXT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[cfg(test)]
 mod r1_material_tests;
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-struct ProjectManifest {
-    project: Project,
-    client: Option<Client>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-struct Project {
-    id: String,
-    name: String,
-    site_package: String,
-    output: PathBuf,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-struct Client {
-    package: String,
-    wasm_name: String,
-    bindgen_output: PathBuf,
-}
 
 struct Context {
     root: PathBuf,
@@ -1173,9 +1156,8 @@ fn load_context() -> Result<Context, String> {
             }
             let source = fs::read_to_string(&manifest_path)
                 .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
-            let manifest: ProjectManifest = toml::from_str(&source)
+            let manifest = parse_project_manifest(&source)
                 .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
-            validate_manifest(&manifest)?;
             return Ok(Context { root, manifest });
         }
         if !current.pop() {
@@ -1290,107 +1272,14 @@ fn validate_loaded_context(context: &Context) -> Result<(), String> {
     }
     let source = fs::read_to_string(&manifest_path)
         .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
-    let current: ProjectManifest =
-        toml::from_str(&source).map_err(|error| format!("{}: {error}", manifest_path.display()))?;
-    validate_manifest(&current)?;
+    let current = parse_project_manifest(&source)
+        .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
     if current != context.manifest {
         return Err(format!(
             "{PROJECT_FILE} changed after project discovery; restart the command so its paths and ownership are reloaded"
         ));
     }
     Ok(())
-}
-
-fn validate_manifest(manifest: &ProjectManifest) -> Result<(), String> {
-    let project = &manifest.project;
-    if project.name.trim().is_empty() || project.site_package.trim().is_empty() {
-        return Err("project name and site_package cannot be empty".to_owned());
-    }
-    if project.id.len() > 64
-        || !project
-            .id
-            .starts_with(|character: char| character.is_ascii_lowercase())
-        || !project.id.chars().all(|character| {
-            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-'
-        })
-    {
-        return Err(
-            "project.id must start with a lowercase ASCII letter and contain at most 64 lowercase letters, digits, or hyphens"
-                .to_owned(),
-        );
-    }
-    let output = validate_generated_path(&project.output, "project.output")?;
-    let reserved = PortablePath::parse("target/.pliego")
-        .map_err(|error| format!("invalid reserved generated path: {error}"))?;
-    if generated_paths_overlap(&output, &reserved) {
-        return Err("project.output cannot overlap reserved target/.pliego".to_owned());
-    }
-    if let Some(client) = &manifest.client {
-        if client.package.trim().is_empty() || client.wasm_name.trim().is_empty() {
-            return Err("client package and wasm_name cannot be empty".to_owned());
-        }
-        if !client
-            .wasm_name
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '_')
-        {
-            return Err("client.wasm_name must be a Rust artifact identifier".to_owned());
-        }
-        let bindgen_output =
-            validate_generated_path(&client.bindgen_output, "client.bindgen_output")?;
-        if generated_paths_overlap(&bindgen_output, &reserved) {
-            return Err("client.bindgen_output cannot overlap reserved target/.pliego".to_owned());
-        }
-        if generated_paths_overlap(&output, &bindgen_output) {
-            return Err(
-                "project.output and client.bindgen_output must be disjoint generated paths"
-                    .to_owned(),
-            );
-        }
-    }
-    Ok(())
-}
-
-fn generated_paths_overlap(left: &PortablePath, right: &PortablePath) -> bool {
-    portable_path_prefix(left.collision_key(), right.collision_key())
-        || portable_path_prefix(right.collision_key(), left.collision_key())
-}
-
-fn portable_path_prefix(prefix: &str, path: &str) -> bool {
-    path == prefix
-        || path
-            .strip_prefix(prefix)
-            .is_some_and(|suffix| suffix.starts_with('/'))
-}
-
-fn validate_relative_path(path: &Path, field: &str) -> Result<(), String> {
-    if path.as_os_str().is_empty()
-        || !path
-            .components()
-            .all(|component| matches!(component, std::path::Component::Normal(_)))
-    {
-        return Err(format!("{field} must be a non-empty relative path"));
-    }
-    Ok(())
-}
-
-fn validate_generated_path(path: &Path, field: &str) -> Result<PortablePath, String> {
-    validate_relative_path(path, field)?;
-    let value = path
-        .to_str()
-        .ok_or_else(|| format!("{field} must be valid UTF-8"))?;
-    let portable = PortablePath::parse(value)
-        .map_err(|error| format!("{field} must be a portable generated path: {error}"))?;
-    if portable.as_str() != value {
-        return Err(format!("{field} must use canonical NFC spelling"));
-    }
-    let mut components = portable.as_str().split('/');
-    if components.next() != Some("target") || components.next().is_none() {
-        return Err(format!(
-            "{field} must be a generated path below target/, for example target/site"
-        ));
-    }
-    Ok(portable)
 }
 
 fn validate_reproducible_build_environment() -> Result<(), String> {

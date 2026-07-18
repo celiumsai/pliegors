@@ -9,6 +9,7 @@
     "check:crates": "node scripts/publish-crates.mjs --check",
     "check:distribution": "node scripts/check-distribution.mjs",
     "check:email-worker": "npm --prefix workers/pliegors-email run check",
+    "check:fuzz": "node scripts/check-fuzz-contract.mjs",
     "check:site": "node scripts/check-pliegors-site.mjs examples/pliegors-site/target/site",
     "check:site-deployment": "npm --prefix workers/pliegors-site run check",
     "check:wasm-lifetimes": "node scripts/check-wasm-lifetimes.mjs",
