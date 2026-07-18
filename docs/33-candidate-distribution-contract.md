@@ -37,7 +37,7 @@ commit and Rust 1.85.0:
 
 | Target | Runner | Tier |
 | --- | --- | --- |
-| `x86_64-unknown-linux-gnu` | Ubuntu 24.04 x64 | production |
+| `x86_64-unknown-linux-gnu` | Ubuntu 22.04 x64 | production |
 | `aarch64-unknown-linux-gnu` | Ubuntu 24.04 ARM64 | production |
 | `x86_64-apple-darwin` | macOS 15 Intel | development |
 | `aarch64-apple-darwin` | macOS 15 ARM64 | development |
@@ -47,6 +47,12 @@ Release builds disable incremental compilation, strip symbols and debug data,
 and remap the checkout path. MSVC additionally receives `/Brepro`; without it,
 the PE timestamp and debug identity differ between builders and the candidate
 must fail.
+
+The accepted `0.0.1` R6 candidate used Ubuntu 24.04 x64. P8 lowers the future
+Linux x64 build host to Ubuntu 22.04 so its glibc requirement is exercised by
+the pinned Debian bookworm container instead of silently inheriting glibc 2.39
+from the newest hosted image. ARM64 remains on the available Ubuntu 24.04 ARM
+runner and therefore has its own recorded host boundary.
 
 Each job uploads a ZIP, sidecar, and canonical build metadata. The seal job
 downloads all ten uploaded replicas before it trusts or signs anything. For the

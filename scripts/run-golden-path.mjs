@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -273,11 +273,20 @@ async function validateScaffold(manifestPath, source, expectedVersion, expectedS
     const matches = manifest.match(new RegExp(`version = "=${escapeRegex(expectedVersion)}"`, 'gu')) ?? [];
     if (matches.length !== 4) throw new Error('registry scaffold does not pin four exact first-party dependencies');
   } else {
-    const paths = [...manifest.matchAll(/path = "([^"]+)"/gu)].map((match) => path.resolve(path.dirname(manifestPath), match[1]));
-    if (paths.length !== 4 || paths.some((entry) => entry !== expectedSourceRoot && !entry.startsWith(`${expectedSourceRoot}${path.sep}`))) {
+    const declaredPaths = [...manifest.matchAll(/path = "([^"]+)"/gu)]
+      .map((match) => path.resolve(path.dirname(manifestPath), match[1]));
+    const canonicalSourceRoot = await realpath(expectedSourceRoot);
+    const canonicalPaths = await Promise.all(declaredPaths.map((entry) => realpath(entry)));
+    if (canonicalPaths.length !== 4 || canonicalPaths.some((entry) => !isPathInside(canonicalSourceRoot, entry))) {
       throw new Error('candidate scaffold path dependencies escape the signed source archive');
     }
   }
+}
+
+function isPathInside(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === ''
+    || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 
 async function devSmoke(cliPath, projectRoot) {

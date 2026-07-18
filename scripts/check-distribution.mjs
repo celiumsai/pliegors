@@ -89,7 +89,7 @@ for (const contract of [
   "inputs.channel == 'canary'", "inputs.channel != 'canary'",
   "format('candidate:{0}', inputs.tag)", "format('draft:{0}', inputs.tag)",
   'replica: [1, 2]',
-  'ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15-intel', 'macos-15', 'windows-2025',
+  'ubuntu-22.04', 'ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15-intel', 'macos-15', 'windows-2025',
   'link-arg=/Brepro',
   'pliego-$env:RELEASE_TARGET.zip', 'retention-days: 7', 'retention-days: 14',
   'CANDIDATE-METADATA.json',

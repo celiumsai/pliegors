@@ -57,7 +57,7 @@ jobs:
       CARGO_INCREMENTAL: 0
     runs-on: >-
       ${{
-        matrix.target == 'x86_64-unknown-linux-gnu' && 'ubuntu-24.04' ||
+        matrix.target == 'x86_64-unknown-linux-gnu' && 'ubuntu-22.04' ||
         matrix.target == 'aarch64-unknown-linux-gnu' && 'ubuntu-24.04-arm' ||
         matrix.target == 'x86_64-apple-darwin' && 'macos-15-intel' ||
         matrix.target == 'aarch64-apple-darwin' && 'macos-15' ||
