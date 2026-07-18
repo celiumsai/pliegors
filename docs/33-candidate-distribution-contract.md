@@ -22,6 +22,11 @@ Draft mode additionally requires `main`, a completely green candidate/golden
 path, and exact `draft:v<VERSION>` confirmation. Only its final job receives
 `contents: write`; it refuses to edit or replace an existing tag or release.
 
+P8 makes the promotion channel explicit. Candidate mode is always `canary`.
+Draft mode requires `beta` or `stable`: beta requires a prerelease SemVer tag
+and produces a GitHub prerelease draft, while stable rejects prerelease tags.
+The channel never changes the sealed bytes or an API's stability tier.
+
 R6 acceptance executed candidate mode only. It did not execute draft mode,
 create a tag, publish a release, deploy a site, or change repository visibility.
 

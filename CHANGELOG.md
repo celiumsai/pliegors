@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- Make canary, beta, and stable release channels explicit in the manual release
+  workflow, enforce prerelease tag semantics, and generate version-neutral notes.
 - Add `pliego doctor` with versioned human/JSON checks for the CLI, Rust
   toolchain, project manifest, lockfile, package alignment, and WASM tools.
 - Add deterministic, local-only `pliego report --bundle` archives with an exact

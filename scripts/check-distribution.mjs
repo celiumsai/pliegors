@@ -85,7 +85,9 @@ const matrixTargets = [...release.matchAll(/^\s+-\s+((?:aarch64|x86_64)-[^\s]+)$
 assert.deepEqual(matrixTargets, releaseTargets, 'release matrix must contain exactly five targets');
 
 for (const contract of [
-  'workflow_dispatch', "format('candidate:{0}', inputs.tag)", "format('draft:{0}', inputs.tag)",
+  'workflow_dispatch', 'channel:', 'canary', 'beta', 'stable',
+  "inputs.channel == 'canary'", "inputs.channel != 'canary'",
+  "format('candidate:{0}', inputs.tag)", "format('draft:{0}', inputs.tag)",
   'replica: [1, 2]',
   'ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15-intel', 'macos-15', 'windows-2025',
   'link-arg=/Brepro',
@@ -93,8 +95,9 @@ for (const contract of [
   'CANDIDATE-METADATA.json',
   'PLIEGORS_CANDIDATE_SIGNING_KEY', 'create-release-manifest.mjs',
   'verify-release-bundle.mjs', 'install.sh', 'install.ps1', 'golden_path',
-  'gh release create', '--target "$GITHUB_SHA"', '--draft', '--latest=false',
+  'gh release create', '--target "$GITHUB_SHA"', '--draft', '--prerelease', '--latest=false',
 ]) assert.ok(release.includes(contract), `release candidate contract lacks ${contract}`);
+assert.doesNotMatch(release, /PliegoRS v0\.0\.1|--version 0\.0\.1/u, 'release notes must use the requested exact version');
 assert.ok(release.includes("github.ref == 'refs/heads/main'"), 'draft mode must be restricted to main');
 assert.equal(
   (release.match(/ref: \$\{\{ github\.sha \}\}/g) ?? []).length,
