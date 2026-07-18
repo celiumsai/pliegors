@@ -9,6 +9,8 @@
   identity, while preserving the existing Ed25519 release bundle.
 - Make both installers verify the Ed25519 manifest, pinned public-key
   fingerprint, selected archive, and signed sidecar before extraction.
+- Add six maintained libFuzzer targets with reviewed corpora and bounded CI for
+  routes, manifests, event JSON, snapshots, DOM adoption, and adapters.
 - Make canary, beta, and stable release channels explicit in the manual release
   workflow, enforce prerelease tag semantics, and generate version-neutral notes.
 - Add `pliego doctor` with versioned human/JSON checks for the CLI, Rust

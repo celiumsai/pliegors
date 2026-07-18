@@ -145,6 +145,7 @@ cargo test --workspace --all-targets --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo clippy --target wasm32-unknown-unknown --locked -p pliegors-site-client -p spike -- -D warnings
 npm ci
+npm run check:fuzz
 npm run check:docs
 npm run check:distribution
 npm run check:phase-1

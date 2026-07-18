@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "pliegors-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+pliego-adapters = { path = "../crates/pliego-adapters" }
+pliego-artifact = { path = "../crates/pliego-artifact" }
+pliego-cli = { path = "../crates/pliego-cli" }
+pliego-dom = { path = "../crates/pliego-dom" }
+pliego-fold = { path = "../crates/pliego-fold" }
+pliego-log = { path = "../crates/pliego-log" }
+serde_json = "1"
+sha2 = "0.10"
+
+[[bin]]
+name = "portable_path"
+path = "fuzz_targets/portable_path.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "project_manifest"
+path = "fuzz_targets/project_manifest.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "event_schema"
+path = "fuzz_targets/event_schema.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "snapshot"
+path = "fuzz_targets/snapshot.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "dom_adoption"
+path = "fuzz_targets/dom_adoption.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "adapter_manifest"
+path = "fuzz_targets/adapter_manifest.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]
