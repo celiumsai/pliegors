@@ -15,6 +15,15 @@ on:
         options:
           - candidate
           - draft
+      channel:
+        description: Promotion channel represented by these exact bytes
+        required: true
+        default: canary
+        type: choice
+        options:
+          - canary
+          - beta
+          - stable
       confirmation:
         description: Type candidate:<tag> or draft:<tag>
         required: true
@@ -34,8 +43,8 @@ jobs:
   build:
     if: >-
       ${{
-        (inputs.mode == 'candidate' && inputs.confirmation == format('candidate:{0}', inputs.tag)) ||
-        (github.ref == 'refs/heads/main' && inputs.mode == 'draft' &&
+        (inputs.mode == 'candidate' && inputs.channel == 'canary' && inputs.confirmation == format('candidate:{0}', inputs.tag)) ||
+        (github.ref == 'refs/heads/main' && inputs.mode == 'draft' && inputs.channel != 'canary' &&
           inputs.confirmation == format('draft:{0}', inputs.tag))
       }}
     name: Build ${{ matrix.target }} replica ${{ matrix.replica }}
@@ -79,6 +88,7 @@ jobs:
         shell: pwsh
         env:
           RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
           RELEASE_MODE: ${{ inputs.mode }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
@@ -93,6 +103,19 @@ jobs:
           }
           if ($env:RELEASE_CONFIRMATION -cne "$env:RELEASE_MODE`:$expectedTag") {
             throw "confirmation must be $env:RELEASE_MODE`:$expectedTag"
+          }
+          $isPrerelease = $version.Contains('-')
+          if ($env:RELEASE_MODE -eq 'candidate' -and $env:RELEASE_CHANNEL -cne 'canary') {
+            throw 'candidate mode is the canary channel'
+          }
+          if ($env:RELEASE_MODE -eq 'draft' -and $env:RELEASE_CHANNEL -eq 'canary') {
+            throw 'draft mode requires the beta or stable channel'
+          }
+          if ($env:RELEASE_CHANNEL -eq 'beta' -and -not $isPrerelease) {
+            throw 'beta channel requires a prerelease SemVer tag'
+          }
+          if ($env:RELEASE_CHANNEL -eq 'stable' -and $isPrerelease) {
+            throw 'stable channel rejects prerelease SemVer tags'
           }
 
       - name: Build reproducible release binary
@@ -219,8 +242,8 @@ jobs:
     if: >-
       ${{
         needs.build.result == 'success' &&
-        ((inputs.mode == 'candidate' && inputs.confirmation == format('candidate:{0}', inputs.tag)) ||
-        (github.ref == 'refs/heads/main' && inputs.mode == 'draft' &&
+        ((inputs.mode == 'candidate' && inputs.channel == 'canary' && inputs.confirmation == format('candidate:{0}', inputs.tag)) ||
+        (github.ref == 'refs/heads/main' && inputs.mode == 'draft' && inputs.channel != 'canary' &&
           inputs.confirmation == format('draft:{0}', inputs.tag)))
       }}
     name: Assemble and sign exact uploaded assets
@@ -336,7 +359,7 @@ jobs:
     if: >-
       ${{
         github.ref == 'refs/heads/main' && needs.golden_path.result == 'success' &&
-        inputs.mode == 'draft' && inputs.confirmation == format('draft:{0}', inputs.tag)
+        inputs.mode == 'draft' && inputs.channel != 'canary' && inputs.confirmation == format('draft:{0}', inputs.tag)
       }}
     name: Create GitHub release draft
     needs: golden_path
@@ -365,6 +388,7 @@ jobs:
       - name: Create immutable manual draft
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
@@ -388,8 +412,9 @@ jobs:
             cat tag-query-error.txt >&2
             exit 1
           fi
+          version="${RELEASE_TAG#v}"
           cat > RELEASE-NOTES.md <<EOF
-          PliegoRS v0.0.1 is the first public release of the Rust-native framework
+          PliegoRS $RELEASE_TAG is a $RELEASE_CHANNEL release of the Rust-native framework
           for verifiable, replayable, durable web interfaces.
 
           Highlights:
@@ -402,7 +427,7 @@ jobs:
           - reproducible two-replica builds and a signed exact-set release manifest.
 
           Install the Rust CLI from the registry with
-          \`cargo install pliego-cli --version 0.0.1 --locked\`, or download the
+          \`cargo install pliego-cli --version $version --locked\`, or download the
           installer and platform archive attached to this release.
 
           The detached Ed25519 manifest covers every downloadable installer,
@@ -411,6 +436,10 @@ jobs:
           PliegoRS is pre-1.0 software. Review the changelog, supported targets,
           and security policy before production use.
           EOF
+          prerelease_flag=()
+          if [ "$RELEASE_CHANNEL" = 'beta' ]; then
+            prerelease_flag+=(--prerelease)
+          fi
           gh release create "$RELEASE_TAG" \
             release-assets/* \
             --repo "$GITHUB_REPOSITORY" \
@@ -418,4 +447,5 @@ jobs:
             --title "PliegoRS $RELEASE_TAG" \
             --notes-file RELEASE-NOTES.md \
             --draft \
+            "${prerelease_flag[@]}" \
             --latest=false

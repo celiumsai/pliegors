@@ -97,7 +97,8 @@ assembles the exact release set, signs the Ed25519 manifest, and proves a first
 application using only public distribution surfaces. Candidate mode writes only
 expiring Actions artifacts. Draft mode is restricted to `main`; it is the only
 job with `contents: write`, and it can create but never publish or mutate a
-release.
+release. Candidate mode is the `canary` channel. A draft selects `beta` or
+`stable`; beta requires a prerelease tag and stable rejects one.
 
 ## Verify the complete bundle
 
