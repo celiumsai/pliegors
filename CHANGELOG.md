@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+- Add a signed release-only golden runner and exact matrix validator for Linux
+  x64/ARM64, macOS x64/ARM64, Windows, Unicode, long paths, a pinned container,
+  and required WSL2 promotion evidence.
+- Make release ZIPs and the signed framework source archive byte-reproducible,
+  and require one release-manifest digest across candidate and draft evidence.
 - Add clean-revision P8 benchmark harnesses for cold and incremental builds,
   real browser DOM application, lifecycle memory plateau, raw observations,
   atomic same-environment resume, nearest-rank summaries, and schema-validated
@@ -32,10 +37,6 @@
 
 All notable PliegoRS changes are recorded here. The project follows Semantic
 Versioning. Before 1.0, minor releases may contain breaking API changes.
-
-## Unreleased
-
-No unreleased changes.
 
 ## 0.0.1 - 2026-07-16
 

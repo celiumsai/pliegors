@@ -14,6 +14,7 @@ export const SIGNATURE_NAME = 'RELEASE-MANIFEST.json.sig';
 export const RELEASE_MANIFEST_SCHEMA = 'dev.pliegors.release-manifest/v1';
 export const REPRODUCIBILITY_SCHEMA = 'dev.pliegors.release-reproducibility/v1';
 export const BUILD_METADATA_SCHEMA = 'dev.pliegors.candidate-build/v1';
+export const SOURCE_ARCHIVE_NAME = 'pliegors-source.tar.gz';
 export const MAX_JSON_BYTES = 1024 * 1024;
 
 export const TARGETS = Object.freeze([
@@ -37,8 +38,10 @@ export function primaryAssetNames() {
   names.push(
     'install.ps1',
     'install.sh',
+    'run-golden-path.mjs',
     'release-bundle-lib.mjs',
     'REPRODUCIBILITY.json',
+    SOURCE_ARCHIVE_NAME,
     'verify-release-bundle.mjs',
   );
   return names.sort((left, right) => left.localeCompare(right));
@@ -57,6 +60,8 @@ export function assetRole(name) {
   if (name.endsWith('.zip')) return 'cli-archive';
   if (name.endsWith('.zip.sha256')) return 'integrity-sidecar';
   if (name === 'install.ps1' || name === 'install.sh') return 'installer';
+  if (name === SOURCE_ARCHIVE_NAME) return 'framework-source';
+  if (name === 'run-golden-path.mjs') return 'golden-path-runner';
   if (name === 'REPRODUCIBILITY.json') return 'reproducibility-evidence';
   if (name === 'verify-release-bundle.mjs') return 'bundle-verifier';
   if (name === 'release-bundle-lib.mjs') return 'bundle-verifier-library';

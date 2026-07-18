@@ -104,7 +104,12 @@ After sealing, a separate least-privilege job creates the CycloneDX SBOM,
 SLSA-compatible provenance, exact attestation manifest, and keyless Sigstore
 bundle. The distribution-only golden path verifies both the original Ed25519
 bundle and the [supply-chain attestation package](37-supply-chain-attestations.md)
-without a source checkout. A draft uploads both exact sets.
+without a source checkout. Five deterministic ZIPs and a deterministic source
+archive make the sealed manifest reproducible for the same revision. The
+[P8 release-only matrix](40-release-only-golden-matrix.md) then executes eight
+hosted clean environments and requires a matching WSL2 registry report before
+draft promotion. A draft uploads the release set, attestation set, and signed
+golden-matrix evidence.
 
 ## Verify the complete bundle
 

@@ -11,6 +11,7 @@
     "check:benchmarks": "node scripts/check-benchmark-contract.mjs",
     "check:email-worker": "npm --prefix workers/pliegors-email run check",
     "check:fuzz": "node scripts/check-fuzz-contract.mjs",
+    "check:golden-path": "node scripts/check-golden-matrix.mjs",
     "check:site": "node scripts/check-pliegors-site.mjs examples/pliegors-site/target/site",
     "check:site-deployment": "npm --prefix workers/pliegors-site run check",
     "check:wasm-lifetimes": "node scripts/check-wasm-lifetimes.mjs",
