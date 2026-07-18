@@ -27,7 +27,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 rust-version = "1.85"
 authors = ["Celiums Solutions LLC <hello@pliegors.dev>"]
@@ -60,11 +60,11 @@ wasm-bindgen-test = "=0.3.76"
 web-sys = "=0.3.103"
 
 # Internal crates resolve locally in the workspace and to the exact release on crates.io.
-pliego-dom = { version = "=0.0.1", path = "crates/pliego-dom" }
-pliego-log = { version = "=0.0.1", path = "crates/pliego-log" }
-pliego-reactive = { version = "=0.0.1", path = "crates/pliego-reactive" }
-pliego-artifact = { version = "=0.0.1", path = "crates/pliego-artifact" }
-pliego-starters = { version = "=0.0.1", path = "crates/pliego-starters" }
+pliego-dom = { version = "=0.0.2", path = "crates/pliego-dom" }
+pliego-log = { version = "=0.0.2", path = "crates/pliego-log" }
+pliego-reactive = { version = "=0.0.2", path = "crates/pliego-reactive" }
+pliego-artifact = { version = "=0.0.2", path = "crates/pliego-artifact" }
+pliego-starters = { version = "=0.0.2", path = "crates/pliego-starters" }
 
 [profile.release]
 # WASM size discipline from day one (docs/00 §5).
