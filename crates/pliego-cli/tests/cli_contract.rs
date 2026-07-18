@@ -3,9 +3,12 @@
 use serde_json::Value;
 use std::fs;
 use std::io::Read;
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::thread;
+use std::time::Duration;
 
 static NEXT_TEST: AtomicU64 = AtomicU64::new(0);
 
@@ -15,6 +18,27 @@ fn pliego(arguments: &[&str], directory: &std::path::Path) -> Output {
         .current_dir(directory)
         .output()
         .expect("run pliego test binary")
+}
+
+fn pliego_with_home(
+    arguments: &[&str],
+    directory: &std::path::Path,
+    home: &std::path::Path,
+    proxy: Option<&str>,
+) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_pliego"));
+    command
+        .args(arguments)
+        .current_dir(directory)
+        .env("PLIEGO_HOME", home);
+    if let Some(proxy) = proxy {
+        command
+            .env("HTTP_PROXY", proxy)
+            .env("HTTPS_PROXY", proxy)
+            .env("ALL_PROXY", proxy)
+            .env("NO_PROXY", "");
+    }
+    command.output().expect("run pliego with isolated home")
 }
 
 fn temporary_directory(label: &str) -> PathBuf {
@@ -112,6 +136,125 @@ fn malformed_doctor_options_are_usage_errors() {
     let output = pliego(&["doctor", "--format", "yaml"], &std::env::temp_dir());
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("PLG-ARG-001"));
+}
+
+#[test]
+fn voluntary_telemetry_is_disabled_local_bounded_and_deletable() {
+    let root = temporary_directory("telemetry-contract");
+    let home = root.join("home");
+    let disabled_project = root.join("disabled-project");
+    let project = root.join("project");
+    let export = root.join("voluntary-report.json");
+    fs::create_dir_all(&root).unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let proxy = format!("http://{}", listener.local_addr().unwrap());
+
+    let status = pliego_with_home(
+        &["telemetry", "status", "--format", "json"],
+        &root,
+        &home,
+        Some(&proxy),
+    );
+    assert!(status.status.success());
+    let status: Value = serde_json::from_slice(&status.stdout).unwrap();
+    assert_eq!(status["enabled"], false);
+    assert_eq!(status["localEventCount"], 0);
+    assert_eq!(status["networkSubmission"], "none");
+    assert!(!home.exists(), "status must not create telemetry storage");
+
+    let disabled_new = pliego_with_home(
+        &[
+            "new",
+            disabled_project.to_str().unwrap(),
+            "--framework-path",
+            framework_root().to_str().unwrap(),
+        ],
+        &root,
+        &home,
+        Some(&proxy),
+    );
+    assert!(disabled_new.status.success());
+    assert!(
+        !home.exists(),
+        "disabled funnel commands must not create telemetry storage"
+    );
+
+    let enabled = pliego_with_home(&["telemetry", "enable"], &root, &home, Some(&proxy));
+    assert!(enabled.status.success());
+    let created = pliego_with_home(
+        &[
+            "new",
+            project.to_str().unwrap(),
+            "--framework-path",
+            framework_root().to_str().unwrap(),
+        ],
+        &root,
+        &home,
+        Some(&proxy),
+    );
+    assert!(
+        created.status.success(),
+        "{}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+
+    let preview = pliego_with_home(
+        &["telemetry", "preview", "--format", "json"],
+        &root,
+        &home,
+        Some(&proxy),
+    );
+    assert!(preview.status.success());
+    let report: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(report["contract"], "dev.pliegors.telemetry-report/v1");
+    assert_eq!(report["events"][0]["event"], "install");
+    assert_eq!(report["events"][1]["event"], "new");
+    assert_eq!(report["events"].as_array().unwrap().len(), 2);
+    let preview_bytes = preview.stdout;
+    let text = String::from_utf8(preview_bytes.clone())
+        .unwrap()
+        .to_ascii_lowercase();
+    for forbidden in ["project", "argument", "error", "environment", "email"] {
+        assert!(
+            !text.contains(forbidden),
+            "telemetry report contains {forbidden}"
+        );
+    }
+
+    let exported = pliego_with_home(
+        &["telemetry", "export", "--output", export.to_str().unwrap()],
+        &root,
+        &home,
+        Some(&proxy),
+    );
+    assert!(exported.status.success());
+    assert_eq!(fs::read(&export).unwrap(), preview_bytes);
+    let overwrite = pliego_with_home(
+        &["telemetry", "export", "--output", export.to_str().unwrap()],
+        &root,
+        &home,
+        Some(&proxy),
+    );
+    assert_eq!(overwrite.status.code(), Some(8));
+    assert!(String::from_utf8_lossy(&overwrite.stderr).contains("PLG-TEL-001"));
+
+    let disabled = pliego_with_home(
+        &["telemetry", "disable", "--delete-local"],
+        &root,
+        &home,
+        Some(&proxy),
+    );
+    assert!(disabled.status.success());
+    assert!(!home.join("telemetry").exists());
+    thread::sleep(Duration::from_millis(50));
+    assert!(
+        listener
+            .accept()
+            .is_err_and(|error| error.kind() == std::io::ErrorKind::WouldBlock),
+        "telemetry controls unexpectedly connected to the proxy"
+    );
+    fs::remove_dir_all(root).unwrap();
 }
 
 fn write_trust_fixture(destination: &std::path::Path, version: &str) {

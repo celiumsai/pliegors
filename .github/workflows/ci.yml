@@ -95,6 +95,9 @@ jobs:
       - name: Check maintained fuzz contract
         run: npm run check:fuzz
 
+      - name: Check voluntary telemetry contract
+        run: npm run check:telemetry
+
       - name: Validate GitHub Actions workflows
         shell: bash
         run: |

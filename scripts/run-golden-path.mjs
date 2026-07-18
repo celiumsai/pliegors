@@ -79,6 +79,15 @@ try {
     const result = await run(cli, ['version'], work);
     if (result.stdout.trim() !== `pliego ${version}`) throw new Error('installed CLI version disagrees with signed release');
   });
+  await step('telemetry-default-before', async () => {
+    const status = JSON.parse((await run(cli, ['telemetry', 'status', '--format', 'json'], work)).stdout);
+    if (status.contract !== 'dev.pliegors.telemetry-status/v1'
+      || status.enabled !== false
+      || status.localEventCount !== 0
+      || status.networkSubmission !== 'none') {
+      throw new Error('telemetry is not disabled and empty before first use');
+    }
+  });
   await step('doctor-global', async () => {
     const result = await run(cli, ['doctor', '--format', 'json'], work);
     doctor = JSON.parse(result.stdout);
@@ -113,6 +122,12 @@ try {
   await step('doctor-project', async () => {
     const report = JSON.parse((await run(cli, ['doctor', '--format', 'json'], project)).stdout);
     if (report.project === null || report.summary?.failed !== 0) throw new Error('project doctor report is unhealthy');
+  });
+  await step('telemetry-default-after', async () => {
+    const status = JSON.parse((await run(cli, ['telemetry', 'status', '--format', 'json'], project)).stdout);
+    if (status.enabled !== false || status.localEventCount !== 0 || status.networkSubmission !== 'none') {
+      throw new Error('first-use path changed disabled telemetry state');
+    }
   });
 } catch (error) {
   failure = bounded(String(error?.stack ?? error));
@@ -329,6 +344,7 @@ function run(command, args, cwd) {
 function cleanEnvironment() {
   const environment = { ...process.env };
   for (const name of ['CARGO_TARGET_DIR', 'CARGO_ENCODED_RUSTFLAGS', 'RUSTFLAGS']) delete environment[name];
+  environment.PLIEGO_HOME = installRoot;
   return environment;
 }
 

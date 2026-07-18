@@ -81,8 +81,9 @@ function report(environmentId, target, scenario, platform, architecture, source,
   const stepNames = [
     'verify-release-bundle',
     ...(source === 'candidate-source' ? ['extract-signed-source'] : []),
-    'install', 'version', 'doctor-global', 'new', 'check', 'cargo-test', 'dev-smoke',
-    'build', 'inspect', 'why-artifact', 'report-bundle', 'upgrade-check', 'doctor-project', 'uninstall',
+    'install', 'version', 'telemetry-default-before', 'doctor-global', 'new', 'check',
+    'cargo-test', 'dev-smoke', 'build', 'inspect', 'why-artifact', 'report-bundle',
+    'upgrade-check', 'doctor-project', 'telemetry-default-after', 'uninstall',
   ];
   return {
     contract: 'dev.pliegors.p8-golden-path/v1',

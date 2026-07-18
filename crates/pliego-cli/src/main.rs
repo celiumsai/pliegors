@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod development;
+mod telemetry;
 mod trust;
 
 use development::{HmrUpdate, explain_artifact, explain_rebuild, load_verified_graph};
@@ -116,6 +117,7 @@ struct ServerOptions {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum FailureKind {
     Doctor,
+    Telemetry,
     Usage,
     Project,
     Scaffold,
@@ -129,6 +131,7 @@ impl FailureKind {
     const fn code(self) -> i32 {
         match self {
             Self::Doctor => 1,
+            Self::Telemetry => 8,
             Self::Usage => 2,
             Self::Project | Self::Scaffold => 3,
             Self::Check => 4,
@@ -141,6 +144,7 @@ impl FailureKind {
     const fn label(self) -> &'static str {
         match self {
             Self::Doctor => "doctor",
+            Self::Telemetry => "telemetry",
             Self::Usage => "usage",
             Self::Project => "project",
             Self::Scaffold => "scaffold",
@@ -154,6 +158,7 @@ impl FailureKind {
     const fn diagnostic_code(self) -> &'static str {
         match self {
             Self::Doctor => "PLG-DOC-000",
+            Self::Telemetry => "PLG-TEL-001",
             Self::Usage => "PLG-ARG-001",
             Self::Project => "PLG-PRJ-001",
             Self::Scaffold => "PLG-NEW-001",
@@ -167,6 +172,9 @@ impl FailureKind {
     const fn help(self) -> &'static str {
         match self {
             Self::Doctor => "Apply the failed doctor actions, then rerun `pliego doctor`.",
+            Self::Telemetry => {
+                "Inspect `pliego telemetry status`; disable and delete local state if it is not recoverable."
+            }
             Self::Usage => {
                 "Run `pliego help` or `pliego templates` to inspect the command contract."
             }
@@ -449,8 +457,10 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
                 format!("unknown template `{template_id}`; available templates: {available}"),
             )
         })?;
-        return create_project(options, template)
-            .map_err(|error| CliFailure::new(FailureKind::Scaffold, error));
+        create_project(options, template)
+            .map_err(|error| CliFailure::new(FailureKind::Scaffold, error))?;
+        record_telemetry(telemetry::FunnelEvent::New);
+        return Ok(());
     }
     if command == "templates" {
         reject_extra_arguments(arguments)
@@ -502,6 +512,19 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
             ))
         };
     }
+    if command == "telemetry" {
+        return telemetry::run(arguments.collect()).map_err(|error| {
+            let (usage, message) = error.into_parts();
+            CliFailure::new(
+                if usage {
+                    FailureKind::Usage
+                } else {
+                    FailureKind::Telemetry
+                },
+                message,
+            )
+        });
+    }
     if command == "css" {
         let css_arguments = parse_css_command(arguments.collect())
             .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
@@ -523,8 +546,16 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 
     let context = load_context().map_err(|error| CliFailure::new(FailureKind::Project, error))?;
     match command.as_str() {
-        "build" => build(&context).map_err(|error| CliFailure::new(FailureKind::Build, error)),
-        "check" => check(&context).map_err(|error| CliFailure::new(FailureKind::Check, error)),
+        "build" => {
+            build(&context).map_err(|error| CliFailure::new(FailureKind::Build, error))?;
+            record_telemetry(telemetry::FunnelEvent::Build);
+            Ok(())
+        }
+        "check" => {
+            check(&context).map_err(|error| CliFailure::new(FailureKind::Check, error))?;
+            record_telemetry(telemetry::FunnelEvent::Check);
+            Ok(())
+        }
         "dev" => {
             let options = parse_server_options(arguments.collect(), 4400)
                 .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
@@ -557,8 +588,16 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 
 fn print_help() {
     println!(
-        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport and upgrade checks are local and never upload or mutate project files.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
+        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego telemetry <status|enable|preview|export|disable> [options]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport, upgrade checks, and voluntary telemetry exports are local and never upload project data.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );
+}
+
+fn record_telemetry(event: telemetry::FunnelEvent) {
+    if let Err(error) = telemetry::record(event) {
+        eprintln!(
+            "PLIEGO[PLG-TEL-001] telemetry: {error}\nhelp: Run `pliego telemetry status` or disable local telemetry."
+        );
+    }
 }
 
 fn parse_css_command(arguments: Vec<String>) -> Result<Vec<String>, String> {
@@ -2806,6 +2845,7 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
     watcher
         .watch(&context.root, RecursiveMode::Recursive)
         .map_err(|error| DevFailure::Project(format!("cannot watch project: {error}")))?;
+    record_telemetry(telemetry::FunnelEvent::Dev);
     println!(
         "PLIEGO dev: watching {} with {:?}",
         context.root.display(),
