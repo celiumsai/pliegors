@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.benchmark-report.schema.json",
+  "title": "PliegoRS P8 benchmark report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "revision",
+    "sourceTreeDirty",
+    "createdAt",
+    "percentileMethod",
+    "methodologyDocument",
+    "build",
+    "browser",
+    "conclusions",
+    "limitations"
+  ],
+  "properties": {
+    "contract": { "const": "dev.pliegors.p8-benchmark-report/v1" },
+    "revision": { "$ref": "#/$defs/revision" },
+    "sourceTreeDirty": { "const": false },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "percentileMethod": { "const": "nearest-rank" },
+    "methodologyDocument": { "const": "docs/39-reproducible-benchmarks.md" },
+    "build": { "$ref": "#/$defs/build" },
+    "browser": { "$ref": "#/$defs/browser" },
+    "conclusions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memoryPlateauObserved", "evidenceScope", "competitiveComparison"],
+      "properties": {
+        "memoryPlateauObserved": { "type": "boolean" },
+        "evidenceScope": { "type": "string", "minLength": 1 },
+        "competitiveComparison": { "const": "none" }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50Ms", "p95Ms"],
+      "properties": {
+        "p50Ms": { "type": "number", "minimum": 0 },
+        "p95Ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "buildObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample", "cleanColdBuildMs", "noChangeWarmMs", "contentOnlyMs", "cssOnlyMs", "rustViewMs"],
+      "properties": {
+        "sample": { "type": "integer", "minimum": 1 },
+        "cleanColdBuildMs": { "type": "number", "minimum": 0 },
+        "noChangeWarmMs": { "type": "number", "minimum": 0 },
+        "contentOnlyMs": { "type": "number", "minimum": 0 },
+        "cssOnlyMs": { "type": "number", "minimum": 0 },
+        "rustViewMs": { "type": "number", "minimum": 0 }
+      }
+    },
+    "build": {
+      "type": "object",
+      "required": ["contract", "revision", "sourceTreeDirty", "createdAt", "sampleCount", "percentileMethod", "environment", "cachePolicy", "rawObservations", "summary", "limitations"],
+      "properties": {
+        "contract": { "const": "dev.pliegors.p8-build-benchmark/v1" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "sourceTreeDirty": { "const": false },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "sampleCount": { "type": "integer", "minimum": 5 },
+        "percentileMethod": { "const": "nearest-rank" },
+        "environment": { "type": "object" },
+        "cachePolicy": { "type": "object" },
+        "rawObservations": { "type": "array", "minItems": 5, "items": { "$ref": "#/$defs/buildObservation" } },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cleanColdBuildMs", "noChangeWarmMs", "contentOnlyMs", "cssOnlyMs", "rustViewMs"],
+          "properties": {
+            "cleanColdBuildMs": { "$ref": "#/$defs/summary" },
+            "noChangeWarmMs": { "$ref": "#/$defs/summary" },
+            "contentOnlyMs": { "$ref": "#/$defs/summary" },
+            "cssOnlyMs": { "$ref": "#/$defs/summary" },
+            "rustViewMs": { "$ref": "#/$defs/summary" }
+          }
+        },
+        "limitations": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "browserObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample", "totalMs", "perUpdateUs"],
+      "properties": {
+        "sample": { "type": "integer", "minimum": 1 },
+        "totalMs": { "type": "number", "minimum": 0 },
+        "perUpdateUs": { "type": "number", "minimum": 0 }
+      }
+    },
+    "memoryObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completedCycles", "linearMemoryBytes", "domChildNodes"],
+      "properties": {
+        "completedCycles": { "type": "integer", "minimum": 1 },
+        "linearMemoryBytes": { "type": "integer", "minimum": 0 },
+        "domChildNodes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "browser": {
+      "type": "object",
+      "required": ["contract", "revision", "sourceTreeDirty", "createdAt", "percentileMethod", "browser", "host", "settings", "updateSummary", "rawObservations", "memory", "limitations"],
+      "properties": {
+        "contract": { "const": "dev.pliegors.p8-browser-benchmark/v1" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "sourceTreeDirty": { "const": false },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "percentileMethod": { "const": "nearest-rank" },
+        "browser": { "type": "object" },
+        "host": { "type": "object" },
+        "settings": { "type": "object" },
+        "updateSummary": { "type": "object" },
+        "rawObservations": { "type": "array", "minItems": 10, "items": { "$ref": "#/$defs/browserObservation" } },
+        "memory": {
+          "type": "object",
+          "required": ["rawObservations", "plateau", "criterion"],
+          "properties": {
+            "rawObservations": { "type": "array", "minItems": 4, "items": { "$ref": "#/$defs/memoryObservation" } },
+            "plateau": { "type": "boolean" },
+            "criterion": { "type": "string", "minLength": 1 }
+          }
+        },
+        "limitations": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    }
+  }
+}
