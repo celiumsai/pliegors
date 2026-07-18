@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod development;
+mod trust;
 
 use development::{HmrUpdate, explain_artifact, explain_rebuild, load_verified_graph};
 use notify::{
@@ -131,6 +132,7 @@ struct ServerOptions {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum FailureKind {
+    Doctor,
     Usage,
     Project,
     Scaffold,
@@ -143,6 +145,7 @@ enum FailureKind {
 impl FailureKind {
     const fn code(self) -> i32 {
         match self {
+            Self::Doctor => 1,
             Self::Usage => 2,
             Self::Project | Self::Scaffold => 3,
             Self::Check => 4,
@@ -154,6 +157,7 @@ impl FailureKind {
 
     const fn label(self) -> &'static str {
         match self {
+            Self::Doctor => "doctor",
             Self::Usage => "usage",
             Self::Project => "project",
             Self::Scaffold => "scaffold",
@@ -166,6 +170,7 @@ impl FailureKind {
 
     const fn diagnostic_code(self) -> &'static str {
         match self {
+            Self::Doctor => "PLG-DOC-000",
             Self::Usage => "PLG-ARG-001",
             Self::Project => "PLG-PRJ-001",
             Self::Scaffold => "PLG-NEW-001",
@@ -178,6 +183,7 @@ impl FailureKind {
 
     const fn help(self) -> &'static str {
         match self {
+            Self::Doctor => "Apply the failed doctor actions, then rerun `pliego doctor`.",
             Self::Usage => {
                 "Run `pliego help` or `pliego templates` to inspect the command contract."
             }
@@ -469,6 +475,24 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
         print_templates();
         return Ok(());
     }
+    if command == "doctor" {
+        let options = trust::parse_doctor_options(arguments.collect())
+            .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
+        let format = options.format;
+        let report =
+            trust::doctor().map_err(|error| CliFailure::new(FailureKind::Doctor, error))?;
+        report
+            .print(format)
+            .map_err(|error| CliFailure::new(FailureKind::Doctor, error))?;
+        return if report.succeeded() {
+            Ok(())
+        } else {
+            Err(CliFailure::new(
+                FailureKind::Doctor,
+                "one or more required doctor checks failed".to_owned(),
+            ))
+        };
+    }
     if command == "css" {
         let css_arguments = parse_css_command(arguments.collect())
             .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
@@ -524,7 +548,7 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 
 fn print_help() {
     println!(
-        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\n`pliego css check` delegates to the separately installed `pliego-cssc` executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
+        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );
 }
 

@@ -86,6 +86,34 @@ fn template_catalog_is_available_without_a_project() {
 }
 
 #[test]
+fn doctor_has_a_versioned_machine_contract_outside_a_project() {
+    let directory = temporary_directory("doctor-global");
+    fs::create_dir_all(&directory).unwrap();
+    let output = pliego(&["doctor", "--format", "json"], &directory);
+    assert!(
+        matches!(output.status.code(), Some(0 | 1)),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: Value = serde_json::from_slice(&output.stdout).expect("doctor JSON report");
+    assert_eq!(value["reportVersion"], "1.0.0");
+    assert_eq!(value["cliVersion"], env!("CARGO_PKG_VERSION"));
+    assert!(value["checks"].as_array().is_some_and(|checks| {
+        checks.iter().any(|check| check["id"] == "PLG-DOC-002")
+            && checks.iter().any(|check| check["id"] == "PLG-DOC-005")
+    }));
+    assert_eq!(value["project"], Value::Null);
+    fs::remove_dir_all(&directory).unwrap();
+}
+
+#[test]
+fn malformed_doctor_options_are_usage_errors() {
+    let output = pliego(&["doctor", "--format", "yaml"], &std::env::temp_dir());
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("PLG-ARG-001"));
+}
+
+#[test]
 fn new_without_template_builds_the_official_first_use_contract() {
     let destination = temporary_directory("default-scaffold");
     let framework = framework_root();
