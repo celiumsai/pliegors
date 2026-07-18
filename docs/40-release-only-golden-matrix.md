@@ -50,6 +50,10 @@ Eight clean GitHub-hosted rows run in parallel:
 
 The container image is digest-pinned to
 `rust:1.85.0-slim-bookworm@sha256:1829c432be4a592f3021501334d3fcca24f238432b13306a4e62669dec538e52`.
+The Linux x64 release binary is built twice on Ubuntu 22.04 and then executed
+inside that Debian bookworm container. This prevents a newer hosted glibc from
+becoming an undeclared runtime requirement. Linux ARM64 is built on the
+available Ubuntu 24.04 ARM runner and remains a separately recorded boundary.
 WSL2 x64 is physical/local evidence because GitHub-hosted runners do not
 represent that Windows subsystem boundary. It uses the same signed runner and
 bundle, then enters promotion as a base64-encoded canonical report.
