@@ -343,10 +343,13 @@ fn upgrade_check_is_read_only_and_reports_exact_alignment() {
 fn upgrade_check_blocks_a_target_cli_that_is_not_running() {
     let destination = temporary_directory("upgrade-target");
     write_trust_fixture(&destination, env!("CARGO_PKG_VERSION"));
+    let target = if env!("CARGO_PKG_VERSION") == "999.0.0" {
+        "998.0.0"
+    } else {
+        "999.0.0"
+    };
     let output = pliego(
-        &[
-            "upgrade", "--check", "--target", "0.0.2", "--format", "json",
-        ],
+        &["upgrade", "--check", "--target", target, "--format", "json"],
         &destination,
     );
     assert_eq!(output.status.code(), Some(1));
