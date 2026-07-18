@@ -40,6 +40,8 @@ if (process.argv.length === 2) {
   assert.match(runner, /registry/u);
   assert.match(runner, /pliegors-source\.tar\.gz/u);
   assert.match(runner, /await realpath\(expectedSourceRoot\)/u);
+  assert.match(runner, /path\.toNamespacedPath\(directory\)/u);
+  assert.match(runner, /environment\.CARGO_TARGET_DIR = path\.join\(work, 'cargo-target'\)/u);
   console.log('P8 golden path contract PASS: schemas and release-only runner');
   process.exit(0);
 }

@@ -32,6 +32,13 @@ Every step records pass/fail and duration in a canonical
 
 The runner deletes its temporary workspace after writing the bounded report.
 Failure still produces a raw report and fails the workflow.
+On Windows, child-process working directories use the extended path namespace;
+process and stdio failures are captured into the same bounded report instead of
+escaping as unhandled Node events.
+The long-path row also relocates Cargo's disposable compilation target to a
+short, isolated directory. The PliegoRS CLI performs the same relocation when
+`CARGO_TARGET_DIR` is not already explicit, while project sources, `target/site`,
+the artifact ledger, and report evidence remain rooted in the original path.
 
 ## Required environments
 

@@ -2325,14 +2325,13 @@ fn toolchain_version(
     name: &str,
     arguments: &[&str],
 ) -> Result<ToolchainEvidence, ArtifactError> {
-    let output = Command::new(name)
-        .args(arguments)
-        .current_dir(project_root)
-        .output()
-        .map_err(|source| ArtifactError::Io {
-            path: PathBuf::from(name),
-            source,
-        })?;
+    let mut command = Command::new(name);
+    command.args(arguments);
+    configure_toolchain_command_directory(&mut command, project_root)?;
+    let output = command.output().map_err(|source| ArtifactError::Io {
+        path: PathBuf::from(name),
+        source,
+    })?;
     if !output.status.success() {
         return Err(ArtifactError::InvalidReceipt(format!(
             "{name} version command exited with {}",
@@ -2352,6 +2351,39 @@ fn toolchain_version(
         name: name.to_owned(),
         version,
     })
+}
+
+fn configure_toolchain_command_directory(
+    command: &mut Command,
+    project_root: &Path,
+) -> Result<(), ArtifactError> {
+    #[cfg(windows)]
+    {
+        let value = project_root.to_string_lossy();
+        let conventional = value
+            .strip_prefix(r"\\?\UNC\")
+            .map(|path| format!(r"\\{path}"))
+            .or_else(|| value.strip_prefix(r"\\?\").map(ToOwned::to_owned))
+            .unwrap_or_else(|| value.into_owned());
+        if conventional.encode_utf16().count() >= 260 {
+            let current = std::env::current_dir()
+                .and_then(|path| path.canonicalize())
+                .map_err(|source| ArtifactError::Io {
+                    path: project_root.to_owned(),
+                    source,
+                })?;
+            if current != project_root {
+                return Err(ArtifactError::InvalidPath(format!(
+                    "long Windows project root {} must be the inherited working directory; current directory is {}",
+                    project_root.display(),
+                    current.display()
+                )));
+            }
+            return Ok(());
+        }
+    }
+    command.current_dir(project_root);
+    Ok(())
 }
 
 #[cfg(test)]

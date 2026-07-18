@@ -292,18 +292,23 @@ function isPathInside(root, candidate) {
 async function devSmoke(cliPath, projectRoot) {
   const port = await freePort();
   const child = spawn(cliPath, ['dev', String(port)], {
-    cwd: projectRoot,
+    cwd: spawnWorkingDirectory(projectRoot),
     env: cleanEnvironment(),
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stdout = '';
   let stderr = '';
+  let processError = null;
   child.stdout.on('data', (chunk) => { stdout = bounded(`${stdout}${chunk}`); });
   child.stderr.on('data', (chunk) => { stderr = bounded(`${stderr}${chunk}`); });
+  child.stdout.once('error', (error) => { processError ??= error; });
+  child.stderr.once('error', (error) => { processError ??= error; });
+  child.once('error', (error) => { processError ??= error; });
   try {
     const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
+      if (processError) throw processError;
       if (child.exitCode !== null) throw new Error(`dev server exited ${child.exitCode}\n${stdout}\n${stderr}`);
       try {
         const response = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1_000) });
@@ -333,26 +338,44 @@ function freePort() {
 function run(command, args, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd,
+      cwd: spawnWorkingDirectory(cwd),
       env: cleanEnvironment(),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
     let stderr = '';
+    let settled = false;
     child.stdout.on('data', (chunk) => { stdout = bounded(`${stdout}${chunk}`); });
     child.stderr.on('data', (chunk) => { stderr = bounded(`${stderr}${chunk}`); });
-    child.once('error', reject);
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      if (child.exitCode === null) child.kill();
+      reject(error);
+    };
+    child.stdout.once('error', fail);
+    child.stderr.once('error', fail);
+    child.once('error', fail);
     child.once('exit', (code, signal) => {
+      if (settled) return;
+      settled = true;
       if (code === 0) resolve({ stdout, stderr });
       else reject(new Error(`${command} ${args.join(' ')} failed (${signal ?? code})\n${stdout}\n${stderr}`));
     });
   });
 }
 
+function spawnWorkingDirectory(directory) {
+  return process.platform === 'win32' ? path.toNamespacedPath(directory) : directory;
+}
+
 function cleanEnvironment() {
   const environment = { ...process.env };
   for (const name of ['CARGO_TARGET_DIR', 'CARGO_ENCODED_RUSTFLAGS', 'RUSTFLAGS']) delete environment[name];
+  if (process.platform === 'win32' && scenario === 'long-path') {
+    environment.CARGO_TARGET_DIR = path.join(work, 'cargo-target');
+  }
   environment.PLIEGO_HOME = installRoot;
   return environment;
 }
