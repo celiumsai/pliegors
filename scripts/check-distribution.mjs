@@ -95,14 +95,18 @@ for (const contract of [
   'CANDIDATE-METADATA.json',
   'PLIEGORS_CANDIDATE_SIGNING_KEY', 'create-release-manifest.mjs',
   'verify-release-bundle.mjs', 'install.sh', 'install.ps1', 'golden_path',
+  'supply_chain:', 'cargo-cyclonedx --version 0.5.9 --locked',
+  'create-supply-chain-attestations.mjs', 'verify-supply-chain-attestations.mjs',
+  'ATTESTATIONS.sigstore.json', 'cosign sign-blob', 'cosign verify-blob',
+  'https://token.actions.githubusercontent.com', 'id-token: write',
   'gh release create', '--target "$GITHUB_SHA"', '--draft', '--prerelease', '--latest=false',
 ]) assert.ok(release.includes(contract), `release candidate contract lacks ${contract}`);
 assert.doesNotMatch(release, /PliegoRS v0\.0\.1|--version 0\.0\.1/u, 'release notes must use the requested exact version');
 assert.ok(release.includes("github.ref == 'refs/heads/main'"), 'draft mode must be restricted to main');
 assert.equal(
   (release.match(/ref: \$\{\{ github\.sha \}\}/g) ?? []).length,
-  2,
-  'build and seal assembler must checkout the validated SHA',
+  3,
+  'build, seal, and attestation jobs must checkout the validated SHA',
 );
 assert.ok(release.includes('$expectedTag = "v$version"'), 'release tag must derive from Cargo version');
 assert.ok(release.includes('$env:RELEASE_TAG -cne $expectedTag'), 'release tag must equal Cargo version');
@@ -127,6 +131,7 @@ assert.doesNotMatch(
 assert.ok(release.includes('sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250'), 'release key fingerprint drift');
 const createRelease = release.slice(release.indexOf('gh release create'));
 assert.ok(createRelease.includes('release-assets/*'), 'draft release must upload the exact sealed bundle');
+assert.ok(createRelease.includes('attestations/*'), 'draft release must upload verified supply-chain attestations');
 for (const forbidden of ['refs/tags/', 'cargo publish', 'cloudflare', 'wrangler']) {
   assert.ok(!release.toLowerCase().includes(forbidden), `release workflow contains ${forbidden}`);
 }
@@ -168,7 +173,10 @@ const publicProjectFiles = [
   'keys/pliegors-candidate-release.pub.pem',
   'scripts/assemble-release-candidate.mjs',
   'scripts/create-release-manifest.mjs',
+  'scripts/create-supply-chain-attestations.mjs',
   'scripts/release-bundle-lib.mjs',
+  'scripts/supply-chain-attestations-lib.mjs',
+  'scripts/verify-supply-chain-attestations.mjs',
   'scripts/verify-release-bundle.mjs',
   'scripts/publish-crates.mjs',
   'crates/pliego-starters/LICENSE',

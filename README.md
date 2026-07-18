@@ -162,6 +162,7 @@ npm run check:site
 - [Product constitution and stability policy](docs/34-product-constitution.md)
 - [P8 trust and adoption contract](docs/35-p8-trust-and-adoption-contract.md)
 - [Diagnostics, reproduction reports, and upgrade checks](docs/36-diagnostics-reports-and-upgrades.md)
+- [Supply-chain attestations](docs/37-supply-chain-attestations.md)
 - [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
 - [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)
 - [R4 acceptance evidence](docs/evidence/r4-dom-lifecycle.md)
