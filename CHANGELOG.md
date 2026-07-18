@@ -2,6 +2,15 @@
 
 # Changelog
 
+## Unreleased
+
+- Define the five-pillar product constitution, open/closed repository boundary,
+  stability tiers, release channels, compatibility scope, and telemetry policy.
+- Add the audited P8 trust and adoption contract for CLI diagnostics, release
+  identity, adversarial validation, benchmarks, and clean-machine evidence.
+- Mark delegated PliegoCSS interoperability experimental and paused rather than
+  part of the supported quickstart.
+
 All notable PliegoRS changes are recorded here. The project follows Semantic
 Versioning. Before 1.0, minor releases may contain breaking API changes.
 
