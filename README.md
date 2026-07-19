@@ -47,6 +47,12 @@ published on crates.io. RFC-006 and RFC-007 remain Draft, and ADR-006 remains
 Proposed; the preview must not be presented as a stable or accepted API. The
 current `main` MSRV is Rust `1.86`.
 
+[`product.capabilities.json`](product.capabilities.json) is the canonical,
+machine-readable inventory of what is released, available only from source,
+partial, not released, or external to this repository. CI rejects drift between
+that inventory, Cargo metadata, the support matrix, public documentation, and
+the official site.
+
 ## Project status
 
 | Surface | Status | Evidence |
@@ -272,8 +278,13 @@ using the native Windows CLI for normal project development.
 - [Browser framework conformance](docs/44-browser-framework-conformance.md)
 - [JSON-RPC and MCP tooling protocol](docs/45-opensdk-tooling-protocol.md)
 - [Compatibility and deprecation policy](docs/46-opensdk-compatibility-and-deprecation.md)
+- [Canonical product capability manifest](docs/47-product-capability-manifest.md)
+- [Full-stack runtime threat model](docs/48-fullstack-threat-model.md)
 - [OpenSDK planes and capability RFC](docs/rfc/RFC-006-opensdk-planes-and-capabilities.md)
 - [Portable build output RFC](docs/rfc/RFC-007-pliego-build-output-contract.md)
+- [Native HTTP runtime RFC](docs/rfc/RFC-008-native-runtime.md)
+- [Full-stack route graph RFC](docs/rfc/RFC-009-route-graph.md)
+- [Data, actions, sessions, and cache RFC](docs/rfc/RFC-010-data-actions-cache.md)
 - [Wasmtime security-floor decision](docs/adr/ADR-006-opensdk-wasmtime-security-floor.md)
 - [Projection snapshot decision](docs/adr/ADR-005-projection-snapshots.md)
 - [R3 acceptance evidence](docs/evidence/r3-snapshot-schema.md)

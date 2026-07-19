@@ -6,6 +6,7 @@
   "scripts": {
     "bundle:phase-1-evidence": "node scripts/bundle-phase-1-evidence.mjs",
     "check:docs": "node scripts/check-doc-links.mjs",
+    "check:product-truth": "node scripts/check-product-truth.mjs",
     "check:crates": "node scripts/publish-crates.mjs --check",
     "check:distribution": "node scripts/check-distribution.mjs",
     "check:benchmarks": "node scripts/check-benchmark-contract.mjs",

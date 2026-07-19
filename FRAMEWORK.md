@@ -6,6 +6,12 @@ typed content, asset policy, build evidence, reactive ownership, and adapter
 lifecycles. It does not claim to replace Cargo, rustc, wasm-bindgen, JavaScript
 libraries, codecs, or browser APIs.
 
+The canonical current-surface authority is
+[`product.capabilities.json`](product.capabilities.json), governed by the
+[product capability manifest](docs/47-product-capability-manifest.md). A Draft
+RFC or source-preview implementation does not extend the released framework
+contract. CI rejects version, support, evidence, registry, and website drift.
+
 ## Project manifest
 
 Every project owns a `pliego.toml`:
@@ -176,6 +182,11 @@ selective build invalidation, deployment automation, and public package
 distribution are not stable surfaces. The R0-R7 gates in
 [`docs/28-hardening-roadmap.md`](docs/28-hardening-roadmap.md) take precedence
 over expanding those areas.
+
+The full-stack evolution is specified, but not released, by RFC-008 through
+RFC-010. Native HTTP serving, dynamic SSR, full-stack routing, loaders, actions,
+sessions, distributed cache, PBOC execution, and Cloudflare application hosting
+remain `not-released` until their named G1-G3 evidence gates close.
 
 ## Release gate
 

@@ -35,6 +35,11 @@ Cargo.lock.bak
 dist/
 pkg/
 
+# Local competitive research and generated dossiers
+/docs/research/
+/docs/47-nextjs-competitive-readiness-audit.md
+/output/pdf/
+
 # editors / os
 .DS_Store
 *.swp

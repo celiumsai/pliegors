@@ -117,6 +117,9 @@ jobs:
       - name: Check documentation links
         run: npm run check:docs
 
+      - name: Check canonical product capabilities
+        run: npm run check:product-truth
+
       - name: Check maintained fuzz contract
         run: npm run check:fuzz
 

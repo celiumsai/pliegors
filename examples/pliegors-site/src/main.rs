@@ -32,6 +32,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     site = site
         .asset(Asset::new(
+            "capabilities.json",
+            include_bytes!("../../../product.capabilities.json").to_vec(),
+        ))
+        .asset(Asset::new(
             "assets/pliegors.css",
             include_bytes!("native.css").to_vec(),
         ))

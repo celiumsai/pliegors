@@ -1,8 +1,9 @@
 # PliegoRS execution backlog
 
-**Updated:** 2026-07-18
-**Objective:** preserve R0-R7 and P8 as regression gates while the OpenSDK
-preview gathers implementation and governance evidence.
+**Updated:** 2026-07-19
+**Objective:** preserve R0-R7 and P8 as regression gates while PliegoRS executes
+the G0-G7 full-stack evolution program. OpenSDK remains a bounded preview and
+advances only where the runtime requires a public extension contract.
 
 The normative hardening sequence is defined in
 [`28-hardening-roadmap.md`](28-hardening-roadmap.md). A task is complete only
@@ -28,6 +29,24 @@ The [product constitution](34-product-constitution.md) governs admission of all
 work after R7. P9 entered preview only after the P8 release gates closed. Its
 implemented conformance surface does not imply RFC or ADR acceptance, stable
 API status, or release of the preview crate.
+
+## Full-stack evolution program
+
+| Gate | Status | Exit evidence |
+| --- | --- | --- |
+| G0 Product truth | In progress | Canonical capability manifest, public-surface consistency checker, runtime/route/data RFCs, and full-stack threat model all pass CI. |
+| G1 Native runtime and dynamic rendering | Not started | Dynamic reference application under fixed load, bounded memory and requests, graceful shutdown, disconnect cleanup, runtime receipts, and no unresolved P0. |
+| G2 Data, actions, and cache | Not started | Progressive authenticated mutation across two instances with idempotency, cancellation, cache isolation, and bounded invalidation lag. |
+| G3 Portable deployment | Not started | The same sealed build and conformance corpus pass native/OCI and Cloudflare hosts. |
+| G4 Adoption | Not started | An unaffiliated team completes a greenfield application and partial migration using public resources only. |
+| G5 OpenSDK ecosystem | Preview foundation only | Reviewed server plane, package lock/resolution, generated SDKs, registry/discovery, and independent non-Rust extension. |
+| G6 Operational maturity | Not started | Exercised release/support/security policy with owner redundancy and incident drill. |
+| G7 Competitive claim | Not started | Reproducible comparison, three external production deployments, public limitations, and approved claim wording. |
+
+The critical path is `G0 -> G1 -> G2 -> G3`. G4 may perform read-only migration
+analysis during G1/G2. G5 cannot stabilize the buffered HTTP preview ahead of
+the runtime lifecycle. G6 is designed from G0 and closes only when it can be
+staffed. G7 cannot close from internal demos or tests.
 
 ## Already implemented foundations
 

@@ -1,0 +1,225 @@
+{
+  "$schema": "./schemas/pliego.product-capabilities.schema.json",
+  "schema": "dev.pliegors.product-capabilities/v1",
+  "framework": {
+    "name": "PliegoRS",
+    "channel": "public-preview",
+    "releasedVersion": "0.0.2",
+    "workspaceVersion": "0.0.2",
+    "openSdkVersion": "0.1.0-preview.1",
+    "license": "Apache-2.0",
+    "releasedCrateCount": 15,
+    "unreleasedCrates": ["pliego-sdk"]
+  },
+  "support": {
+    "rust": {
+      "msrv": "1.86.0",
+      "releaseToolchain": "1.86.0"
+    },
+    "targets": [
+      { "id": "linux-aarch64", "role": "production", "status": "released" },
+      { "id": "linux-x86-64", "role": "production", "status": "released" },
+      { "id": "macos-aarch64", "role": "development", "status": "released" },
+      { "id": "macos-x86-64", "role": "development", "status": "released" },
+      { "id": "windows-x86-64", "role": "development", "status": "released" }
+    ],
+    "browsers": [
+      { "id": "chromium", "status": "release-blocking", "evidence": "docs/evidence/r4-dom-lifecycle.md" },
+      { "id": "firefox", "status": "compatibility-candidate", "evidence": "docs/34-product-constitution.md" },
+      { "id": "safari", "status": "compatibility-candidate", "evidence": "docs/34-product-constitution.md" }
+    ],
+    "telemetry": {
+      "default": "disabled",
+      "networkSubmission": "none"
+    }
+  },
+  "surfaces": [
+    {
+      "id": "adaptive-assets",
+      "label": "Adaptive asset planning",
+      "domain": "build",
+      "availability": "released",
+      "stability": "preview",
+      "gate": "preserved",
+      "summary": "Build-time media, font, video, and 3D plans with explicit device budgets and fallbacks.",
+      "evidence": ["docs/08-pliego-assets.md", "docs/26-security-plugins-and-adaptive-media.md"],
+      "limitations": ["Runtime image optimization and dynamic Open Graph rendering are not released."]
+    },
+    {
+      "id": "browser-adapters",
+      "label": "Browser adapter lifecycle",
+      "domain": "browser",
+      "availability": "released",
+      "stability": "preview",
+      "gate": "preserved",
+      "summary": "Explicit mount, update, unmount, abort, lazy admission, reduced-motion, and cleanup for JavaScript libraries.",
+      "evidence": ["docs/12-external-adapters.md", "docs/evidence/r4-dom-lifecycle.md"],
+      "limitations": ["Adapters execute with page privileges and are a lifecycle contract, not a JavaScript sandbox."]
+    },
+    {
+      "id": "cloudflare-runtime",
+      "label": "Cloudflare application runtime",
+      "domain": "deployment",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G3",
+      "summary": "A conformant Cloudflare Workers runtime for portable PliegoRS server applications.",
+      "evidence": ["docs/rfc/RFC-007-pliego-build-output-contract.md", "docs/rfc/RFC-008-native-runtime.md"],
+      "limitations": ["The current Cloudflare package serves the static documentation site; it is not the PliegoRS application runtime."]
+    },
+    {
+      "id": "data-actions-cache",
+      "label": "Loaders, actions, sessions, and cache",
+      "domain": "data",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G2",
+      "summary": "Request-scoped data loading, progressive mutations, session boundaries, and explicit distributed cache policies.",
+      "evidence": ["docs/rfc/RFC-010-data-actions-cache.md", "docs/48-fullstack-threat-model.md"],
+      "limitations": ["PliegoRS currently provides no production server actions, sessions, ISR, or multi-instance invalidation contract."]
+    },
+    {
+      "id": "deterministic-ssg",
+      "label": "Deterministic static generation",
+      "domain": "build",
+      "availability": "released",
+      "stability": "preview",
+      "gate": "preserved",
+      "summary": "Typed documents, routes, heads, assets, staged publication, ownership ledgers, and exact-set verification.",
+      "evidence": ["FRAMEWORK.md", "docs/evidence/r1-artifact-trust.md"],
+      "limitations": ["The released server serves static output only and does not provide request-time rendering."]
+    },
+    {
+      "id": "dynamic-ssr",
+      "label": "Dynamic and streamed SSR",
+      "domain": "server",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G1",
+      "summary": "Request-time synchronous, asynchronous, and streamed server rendering with explicit boundaries.",
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md"],
+      "limitations": ["No request-time SSR or streaming API is part of the current public release."]
+    },
+    {
+      "id": "fullstack-routing",
+      "label": "Full-stack route graph",
+      "domain": "server",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G1",
+      "summary": "Nested layouts, typed dynamic parameters, route handlers, middleware, and authored error boundaries.",
+      "evidence": ["docs/rfc/RFC-009-route-graph.md"],
+      "limitations": ["The current route graph owns static output paths and does not dispatch production HTTP requests."]
+    },
+    {
+      "id": "hyphae-client",
+      "label": "Hyphae verified protocol boundary",
+      "domain": "data",
+      "availability": "partial",
+      "stability": "preview",
+      "gate": "preserved",
+      "summary": "Optional protocol v2 attestations, authority policy, and type-gated verified replay for durable applications.",
+      "evidence": ["docs/29-hyphae-verified-sync-guide.md", "docs/evidence/r2-verified-sync.md"],
+      "limitations": ["No production Hyphae gateway or durability service is claimed by this repository."]
+    },
+    {
+      "id": "native-http-runtime",
+      "label": "Native HTTP runtime",
+      "domain": "server",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G1",
+      "summary": "A production Axum, Hyper, Tower, and Tokio host with bounded requests, cancellation, streaming, and graceful shutdown.",
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md"],
+      "limitations": ["tiny_http is used only by development and preview commands for static output."]
+    },
+    {
+      "id": "opensdk-browser-tooling",
+      "label": "OpenSDK browser and tooling planes",
+      "domain": "extension",
+      "availability": "source-preview",
+      "stability": "preview",
+      "gate": "G5",
+      "summary": "Browser framework and JSON-RPC/MCP conformance surfaces implemented on main for evaluation.",
+      "evidence": ["docs/44-browser-framework-conformance.md", "docs/45-opensdk-tooling-protocol.md"],
+      "limitations": ["The preview is not published on crates.io and its RFC and ADR decisions remain pending."]
+    },
+    {
+      "id": "opensdk-build",
+      "label": "OpenSDK build plane",
+      "domain": "extension",
+      "availability": "source-preview",
+      "stability": "preview",
+      "gate": "G5",
+      "summary": "Typed WebAssembly Component admission, resource budgets, capabilities, effect receipts, and conformance fixtures.",
+      "evidence": ["docs/42-opensdk-foundation.md", "docs/43-opensdk-multilang-conformance.md"],
+      "limitations": ["pliego-sdk 0.1.0-preview.1 exists only on main and is not part of the released 0.0.2 package set."]
+    },
+    {
+      "id": "opensdk-server",
+      "label": "OpenSDK server plane",
+      "domain": "extension",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G5",
+      "summary": "Language-neutral server extensions aligned with standard WASI HTTP semantics and explicit PliegoRS capabilities.",
+      "evidence": ["docs/rfc/RFC-006-opensdk-planes-and-capabilities.md", "docs/rfc/RFC-008-native-runtime.md"],
+      "limitations": ["The current pliego:http preview buffers complete request and response bodies and must not be stabilized."]
+    },
+    {
+      "id": "pboc",
+      "label": "Pliego Build Output Contract",
+      "domain": "deployment",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G3",
+      "summary": "A provider-neutral, digest-bound, executable output contract shared by independent deployment hosts.",
+      "evidence": ["docs/rfc/RFC-007-pliego-build-output-contract.md"],
+      "limitations": ["RFC-007 is Draft and no native plus Cloudflare conformance corpus has closed the stability gate."]
+    },
+    {
+      "id": "production-observability",
+      "label": "Production server observability",
+      "domain": "operations",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G1",
+      "summary": "OpenTelemetry HTTP spans, metrics, structured logs, runtime diagnostics, and bounded support evidence.",
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md"],
+      "limitations": ["Build and browser evidence do not constitute request-time server observability."]
+    },
+    {
+      "id": "rust-wasm-ui",
+      "label": "Rust and WebAssembly UI runtime",
+      "domain": "browser",
+      "availability": "released",
+      "stability": "preview",
+      "gate": "preserved",
+      "summary": "Escaped views, typed components, reactive ownership, event folds, resume actions, and verified DOM cleanup.",
+      "evidence": ["FRAMEWORK.md", "docs/evidence/r0-reactive-safety.md", "docs/evidence/r4-dom-lifecycle.md"],
+      "limitations": ["Current release-blocking browser lifecycle evidence is Chromium; Firefox and Safari remain candidates."]
+    },
+    {
+      "id": "server-deployment",
+      "label": "Native and OCI application deployment",
+      "domain": "deployment",
+      "availability": "not-released",
+      "stability": "none",
+      "gate": "G3",
+      "summary": "A portable Linux and OCI server artifact with runtime capabilities, rolling deployment, and rollback evidence.",
+      "evidence": ["docs/rfc/RFC-007-pliego-build-output-contract.md", "docs/rfc/RFC-008-native-runtime.md"],
+      "limitations": ["Released CLI platform archives are development and build tools, not full-stack application server artifacts."]
+    },
+    {
+      "id": "typed-content",
+      "label": "Typed content collections",
+      "domain": "build",
+      "availability": "released",
+      "stability": "preview",
+      "gate": "preserved",
+      "summary": "Bounded Markdown, JSON, and TOML discovery with typed schemas, safe paths, and deterministic diagnostics.",
+      "evidence": ["docs/21-typed-content-collections.md"],
+      "limitations": ["Content loading is build-time and is not a request-scoped server data loader."]
+    }
+  ]
+}
