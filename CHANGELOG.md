@@ -18,6 +18,12 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 - Raise the next-release MSRV from Rust `1.85.0` to `1.86.0` so the OpenSDK host
   can use Wasmtime `36.0.8`, the first compatible patch line that resolves the
   RustSec advisories affecting the original `34.0.2` prototype.
+- Replace the stale website release summary with a bilingual, evidence-linked
+  changelog for Unreleased, `0.0.2`, and `0.0.1`, and align current-release copy
+  across the site and documentation.
+- Keep `main` as the sole persistent repository branch by replacing automated
+  dependency-update branches with maintainer-batched, short-lived updates;
+  dependency alerts and security scanners remain active.
 
 ### Security
 

@@ -1,5 +1,5 @@
 key = "changelog"
 title = { en = "PliegoRS Changelog | Verified Framework Progress", es = "Changelog de PliegoRS | Progreso verificable del framework" }
-description = { en = "Completed PliegoRS framework milestones, hardening gates, compatibility work, and release evidence without speculative claims.", es = "Milestones completados, gates de fortalecimiento, compatibilidad y evidencia de releases de PliegoRS sin afirmaciones especulativas." }
+description = { en = "Verified PliegoRS releases, current OpenSDK preview work, compatibility changes, and evidence boundaries in one public record.", es = "Releases verificados de PliegoRS, trabajo actual del preview OpenSDK, cambios de compatibilidad y límites de evidencia en un registro público." }
 image = "/media/pliegors/ledger-wide.webp"
 imageAlt = { en = "PliegoRS build and interface evidence folio", es = "Folio de evidencia de builds e interfaces de PliegoRS" }

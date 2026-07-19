@@ -117,7 +117,7 @@ fn hero(locale: Locale) -> View {
                 .child(
                     el("p")
                         .class("utility-label")
-                        .child("PLIEGORS / 0.0.1 / PUBLIC PREVIEW"),
+                        .child("PLIEGORS / 0.0.2 / PUBLIC PREVIEW"),
                 )
                 .child(el("h1").child("Pliego").child(el("em").child("RS")))
                 .child(el("p").class("rs-hero__lead").child(l(
@@ -663,15 +663,15 @@ fn distribution(locale: Locale) -> View {
                 .child(el("h2").child(l(locale, "Built once. Verified per target.", "Compilado una vez. Verificado por target.")))
                 .child(el("p").child(l(
                     locale,
-                    "PliegoRS 0.0.1 is public on crates.io and GitHub Releases. Linux artifacts are production targets; macOS and Windows builds support local development. The release carries complete R0-R7 evidence.",
-                    "PliegoRS 0.0.1 está disponible en crates.io y GitHub Releases. Los artefactos Linux son targets de producción; los builds de macOS y Windows sirven al desarrollo local. El release contiene la evidencia R0-R7 completa.",
+                    "PliegoRS 0.0.2 is public on crates.io and GitHub Releases. Linux artifacts are production targets; macOS and Windows builds support local development. The release carries complete R0-R7 and P8 evidence.",
+                    "PliegoRS 0.0.2 está disponible en crates.io y GitHub Releases. Los artefactos Linux son targets de producción; los builds de macOS y Windows sirven al desarrollo local. El release contiene la evidencia R0-R7 y P8 completa.",
                 ))),
         )
         .child(
             el("pre")
                 .class("rs-terminal")
                 .attr("aria-label", l(locale, "PliegoRS installation example", "Ejemplo de instalación de PliegoRS"))
-                .child(el("code").child("$ cargo install pliego-cli --version 0.0.1 --locked\n$ pliego new field-notes\n$ cd field-notes\n$ pliego dev\n\nPLIEGORS  local  http://127.0.0.1:4400")),
+                .child(el("code").child("$ cargo install pliego-cli --version 0.0.2 --locked\n$ pliego new field-notes\n$ cd field-notes\n$ pliego dev\n\nPLIEGORS  local  http://127.0.0.1:4400")),
         )
         .into_view()
 }
@@ -901,16 +901,16 @@ fn about_release(locale: Locale) -> View {
             "04",
             l(locale, "Current state", "Estado actual"),
         ))
-        .child(el("p").class("utility-label").child("0.0.1 / PUBLIC PREVIEW"))
+        .child(el("p").class("utility-label").child("0.0.2 / PUBLIC PREVIEW"))
         .child(el("h2").child(l(
             locale,
-            "The first release is evidence, not a countdown.",
-            "El primer release es evidencia, no una cuenta regresiva.",
+            "The current release is a reproducible claim.",
+            "El release actual es una afirmación reproducible.",
         )))
         .child(el("p").child(l(
             locale,
-            "Source, documentation, crates.io packages, platform builds, checksums, security posture, and R0-R7 evidence agree on the 0.0.1 public preview release. Support is intentionally bounded to the published matrix and pre-1.0 policy.",
-            "El código, la documentación, los paquetes de crates.io, los builds por plataforma, los checksums, la postura de seguridad y la evidencia R0-R7 coinciden en el release 0.0.1 de preview público. El soporte se limita deliberadamente a la matriz publicada y a la política pre-1.0.",
+            "Source, documentation, 15 crates.io packages, five platform builds, signed attestations, the nine-environment golden matrix, and R0-R7 plus P8 evidence agree on the 0.0.2 public preview release.",
+            "El código, la documentación, 15 paquetes de crates.io, cinco builds de plataforma, attestations firmadas, la matriz golden de nueve entornos y la evidencia R0-R7 más P8 coinciden en el release 0.0.2 de preview público.",
         )))
         .child(
             el("div")
@@ -930,68 +930,204 @@ fn about_release(locale: Locale) -> View {
 }
 
 pub fn changelog(locale: Locale) -> View {
-    let entries = [
-        (
-            "0.0.1",
-            "2026-07-16",
-            l(locale, "First public release", "Primer release público"),
-            l(
-                locale,
-                "Native SSG, typed content, Rust/WASM runtime, adapters, adaptive assets, verified Hyphae boundary, signed five-target distribution, and an independently exercised external application.",
-                "SSG nativo, contenido tipado, runtime Rust/WASM, adaptadores, assets adaptativos, límite Hyphae verificado, distribución firmada para cinco targets y una aplicación externa ejercitada de forma independiente.",
-            ),
-        ),
-        (
-            "R5–R7",
-            "ACCEPTED",
-            l(
-                locale,
-                "Delivery and external proof",
-                "Entrega y prueba externa",
-            ),
-            l(
-                locale,
-                "Causal HMR, why commands, replayable first use, signed reproducible candidates, installer lifecycle, and an external durable application passed their acceptance gates.",
-                "HMR causal, comandos why, primer uso reproducible, candidatos firmados y reproducibles, lifecycle de instaladores y una aplicación durable externa aprobaron sus gates de aceptación.",
-            ),
-        ),
-        (
-            "R0–R4",
-            "ACCEPTED",
-            l(locale, "Core hardening", "Fortalecimiento del núcleo"),
-            l(
-                locale,
-                "Reactive safety, artifact trust, verified sync, schema and snapshot identity, keyed reconciliation, SSR adoption, and deterministic DOM cleanup passed their acceptance gates.",
-                "Seguridad reactiva, confianza de artefactos, sync verificado, identidad de schemas y snapshots, reconciliación keyed, adopción SSR y cleanup determinista del DOM aprobaron sus gates de aceptación.",
-            ),
-        ),
-    ];
-    let mut list = el("div").class("rs-change-list");
-    for (version, date, stage, summary) in entries {
-        list = list.child(
-            el("article")
-                .child(el("span").child(date))
-                .child(el("h2").child(version))
-                .child(el("strong").child(stage))
-                .child(el("p").child(summary)),
-        );
-    }
     View::Fragment(vec![
         page_hero(
             "CHANGELOG",
             l(
                 locale,
-                "Changes with evidence attached.",
-                "Cambios con evidencia adjunta.",
+                "A public record, not a victory lap.",
+                "Un registro público, no una vuelta de victoria.",
             ),
             l(
                 locale,
-                "Only completed, testable framework work belongs here.",
-                "Aquí sólo entra trabajo del framework completo y verificable.",
+                "Released evidence stays separate from experimental work. Every entry names what changed, what passed, and what remains unsettled.",
+                "La evidencia liberada permanece separada del trabajo experimental. Cada entrada nombra qué cambió, qué aprobó y qué sigue sin resolverse.",
             ),
         ),
-        list.into_view(),
+        changelog_overview(locale),
+        el("section")
+            .class("rs-change-list")
+            .attr(
+                "aria-label",
+                l(locale, "Release history", "Historial de releases"),
+            )
+            .child(change_entry(
+                locale,
+                "unreleased",
+                "UNRELEASED",
+                "MAIN",
+                None,
+                l(locale, "Experimental preview", "Preview experimental"),
+                l(locale, "OpenSDK becomes executable.", "OpenSDK se vuelve ejecutable."),
+                l(
+                    locale,
+                    "The public extension boundary now has typed contracts and real conformance evidence. It is implemented for evaluation, not declared stable.",
+                    "El límite público de extensiones ya tiene contratos tipados y evidencia real de conformidad. Está implementado para evaluación, no declarado estable.",
+                ),
+                &[
+                    l(locale, "Typed Wasm Component host with fuel, deadline, memory, output, and capability limits.", "Host tipado de Wasm Components con límites de fuel, deadline, memoria, output y capacidades."),
+                    l(locale, "Rust, TypeScript, Python, React, Svelte, Lit, JSON-RPC, and MCP conformance fixtures.", "Fixtures de conformidad para Rust, TypeScript, Python, React, Svelte, Lit, JSON-RPC y MCP."),
+                    l(locale, "RFC-006 and RFC-007 remain Draft; ADR-006 remains Proposed.", "RFC-006 y RFC-007 siguen Draft; ADR-006 sigue Proposed."),
+                ],
+                Some((
+                    "https://github.com/celiumsai/pliegors/blob/main/CHANGELOG.md",
+                    l(locale, "Inspect the source record", "Inspeccionar el registro fuente"),
+                )),
+            ))
+            .child(change_entry(
+                locale,
+                "v0-0-2",
+                "0.0.2",
+                "2026-07-18",
+                Some("2026-07-18"),
+                l(locale, "Public preview", "Preview público"),
+                l(locale, "Trust becomes part of the toolchain.", "La confianza pasa a ser parte del toolchain."),
+                l(
+                    locale,
+                    "P8 closes the gap between a working framework and one that can be independently evaluated, installed, diagnosed, and verified.",
+                    "P8 cierra la distancia entre un framework funcional y uno que puede evaluarse, instalarse, diagnosticarse y verificarse de forma independiente.",
+                ),
+                &[
+                    l(locale, "15 crates at 0.0.2, five platform targets, 28 signed release assets, SBOM, provenance, and Sigstore identity.", "15 crates en 0.0.2, cinco targets de plataforma, 28 assets firmados, SBOM, provenance e identidad Sigstore."),
+                    l(locale, "Nine-environment golden matrix including WSL2, Unicode paths, long paths, and a pinned container.", "Matriz golden de nueve entornos, incluyendo WSL2, rutas Unicode, rutas largas y un contenedor fijado."),
+                    l(locale, "Doctor, deterministic support reports, upgrade checks, bounded fuzzing, reproducible benchmarks, and opt-in local telemetry.", "Doctor, reportes de soporte deterministas, checks de upgrade, fuzzing acotado, benchmarks reproducibles y telemetría local opt-in."),
+                ],
+                Some((
+                    "https://github.com/celiumsai/pliegors/releases/tag/v0.0.2",
+                    l(locale, "Verify release 0.0.2", "Verificar el release 0.0.2"),
+                )),
+            ))
+            .child(change_entry(
+                locale,
+                "v0-0-1",
+                "0.0.1",
+                "2026-07-16",
+                Some("2026-07-16"),
+                l(locale, "First public preview", "Primer preview público"),
+                l(locale, "The framework leaves the workshop.", "El framework sale del taller."),
+                l(
+                    locale,
+                    "The first public release established the Rust-native framework, authored developer experience, and accepted R0-R7 evidence baseline.",
+                    "El primer release público estableció el framework nativo en Rust, la experiencia de desarrollo con autoría y la línea base de evidencia R0-R7 aceptada.",
+                ),
+                &[
+                    l(locale, "Native SSG, typed views and content, event folds, reactive runtime, DOM lifecycle, adapters, assets, and Hyphae boundary.", "SSG nativo, views y contenido tipados, event folds, runtime reactivo, lifecycle DOM, adaptadores, assets y límite Hyphae."),
+                    l(locale, "Signed five-target distribution, authored error pages, official starters, bilingual documentation, and external flagship evidence.", "Distribución firmada para cinco targets, páginas de error con autoría, starters oficiales, documentación bilingüe y evidencia flagship externa."),
+                ],
+                Some((
+                    "https://github.com/celiumsai/pliegors/releases/tag/v0.0.1",
+                    l(locale, "Verify release 0.0.1", "Verificar el release 0.0.1"),
+                )),
+            ))
+            .into_view(),
     ])
+}
+
+fn changelog_overview(locale: Locale) -> View {
+    let facts = [
+        (l(locale, "Current release", "Release actual"), "0.0.2"),
+        (l(locale, "Published", "Publicado"), "2026-07-18"),
+        (l(locale, "Published crates", "Crates publicados"), "15"),
+        (l(locale, "Signed assets", "Assets firmados"), "28"),
+    ];
+    let mut fact_list = el("dl").class("rs-changelog-overview__facts");
+    for (label, value) in facts {
+        fact_list = fact_list.child(
+            el("div")
+                .child(el("dt").child(label))
+                .child(el("dd").child(value)),
+        );
+    }
+    el("section")
+        .class("rs-changelog-overview")
+        .child(
+            el("div")
+                .class("rs-changelog-overview__copy")
+                .child(el("p").class("utility-label").child("RELEASE LEDGER / 002"))
+                .child(el("h2").child(l(
+                    locale,
+                    "The latest claim is the one you can verify.",
+                    "La afirmación más reciente es la que puedes verificar.",
+                )))
+                .child(el("p").child(l(
+                    locale,
+                    "The website summarizes the record. GitHub keeps the canonical Markdown, immutable tags, signatures, attestations, and downloadable bytes.",
+                    "El sitio resume el registro. GitHub conserva el Markdown canónico, los tags inmutables, firmas, attestations y bytes descargables.",
+                )))
+                .child(
+                    el("div")
+                        .class("rs-actions")
+                        .child(action(
+                            "https://github.com/celiumsai/pliegors/releases/tag/v0.0.2",
+                            l(locale, "Open latest release", "Abrir el último release"),
+                            true,
+                        ))
+                        .child(action(
+                            "https://github.com/celiumsai/pliegors/blob/main/CHANGELOG.md",
+                            l(locale, "Read source changelog", "Leer changelog fuente"),
+                            false,
+                        )),
+                ),
+        )
+        .child(fact_list)
+        .into_view()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn change_entry(
+    locale: Locale,
+    id: &str,
+    version: &str,
+    date_label: &str,
+    datetime: Option<&str>,
+    status: &str,
+    title: &str,
+    summary: &str,
+    bullets: &[&str],
+    source: Option<(&str, &str)>,
+) -> View {
+    let date = if let Some(datetime) = datetime {
+        el("time")
+            .attr("datetime", datetime)
+            .child(date_label.to_owned())
+    } else {
+        el("span").child(date_label.to_owned())
+    };
+    let mut details = el("ul").class("rs-change-entry__details");
+    for bullet in bullets {
+        details = details.child(el("li").child((*bullet).to_owned()));
+    }
+    let mut body = el("div")
+        .class("rs-change-entry__body")
+        .child(el("h3").child(title.to_owned()))
+        .child(el("p").child(summary.to_owned()))
+        .child(details);
+    if let Some((href, label)) = source {
+        body = body.child(
+            el("a")
+                .class("rs-change-entry__link")
+                .attr("href", href)
+                .child(label.to_owned())
+                .child(el("span").attr("aria-hidden", "true").child("↗")),
+        );
+    }
+    el("article")
+        .id(id)
+        .attr("data-change-entry", id)
+        .child(
+            el("div")
+                .class("rs-change-entry__meta")
+                .child(date)
+                .child(el("span").child(status.to_owned())),
+        )
+        .child(
+            el("div")
+                .class("rs-change-entry__version")
+                .child(el("span").child(l(locale, "Version", "Versión")))
+                .child(el("h2").child(version.to_owned())),
+        )
+        .child(body)
+        .into_view()
 }
 
 pub fn security(locale: Locale) -> View {
@@ -1098,7 +1234,7 @@ fn security_hero(locale: Locale) -> View {
                 .child(
                     el("span")
                         .child("PUBLIC PREVIEW")
-                        .child(el("small").child(l(locale, "0.0.1 supported", "0.0.1 soportado"))),
+                        .child(el("small").child(l(locale, "0.0.2 supported", "0.0.2 soportado"))),
                 ),
         )
         .into_view()
@@ -1172,8 +1308,8 @@ fn security_posture(locale: Locale) -> View {
                 )))
                 .child(el("p").child(l(
                     locale,
-                    "These numbers describe the 0.0.1 public preview release and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
-                    "Estas cifras describen el release 0.0.1 de preview público y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
+                    "These numbers describe the 0.0.2 public preview release and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
+                    "Estas cifras describen el release 0.0.2 de preview público y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
                 ))),
         )
         .child(grid)
@@ -1633,9 +1769,9 @@ fn security_support(locale: Locale) -> View {
                         .child(
                             el("tbody").child(
                                 el("tr")
-                                    .child(el("th").attr("scope", "row").child("0.0.1"))
+                                    .child(el("th").attr("scope", "row").child("0.0.2"))
                                     .child(el("td").child(l(locale, "Public pre-release", "Pre-release público")))
-                                    .child(el("td").child(l(locale, "0.0.1 and main", "0.0.1 y main"))),
+                                    .child(el("td").child(l(locale, "0.0.2 and main", "0.0.2 y main"))),
                             ),
                         ),
                 )
@@ -1890,8 +2026,8 @@ pub fn legal_document(locale: Locale, slug: &str) -> Result<View, String> {
                     "01",
                     "Current status",
                     "Estado actual",
-                    "PliegoRS 0.0.1 is public pre-1.0 software. Documented APIs may change between minor releases and changes are recorded in the changelog.",
-                    "PliegoRS 0.0.1 es software público pre-1.0. Las APIs documentadas pueden cambiar entre releases menores y los cambios se registran en el changelog.",
+                    "PliegoRS 0.0.2 is public pre-1.0 software. Documented APIs may change between minor releases and changes are recorded in the changelog.",
+                    "PliegoRS 0.0.2 es software público pre-1.0. Las APIs documentadas pueden cambiar entre releases menores y los cambios se registran en el changelog.",
                 ),
                 (
                     "02",

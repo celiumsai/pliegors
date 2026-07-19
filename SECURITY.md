@@ -13,7 +13,7 @@ published pre-release and the default branch.
 
 | Version | Supported |
 | --- | --- |
-| `0.0.1` | Yes |
+| `0.0.2` | Yes |
 | Earlier versions | No |
 
 After 1.0, this table will identify every supported release line.
@@ -58,6 +58,14 @@ There are no published PliegoRS security advisories as of 2026-07-16. This is a
 disclosure status, not a claim that undiscovered vulnerabilities do not exist.
 Published advisories appear in the GitHub Security Advisories section and are
 linked from the online trust center.
+
+## Dependency maintenance
+
+GitHub dependency alerts, CodeQL, secret scanning, `cargo audit`, and `npm
+audit` remain active. Automated dependency-update branches are disabled so the
+public repository keeps `main` as its sole persistent branch. Maintainers batch
+reviewed updates in short-lived branches, pass the protected-branch gates, and
+delete those branches immediately after a linear merge.
 
 The current lockfile has no known vulnerability advisories. `cargo audit`
 reports one allowed maintenance warning, `RUSTSEC-2026-0173`, for the
