@@ -1,0 +1,5 @@
+key = "docs-opensdk-compatibility"
+title = { en = "Compatibility and Deprecation | PliegoRS OpenSDK", es = "Compatibilidad y deprecación | PliegoRS OpenSDK" }
+description = { en = "Read the machine-verifiable OpenSDK compatibility matrix, preview stability boundary, deprecation rules, and migration requirements.", es = "Lee la matriz verificable de OpenSDK, el límite de estabilidad preview, reglas de deprecación y requisitos de migración." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A material ledger representing OpenSDK compatibility and migration evidence", es = "Un ledger material que representa compatibilidad y evidencia de migración OpenSDK" }

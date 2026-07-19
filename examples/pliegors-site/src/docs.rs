@@ -123,6 +123,51 @@ pub const TOPICS: &[DocTopic] = &[
         summary_es: "Controla rangos montados, reconcilia hijos keyed, adopta salida SSR exacta y elimina listeners, efectos, adapters y nodos de forma determinista.",
     },
     DocTopic {
+        slug: "opensdk",
+        group_en: "OpenSDK",
+        group_es: "OpenSDK",
+        title_en: "OpenSDK preview",
+        title_es: "Preview de OpenSDK",
+        summary_en: "Evaluate the unreleased extension boundary from main, understand admission, capabilities, effects, and its governance status.",
+        summary_es: "Evalúa desde main el límite de extensiones aún no liberado y entiende admisión, capabilities, efectos y su estado de gobernanza.",
+    },
+    DocTopic {
+        slug: "opensdk-components",
+        group_en: "OpenSDK",
+        group_es: "OpenSDK",
+        title_en: "Components and languages",
+        title_es: "Componentes y lenguajes",
+        summary_en: "Run the typed Wasm Component host and compare the bounded Rust, TypeScript, and Python conformance implementations.",
+        summary_es: "Ejecuta el host tipado de Wasm Components y compara las implementaciones limitadas de conformidad en Rust, TypeScript y Python.",
+    },
+    DocTopic {
+        slug: "browser-framework-conformance",
+        group_en: "OpenSDK",
+        group_es: "OpenSDK",
+        title_en: "Browser framework conformance",
+        title_es: "Conformidad de frameworks web",
+        summary_en: "Integrate React, Svelte, and Lit through explicit Custom Element and adapter lifecycles with measurable cleanup.",
+        summary_es: "Integra React, Svelte y Lit mediante lifecycles explícitos de Custom Elements y adapters con cleanup medible.",
+    },
+    DocTopic {
+        slug: "opensdk-tooling",
+        group_en: "OpenSDK",
+        group_es: "OpenSDK",
+        title_en: "Tooling protocol",
+        title_es: "Protocolo de tooling",
+        summary_en: "Negotiate editor and MCP clients over bounded JSON-RPC without granting ambient project or network authority.",
+        summary_es: "Negocia clientes de editor y MCP sobre JSON-RPC limitado sin conceder autoridad ambiental sobre el proyecto o la red.",
+    },
+    DocTopic {
+        slug: "opensdk-compatibility",
+        group_en: "OpenSDK",
+        group_es: "OpenSDK",
+        title_en: "Compatibility and deprecation",
+        title_es: "Compatibilidad y deprecación",
+        summary_en: "Read the machine-verifiable support matrix, stability tiers, migration requirements, and provider-neutral source boundary.",
+        summary_es: "Lee la matriz verificable de soporte, niveles de estabilidad, requisitos de migración y límite de fuente independiente del proveedor.",
+    },
+    DocTopic {
         slug: "assets",
         group_en: "Delivery",
         group_es: "Entrega",
@@ -238,6 +283,36 @@ pub fn index(locale: Locale) -> View {
         .child(
             el("section")
                 .class("rs-doc-start")
+                .attr("aria-labelledby", "docs-status-title")
+                .child(
+                    el("div")
+                        .child(
+                            el("p")
+                                .class("utility-label")
+                                .child("RELEASE / 0.0.2 + OPENSDK / PREVIEW"),
+                        )
+                        .child(el("h2").id("docs-status-title").child(localized(
+                            locale,
+                            "Published framework. Unreleased extension boundary.",
+                            "Framework publicado. Límite de extensiones aún no liberado.",
+                        )))
+                        .child(el("p").child(localized(
+                            locale,
+                            "The fifteen 0.0.2 crates are the current installable release. OpenSDK 0.1.0-preview.1 is executable on main with Rust 1.86, but pliego-sdk is not on crates.io and its RFC and ADR decisions remain pending.",
+                            "Los quince crates 0.0.2 forman el release instalable actual. OpenSDK 0.1.0-preview.1 es ejecutable en main con Rust 1.86, pero pliego-sdk no está en crates.io y sus decisiones RFC y ADR siguen pendientes.",
+                        ))),
+                )
+                .child(link_list(
+                    locale,
+                    &[
+                        ("/docs/opensdk", "Evaluate OpenSDK", "Evaluar OpenSDK"),
+                        ("/changelog", "Read the release boundary", "Leer el límite de release"),
+                    ],
+                )),
+        )
+        .child(
+            el("section")
+                .class("rs-doc-start")
                 .attr("aria-labelledby", "docs-start-title")
                 .child(
                     el("div")
@@ -312,6 +387,11 @@ pub fn article(locale: Locale, slug: &str) -> Result<View, String> {
         "content" => typed_content(locale),
         "browser-runtime" => browser_runtime(locale),
         "dom-lifecycle" => dom_lifecycle(locale),
+        "opensdk" => opensdk(locale),
+        "opensdk-components" => opensdk_components(locale),
+        "browser-framework-conformance" => browser_framework_conformance(locale),
+        "opensdk-tooling" => opensdk_tooling(locale),
+        "opensdk-compatibility" => opensdk_compatibility(locale),
         "assets" => adaptive_assets(locale),
         "artifact-trust" => artifact_trust(locale),
         "release-trust" => release_trust(locale),
@@ -524,7 +604,7 @@ fn getting_started(locale: Locale) -> View {
             vec![
                 paragraph(locale, "PliegoRS projects are Rust workspaces. Install a stable Rust toolchain, the wasm32-unknown-unknown target when the project has a browser client, and wasm-bindgen-cli at the exact version reported by pliego check.", "Los proyectos PliegoRS son workspaces Rust. Instala un toolchain Rust estable, el target wasm32-unknown-unknown cuando el proyecto tenga cliente de navegador y wasm-bindgen-cli en la versión exacta indicada por pliego check."),
                 definition_list(locale, &[
-                    ("Rust", "1.85 or the release toolchain declared by the project", "1.85 o el toolchain de release declarado por el proyecto"),
+                    ("Rust", "1.85.0 for released v0.0.2 artifacts; 1.86.0 for current main and OpenSDK", "1.85.0 para artefactos v0.0.2 liberados; 1.86.0 para main actual y OpenSDK"),
                     ("Targets", "Linux x64/ARM64 for production; macOS and Windows for development", "Linux x64/ARM64 para producción; macOS y Windows para desarrollo"),
                     ("Source", "crates.io packages, GitHub Releases, and the canonical celiumsai/pliegors repository", "Paquetes de crates.io, GitHub Releases y el repositorio canónico celiumsai/pliegors"),
                 ]),
@@ -846,6 +926,158 @@ fn dom_lifecycle(locale: Locale) -> View {
     ].into_view()
 }
 
+fn opensdk(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "status", "Evaluate the preview from main", "Evalúa el preview desde main", vec![
+            paragraph(locale, "OpenSDK 0.1.0-preview.1 landed after PliegoRS v0.0.2. Its implementation and conformance suites are available in the repository, but pliego-sdk is not published on crates.io and the 0.0.2 CLI does not contain this command surface.", "OpenSDK 0.1.0-preview.1 llegó después de PliegoRS v0.0.2. Su implementación y suites de conformidad están disponibles en el repositorio, pero pliego-sdk no está publicado en crates.io y el CLI 0.0.2 no contiene esta superficie de comandos."),
+            code_block(locale, "shell", "git clone https://github.com/celiumsai/pliegors.git\ncd pliegors\ncargo run -p pliego-cli --locked -- sdk compatibility\nnpm ci\nnpm run check:opensdk:all"),
+            note(locale, "Toolchain boundary", "The current main branch requires Rust 1.86.0 for the Wasmtime 36.0.8 security floor. Released v0.0.2 artifacts retain their original Rust 1.85.0 evidence.", "Límite del toolchain", "El branch main actual requiere Rust 1.86.0 por el security floor de Wasmtime 36.0.8. Los artefactos v0.0.2 liberados conservan su evidencia original de Rust 1.85.0."),
+        ]),
+        doc_section(locale, "admission", "Admit exact bytes before execution", "Admite bytes exactos antes de ejecutar", vec![
+            paragraph(locale, "An extension manifest declares its identity, exact entry points, OpenSDK API, compatible host range, required features, requested capabilities, and resource budgets. Admission verifies the component digest and policy before returning a ValidatedExtension typestate that a runtime can execute.", "El manifest de una extensión declara identidad, entry points exactos, API OpenSDK, rango de host compatible, features requeridos, capabilities solicitadas y presupuestos de recursos. La admisión verifica el digest del componente y la política antes de retornar el typestate ValidatedExtension que un runtime puede ejecutar."),
+            code_block(locale, "rust", "use pliego_sdk::{CapabilityPolicy, ExtensionManifest, HostContract};\nuse semver::Version;\n\nlet manifest: ExtensionManifest = serde_json::from_slice(manifest_bytes)?;\nlet host = HostContract::preview(\n    Version::parse(\"0.1.0-preview.1\")?,\n    CapabilityPolicy::deny_all(),\n);\nlet validated = host.admit(manifest, component_bytes)?;"),
+            note(locale, "A request is not authority", "Declaring a capability never creates a filesystem, network, clock, random, environment, or HTTP handle. The host policy and application-supplied executor remain the resource boundary.", "Una solicitud no es autoridad", "Declarar una capability nunca crea un handle de filesystem, red, reloj, random, environment o HTTP. La política del host y el executor suministrado por la aplicación siguen siendo el límite del recurso."),
+        ]),
+        doc_section(locale, "effects", "Broker effects and retain evidence", "Intermedia efectos y conserva evidencia", vec![
+            paragraph(locale, "Non-deterministic work crosses EffectBroker only after both the broker and specific effect capabilities pass policy. Calls that reach the executor produce ordered SHA-256 receipts for success or error. Denials happen before execution and do not claim that an effect occurred.", "El trabajo no determinista cruza EffectBroker sólo después de que la capability del broker y la del efecto específico superan la política. Las llamadas que alcanzan el executor producen recibos SHA-256 ordenados para success o error. Las denegaciones suceden antes de ejecutar y no afirman que ocurrió un efecto."),
+            definition_list(locale, &[
+                ("Fuel and deadline", "Bound computation and interrupt an expired invocation", "Limitan el cómputo e interrumpen una invocación vencida"),
+                ("Memory and output", "Reject growth or results beyond the declared budgets", "Rechazan crecimiento o resultados fuera de los presupuestos declarados"),
+                ("Effect receipts", "Bind ordered operation, request, outcome, and response evidence", "Vinculan operación, solicitud, resultado y evidencia de respuesta en orden"),
+                ("Ambient WASI", "Not linked by the reference component host", "No está enlazado por el host de componentes de referencia"),
+            ]),
+        ]),
+        doc_section(locale, "governance", "Implemented does not mean stable", "Implementado no significa estable", vec![
+            paragraph(locale, "RFC-006 and RFC-007 remain Draft, and ADR-006 remains Proposed. The implementation is executable evidence for governance and external evaluation; incompatible changes may arrive in another preview protocol. None of this surface is labeled stable.", "RFC-006 y RFC-007 siguen Draft, y ADR-006 sigue Proposed. La implementación es evidencia ejecutable para gobernanza y evaluación externa; pueden llegar cambios incompatibles en otro protocolo preview. Ninguna parte de esta superficie se etiqueta como estable."),
+            link_list(locale, &[
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/42-opensdk-foundation.md", "OpenSDK foundation", "Fundamentos de OpenSDK"),
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/rfc/RFC-006-opensdk-planes-and-capabilities.md", "RFC-006: planes and capabilities", "RFC-006: planos y capabilities"),
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/rfc/RFC-007-pliego-build-output-contract.md", "RFC-007: portable build output", "RFC-007: salida de build portable"),
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/adr/ADR-006-opensdk-wasmtime-security-floor.md", "ADR-006: Wasmtime security floor", "ADR-006: security floor de Wasmtime"),
+            ]),
+        ]),
+    ].into_view()
+}
+
+fn opensdk_components(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "component", "Typed Wasm Component execution", "Ejecución tipada de Wasm Components", vec![
+            paragraph(locale, "The reference sandbox compiles and admits a Rust WebAssembly Component against pliego:build/transformer@0.1.0. The host instantiates it without ambient WASI, invokes the typed export, and emits a schema-valid build transform receipt over framed input and output digests.", "El sandbox de referencia compila y admite un WebAssembly Component Rust contra pliego:build/transformer@0.1.0. El host lo instancia sin WASI ambiental, invoca el export tipado y emite un recibo de transformación válido contra schema sobre digests enmarcados de entrada y salida."),
+            note(locale, "Preview protocol", "This conformance surface belongs to OpenSDK 0.1.0-preview.1 on main and is not part of the published PliegoRS v0.0.2 packages.", "Protocolo preview", "Esta superficie de conformidad pertenece a OpenSDK 0.1.0-preview.1 en main y no forma parte de los paquetes PliegoRS v0.0.2 publicados."),
+            code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk test \\\n  fixtures/opensdk/rust-component/pliego-extension.json \\\n  --input fixtures/opensdk/transform-input.json \\\n  --format json"),
+        ]),
+        doc_section(locale, "languages", "One contract, independent implementations", "Un contrato, implementaciones independientes", vec![
+            paragraph(locale, "The conformance fixture implements the same bounded build transform in Rust, TypeScript, and Python process bridges plus the Rust Wasm Component. The gate runs each implementation twice and requires exact canonical result bytes across all four.", "El fixture de conformidad implementa la misma transformación limitada en bridges de proceso Rust, TypeScript y Python, además del Wasm Component Rust. El gate ejecuta cada implementación dos veces y exige bytes canónicos exactos en las cuatro."),
+            code_block(locale, "shell", "npm run check:opensdk:multilang"),
+            definition_list(locale, &[
+                ("Rust Component", "Reference sandboxed Component Model implementation", "Implementación sandboxed de referencia para Component Model"),
+                ("TypeScript", "Conformance process bridge transpiled with esbuild and run on Node.js 20", "Bridge de proceso de conformidad transpilado con esbuild y ejecutado en Node.js 20"),
+                ("Python", "Independent conformance process bridge", "Bridge de proceso de conformidad independiente"),
+            ]),
+        ]),
+        doc_section(locale, "budgets", "Prove resource failures", "Prueba fallos de recursos", vec![
+            paragraph(locale, "The component gate also proves finite fuel exhaustion, wall-time interruption, memory rejection, output rejection, and receipt validation. Instantiation and invocation share one deadline, and each execution receives an isolated Wasmtime engine.", "El gate del componente también prueba agotamiento de fuel finito, interrupción por wall-time, rechazo de memoria, rechazo de output y validación del recibo. Instanciación e invocación comparten un deadline y cada ejecución recibe un engine Wasmtime aislado."),
+        ]),
+        doc_section(locale, "limits", "Know what the evidence means", "Entiende qué significa la evidencia", vec![
+            paragraph(locale, "This fixture proves protocol equivalence for one build transform. The TypeScript and Python bridges are native-trusted conformance implementations, not sandboxed Component Model SDKs. A third stable Component SDK still requires hosted cross-platform Component Model evidence.", "Este fixture prueba equivalencia de protocolo para una transformación de build. Los bridges TypeScript y Python son implementaciones de conformidad native-trusted, no SDKs sandboxed de Component Model. Un tercer SDK Component estable aún requiere evidencia hosted y cross-platform de Component Model."),
+            link_list(locale, &[
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/43-opensdk-multilang-conformance.md", "Multilanguage evidence contract", "Contrato de evidencia multilenguaje"),
+                ("/docs/opensdk-compatibility", "Read the support matrix boundary", "Leer el límite de la matriz de soporte"),
+            ]),
+        ]),
+    ].into_view()
+}
+
+fn browser_framework_conformance(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "native", "Keep framework runtimes native", "Mantén nativos los runtimes", vec![
+            paragraph(locale, "React, Svelte, and Lit keep their normal browser packages and APIs. PliegoRS does not reimplement their renderers. Each fixture is exposed through a Custom Element and admitted through adapter API v1, leaving the real integration point visible to developers.", "React, Svelte y Lit conservan sus paquetes y APIs normales del navegador. PliegoRS no reimplementa sus renderers. Cada fixture se expone mediante un Custom Element y se admite mediante adapter API v1, dejando visible para el desarrollador el punto real de integración."),
+            note(locale, "Preview protocol", "These fixtures exercise OpenSDK 0.1.0-preview.1 from main; they are conformance evidence rather than a released browser framework SDK.", "Protocolo preview", "Estos fixtures ejercitan OpenSDK 0.1.0-preview.1 desde main; son evidencia de conformidad, no un SDK de frameworks web liberado."),
+            note(locale, "Conformance, not a new abstraction", "The wrappers are examples and test inputs. They do not create another component model over React, Svelte, or Lit.", "Conformidad, no una abstracción nueva", "Los wrappers son ejemplos y entradas de prueba. No crean otro modelo de componentes sobre React, Svelte o Lit."),
+        ]),
+        doc_section(locale, "descriptor", "Match the admitted descriptor", "Coincide con el descriptor admitido", vec![
+            paragraph(locale, "Before registration, the exported component tag, adapter API version, lifecycle exports, and capabilities must match the exact admitted manifest descriptor. Reserved or malformed Custom Element names and incoherent lifecycle combinations are rejected.", "Antes del registro, el tag exportado del componente, versión de API del adapter, exports de lifecycle y capabilities deben coincidir con el descriptor exacto admitido en el manifest. Se rechazan nombres reservados o inválidos de Custom Elements y combinaciones incoherentes de lifecycle."),
+            definition_list(locale, &[
+                ("mount", "Create one owned framework root", "Crea un root controlado del framework"),
+                ("update", "Apply live properties to the admitted generation", "Aplica propiedades en vivo a la generación admitida"),
+                ("HMR", "Dispose the old root before importing and mounting a fresh generation", "Dispone el root anterior antes de importar y montar una generación nueva"),
+                ("destroy", "Retire roots, listeners, timers, channels, and adapter scopes", "Retira roots, listeners, timers, channels y scopes del adapter"),
+            ]),
+        ]),
+        doc_section(locale, "gate", "Run real browser conformance", "Ejecuta conformidad real en navegador", vec![
+            code_block(locale, "shell", "npm run check:opensdk:browser-frameworks"),
+            paragraph(locale, "The headless Chrome gate covers mount, live property update, reduced-motion propagation, HMR replacement, runtime destruction, and listener cleanup for React, Svelte, and Lit.", "El gate de Chrome headless cubre mount, actualización de propiedades, propagación de reduced motion, reemplazo HMR, destrucción del runtime y cleanup de listeners para React, Svelte y Lit."),
+        ]),
+        doc_section(locale, "cleanup-evidence", "Measure cleanup under adversarial ownership", "Mide cleanup bajo ownership adversarial", vec![
+            paragraph(locale, "A separate adversarial adapter owns a real interval, document listener, abort scope, and MessageChannel. HMR must replace them without duplication; destroy must reduce all four counters to zero, and later events or time may not change the retired counter stream.", "Un adapter adversarial separado controla un interval real, listener del documento, abort scope y MessageChannel. HMR debe reemplazarlos sin duplicación; destroy debe reducir los cuatro contadores a cero y los eventos o el tiempo posteriores no pueden cambiar el stream de contadores retirado."),
+            link_list(locale, &[
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/44-browser-framework-conformance.md", "Browser conformance evidence", "Evidencia de conformidad web"),
+                ("/docs/browser-runtime", "Understand adapter admission", "Entender la admisión de adapters"),
+                ("/docs/dom-lifecycle", "Understand deterministic cleanup", "Entender el cleanup determinista"),
+            ]),
+        ]),
+    ].into_view()
+}
+
+fn opensdk_tooling(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "protocol", "One bounded tooling plane", "Un plano de tooling limitado", vec![
+            paragraph(locale, "The OpenSDK tooling host uses newline-delimited JSON-RPC 2.0 over standard input and output. Editors negotiate through pliego/handshake; the reference MCP adapter exposes the same capability handshake after completing the MCP 2025-11-25 initialization lifecycle.", "El host de tooling OpenSDK usa JSON-RPC 2.0 delimitado por líneas sobre entrada y salida estándar. Los editores negocian mediante pliego/handshake; el adapter MCP de referencia expone el mismo handshake de capabilities después de completar el lifecycle de inicialización MCP 2025-11-25."),
+            definition_list(locale, &[
+                ("OpenSDK", "0.1.0-preview.1", "0.1.0-preview.1"),
+                ("JSON-RPC", "2.0 over bounded newline-delimited messages", "2.0 sobre mensajes delimitados por líneas y limitados"),
+                ("MCP", "2025-11-25 reference client surface", "Superficie del cliente de referencia 2025-11-25"),
+            ]),
+        ]),
+        doc_section(locale, "editor", "Negotiate before diagnostics", "Negocia antes de diagnósticos", vec![
+            code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk tooling-host \\\n  --protocol pliego \\\n  --feature diagnostic-links"),
+            paragraph(locale, "The native handshake must include protocolVersion 0.1.0-preview.1. Missing or incompatible versions fail before any diagnostic or project method becomes available.", "El handshake nativo debe incluir protocolVersion 0.1.0-preview.1. Las versiones ausentes o incompatibles fallan antes de que esté disponible cualquier método de diagnóstico o proyecto."),
+        ]),
+        doc_section(locale, "mcp", "MCP is a client, not a privilege", "MCP es un cliente, no un privilegio", vec![
+            code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk tooling-host \\\n  --protocol mcp \\\n  --feature diagnostic-links\nnpm run check:opensdk:tooling"),
+            paragraph(locale, "The MCP client receives no implicit filesystem root, network access, sampling, elicitation, or project capability. Its reference tool accepts only the empty arguments object declared by its schema and cannot bypass OpenSDK admission policy.", "El cliente MCP no recibe filesystem root, acceso de red, sampling, elicitation ni capability de proyecto implícitos. Su tool de referencia acepta únicamente el objeto vacío declarado por su schema y no puede evadir la política de admisión OpenSDK."),
+        ]),
+        doc_section(locale, "limits", "Fail with structured boundaries", "Falla con límites estructurados", vec![
+            paragraph(locale, "The host accepts at most 10,000 requests per process and 1 MiB per JSON line. Invalid JSON-RPC versions, unknown fields, unsupported MCP versions, pre-initialization calls, unknown methods, and unknown tools return structured errors; notifications produce no response.", "El host acepta como máximo 10.000 requests por proceso y 1 MiB por línea JSON. Versiones JSON-RPC inválidas, campos desconocidos, versiones MCP incompatibles, llamadas previas a initialization, métodos desconocidos y tools desconocidos retornan errores estructurados; las notifications no producen respuesta."),
+            link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/docs/45-opensdk-tooling-protocol.md", "Complete tooling protocol", "Protocolo completo de tooling")]),
+        ]),
+    ].into_view()
+}
+
+fn opensdk_compatibility(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "matrix", "Read the machine-verifiable matrix", "Lee la matriz verificable por máquinas", vec![
+            code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk compatibility --format json"),
+            paragraph(locale, "The output conforms to pliego.sdk-compatibility-matrix.schema.json and records tested hosts, language toolchains, browser surfaces, tooling protocols, and deprecations. An integration is supported only at the boundary and version listed by that matrix.", "La salida cumple pliego.sdk-compatibility-matrix.schema.json y registra hosts probados, toolchains de lenguajes, superficies web, protocolos de tooling y deprecaciones. Una integración tiene soporte únicamente en el límite y versión incluidos por esa matriz."),
+        ]),
+        doc_section(locale, "stability", "Distinguish stability tiers", "Distingue niveles de estabilidad", vec![
+            definition_list(locale, &[
+                ("experimental", "May change without a compatibility window and is never enabled implicitly", "Puede cambiar sin ventana de compatibilidad y nunca se habilita implícitamente"),
+                ("preview", "Versioned and tested, with breaking changes allowed in a new preview protocol", "Versionado y probado, con cambios incompatibles permitidos en un nuevo protocolo preview"),
+                ("stable", "Preserves the contract for the documented compatibility window", "Preserva el contrato durante la ventana de compatibilidad documentada"),
+            ]),
+            note(locale, "Current tier", "OpenSDK 0.1.0-preview.1 is preview. Rust is the reference Component Model toolchain; TypeScript and Python are process-bridge conformance implementations.", "Nivel actual", "OpenSDK 0.1.0-preview.1 es preview. Rust es el toolchain Component Model de referencia; TypeScript y Python son implementaciones de conformidad mediante bridges de proceso."),
+        ]),
+        doc_section(locale, "deprecation", "Require an executable migration path", "Exige una ruta de migración ejecutable", vec![
+            steps(locale, &[
+                ("Publish", "Record the deprecated contract and its replacement in the matrix", "Publicar", "Registra en la matriz el contrato deprecado y su reemplazo"),
+                ("Prove", "Give the replacement equivalent conformance coverage", "Probar", "Da al reemplazo cobertura de conformidad equivalente"),
+                ("Wait", "Keep at least one later OpenSDK protocol version before removal", "Esperar", "Conserva al menos una versión posterior del protocolo OpenSDK antes de eliminar"),
+                ("Migrate", "Publish documentation and a diagnostic that identifies the replacement", "Migrar", "Publica documentación y un diagnóstico que identifique el reemplazo"),
+            ]),
+            paragraph(locale, "Security fixes may disable unsafe behavior immediately, while the contract identifier remains visible with a security note until the next protocol release.", "Los fixes de seguridad pueden deshabilitar comportamiento inseguro inmediatamente, mientras el identificador del contrato permanece visible con una nota de seguridad hasta el siguiente release del protocolo."),
+        ]),
+        doc_section(locale, "source", "Keep the contract provider-neutral", "Mantén el contrato independiente del proveedor", vec![
+            paragraph(locale, "The public compatibility authority is the celiumsai/pliegors repository: schemas, WIT packages, Rust types, fixtures, and conformance reports. A deployment product may consume those contracts, but no private service is required to implement or validate OpenSDK.", "La autoridad pública de compatibilidad es el repositorio celiumsai/pliegors: schemas, paquetes WIT, tipos Rust, fixtures y reportes de conformidad. Un producto de despliegue puede consumir esos contratos, pero ningún servicio privado es necesario para implementar o validar OpenSDK."),
+            link_list(locale, &[
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/46-opensdk-compatibility-and-deprecation.md", "Compatibility and deprecation contract", "Contrato de compatibilidad y deprecación"),
+                ("https://github.com/celiumsai/pliegors/blob/main/schemas/pliego.sdk-compatibility-matrix.schema.json", "Compatibility matrix schema", "Schema de la matriz de compatibilidad"),
+                ("/docs/opensdk", "Return to the OpenSDK boundary", "Volver al límite OpenSDK"),
+            ]),
+        ]),
+    ].into_view()
+}
+
 fn adaptive_assets(locale: Locale) -> View {
     vec![
         doc_section(locale, "manifest", "Asset manifest", "Manifest de assets", vec![
@@ -1040,7 +1272,9 @@ fn crate_reference(locale: Locale) -> View {
                 ("pliego-artifact / pliego-ssg / pliego-inspect", "Portable output, documents, routes, receipts, graphs, staged publication, and verification", "Salida portable, documentos, rutas, recibos, grafos, publicación por staging y verificación"),
                 ("pliego-adapters / pliego-hyphae", "External browser lifecycle and verified durable sync boundaries", "Lifecycle externo del navegador y límites de sync durable verificado"),
                 ("pliego-starters / pliego-cli", "Maintained first-use projects and the complete command surface", "Proyectos mantenidos de primer uso y superficie completa de comandos"),
+                ("pliego-sdk (unreleased)", "OpenSDK preview manifests, capability admission, Component Model runtime, effect receipts, compatibility, and tooling protocols", "Manifests preview de OpenSDK, admisión de capabilities, runtime Component Model, recibos de efectos, compatibilidad y protocolos de tooling"),
             ]),
+            note(locale, "Registry boundary", "The fifteen PliegoRS 0.0.2 packages are published on crates.io. pliego-sdk 0.1.0-preview.1 exists only on main and must be evaluated from a source checkout.", "Límite del registry", "Los quince paquetes PliegoRS 0.0.2 están publicados en crates.io. pliego-sdk 0.1.0-preview.1 existe únicamente en main y debe evaluarse desde un checkout de fuentes."),
         ]),
         doc_section(locale, "symbols", "Core public entry points", "Entradas públicas principales", vec![
             definition_list(locale, &[
@@ -1052,6 +1286,7 @@ fn crate_reference(locale: Locale) -> View {
                 ("pliego_artifact::BuildContext", "Capture exact source identity for verified publication", "Captura identidad exacta de fuentes para publicación verificada"),
                 ("pliego_adapters::{AdapterIsland, AdapterPolicy}", "Declare external browser modules and their admission policy", "Declara módulos externos del navegador y su política de admisión"),
                 ("pliego_hyphae::{ReceiptVerifier, VerifiedAppendResponse, VerifiedPullPage}", "Cross the durable authority boundary through verified typestate", "Cruza el límite de autoridad durable mediante typestate verificado"),
+                ("pliego_sdk::{ExtensionManifest, HostContract, CapabilityPolicy}", "Evaluate the unreleased OpenSDK admission boundary from main", "Evalúa desde main el límite de admisión OpenSDK aún no liberado"),
             ]),
         ]),
         doc_section(locale, "rustdoc", "Generate exact-version Rustdoc", "Genera Rustdoc de versión exacta", vec![
@@ -1061,6 +1296,7 @@ fn crate_reference(locale: Locale) -> View {
         doc_section(locale, "stability", "Respect the pre-1.0 boundary", "Respeta el límite pre-1.0", vec![
             paragraph(locale, "PliegoRS 0.0.2 is public pre-1.0 software. Crate names identify stable ownership boundaries, but public signatures may change between minor releases. Pin one exact released version across every pliego-* dependency and never mix framework versions inside one application graph.", "PliegoRS 0.0.2 es software público pre-1.0. Los nombres de crates identifican límites estables de propiedad, pero las firmas públicas pueden cambiar entre releases menores. Fija una versión liberada exacta en todas las dependencias pliego-* y nunca mezcles versiones del framework dentro del grafo de una aplicación."),
             note(locale, "Published support contract", "The compatibility matrix and changelog define supported toolchains, targets, features, deprecations, and upgrade paths for each release. Linux x64 and ARM64 are the production targets for 0.0.2.", "Contrato de soporte publicado", "La matriz de compatibilidad y el changelog definen toolchains, targets, features, deprecaciones y rutas de upgrade para cada release. Linux x64 y ARM64 son los targets de producción para 0.0.2."),
+            note(locale, "OpenSDK uses a separate preview line", "OpenSDK 0.1.0-preview.1 may change in another preview protocol. Its implementation does not extend the stability promise of the fifteen published 0.0.2 crates.", "OpenSDK usa una línea preview separada", "OpenSDK 0.1.0-preview.1 puede cambiar en otro protocolo preview. Su implementación no amplía la promesa de estabilidad de los quince crates 0.0.2 publicados."),
         ]),
         doc_section(locale, "boundaries", "Read the normative boundaries", "Lee los límites normativos", vec![
             link_list(locale, &[
@@ -1363,6 +1599,44 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("adoption", "SSR adoption", "Adopción SSR"),
             ("cleanup", "Deterministic cleanup", "Cleanup determinista"),
         ],
+        "opensdk" => vec![
+            ("status", "Preview status", "Estado del preview"),
+            ("admission", "Admission", "Admisión"),
+            ("effects", "Effect broker", "Broker de efectos"),
+            ("governance", "Governance", "Gobernanza"),
+        ],
+        "opensdk-components" => vec![
+            ("component", "Wasm Component", "Wasm Component"),
+            (
+                "languages",
+                "Language implementations",
+                "Implementaciones por lenguaje",
+            ),
+            ("budgets", "Resource failures", "Fallos de recursos"),
+            ("limits", "Evidence boundary", "Límite de evidencia"),
+        ],
+        "browser-framework-conformance" => vec![
+            ("native", "Native runtimes", "Runtimes nativos"),
+            ("descriptor", "Admitted descriptor", "Descriptor admitido"),
+            ("gate", "Browser gate", "Gate de navegador"),
+            (
+                "cleanup-evidence",
+                "Cleanup evidence",
+                "Evidencia de cleanup",
+            ),
+        ],
+        "opensdk-tooling" => vec![
+            ("protocol", "Tooling plane", "Plano de tooling"),
+            ("editor", "Editor handshake", "Handshake de editor"),
+            ("mcp", "MCP client", "Cliente MCP"),
+            ("limits", "Protocol limits", "Límites del protocolo"),
+        ],
+        "opensdk-compatibility" => vec![
+            ("matrix", "Compatibility matrix", "Matriz de compatibilidad"),
+            ("stability", "Stability tiers", "Niveles de estabilidad"),
+            ("deprecation", "Deprecation", "Deprecación"),
+            ("source", "Source boundary", "Límite de fuente"),
+        ],
         "assets" => vec![
             ("manifest", "Asset manifest", "Manifest de assets"),
             ("profiles", "Profiles", "Perfiles"),
@@ -1446,7 +1720,7 @@ mod tests {
             assert!(article(Locale::Es, topic.slug).is_ok());
             assert!(outline(topic.slug).len() >= 4);
         }
-        assert_eq!(TOPICS.len(), 21);
+        assert_eq!(TOPICS.len(), 26);
     }
 
     #[test]

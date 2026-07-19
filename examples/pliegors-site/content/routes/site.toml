@@ -92,6 +92,36 @@ pageType = "web-page"
 robots = "index-follow"
 
 [[routes]]
+path = "/docs/opensdk"
+page = "docs-opensdk"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/opensdk-components"
+page = "docs-opensdk-components"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/browser-framework-conformance"
+page = "docs-browser-framework-conformance"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/opensdk-tooling"
+page = "docs-opensdk-tooling"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
+path = "/docs/opensdk-compatibility"
+page = "docs-opensdk-compatibility"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
 path = "/docs/assets"
 page = "docs-assets"
 pageType = "web-page"

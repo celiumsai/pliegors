@@ -1,0 +1,5 @@
+key = "docs-opensdk-components"
+title = { en = "Wasm Components and Languages | PliegoRS OpenSDK", es = "Wasm Components y lenguajes | PliegoRS OpenSDK" }
+description = { en = "Run the typed PliegoRS Wasm Component host and reproduce Rust, TypeScript, and Python OpenSDK conformance evidence.", es = "Ejecuta el host tipado de Wasm Components y reproduce evidencia OpenSDK en Rust, TypeScript y Python." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A material index representing language-neutral OpenSDK components", es = "Un índice material que representa componentes OpenSDK independientes del lenguaje" }

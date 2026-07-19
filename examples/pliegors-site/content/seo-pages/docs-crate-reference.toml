@@ -1,5 +1,5 @@
 key = "docs-crate-reference"
 title = { en = "Crates and API | PliegoRS", es = "Crates y API | PliegoRS" }
-description = { en = "Map PliegoRS contracts to their owning crates, generate exact-version Rustdoc, and understand the public pre-1.0 API stability boundary.", es = "Mapea contratos PliegoRS hacia sus crates propietarios, genera Rustdoc de versión exacta y entiende el límite de estabilidad público pre-1.0." }
+description = { en = "Map the fifteen published PliegoRS crates and unreleased pliego-sdk preview, generate exact Rustdoc, and understand the pre-1.0 stability boundary.", es = "Mapea los quince crates PliegoRS publicados y el preview pliego-sdk aún no liberado, genera Rustdoc exacto y entiende el límite pre-1.0." }
 image = "/media/pliegors/ledger-wide.webp"
 imageAlt = { en = "A material index representing the PliegoRS crate and API reference", es = "Un índice material que representa la referencia de crates y API de PliegoRS" }

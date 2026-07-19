@@ -22,6 +22,11 @@ const routes = [
   "/docs/content",
   "/docs/browser-runtime",
   "/docs/dom-lifecycle",
+  "/docs/opensdk",
+  "/docs/opensdk-components",
+  "/docs/browser-framework-conformance",
+  "/docs/opensdk-tooling",
+  "/docs/opensdk-compatibility",
   "/docs/assets",
   "/docs/artifact-trust",
   "/docs/release-trust",
@@ -211,7 +216,14 @@ for (const [route, file, localizedTitle] of changelogPages) {
 const docsHtml = await readFile(path.join(root, "docs/index.html"), "utf8").catch(() => "");
 const docsDocument = parse(docsHtml);
 const docsItems = elements(docsDocument, "a").filter((node) => attribute(node, "data-docs-item") === "");
-if (docsItems.length !== 21) failures.push(`docs index: expected 21 topics, found ${docsItems.length}`);
+if (docsItems.length !== 26) failures.push(`docs index: expected 26 topics, found ${docsItems.length}`);
+for (const required of [
+  "RELEASE / 0.0.2 + OPENSDK / PREVIEW",
+  "pliego-sdk is not on crates.io",
+  "/docs/opensdk",
+]) {
+  if (!docsHtml.includes(required)) failures.push(`docs index: missing release boundary ${required}`);
+}
 
 const cliSource = await readFile(path.join(repository, "crates/pliego-cli/src/main.rs"), "utf8");
 const cliGuide = await readFile(path.join(root, "docs/cli/index.html"), "utf8").catch(() => "");
@@ -254,8 +266,28 @@ for (const crate of [
   "pliego-hyphae",
   "pliego-starters",
   "pliego-cli",
+  "pliego-sdk",
 ]) {
   if (!crateGuide.includes(crate)) failures.push(`crate reference: missing ${crate}`);
+}
+
+const opensdkPages = [
+  ["/docs/opensdk", ["0.1.0-preview.1", "pliego-sdk is not published on crates.io", "Rust 1.86.0", "RFC-006", "ADR-006"]],
+  ["/docs/opensdk-components", ["pliego:build/transformer@0.1.0", "TypeScript", "Python", "npm run check:opensdk:multilang", "native-trusted"]],
+  ["/docs/browser-framework-conformance", ["React", "Svelte", "Lit", "npm run check:opensdk:browser-frameworks", "MessageChannel"]],
+  ["/docs/opensdk-tooling", ["JSON-RPC 2.0", "MCP 2025-11-25", "pliego/handshake", "10,000", "1 MiB"]],
+  ["/docs/opensdk-compatibility", ["pliego.sdk-compatibility-matrix.schema.json", "experimental", "preview", "stable", "provider-neutral"]],
+];
+for (const [route, requiredTerms] of opensdkPages) {
+  const html = await readFile(outputPath(route), "utf8").catch(() => "");
+  for (const required of requiredTerms) {
+    if (!html.includes(required)) failures.push(`${route}: missing OpenSDK contract ${required}`);
+  }
+  const spanishRoute = `/es${route}`;
+  const spanishHtml = await readFile(outputPath(spanishRoute), "utf8").catch(() => "");
+  if (!spanishHtml.includes("0.1.0-preview.1")) {
+    failures.push(`${spanishRoute}: missing localized OpenSDK version boundary`);
+  }
 }
 
 const securityPages = [
