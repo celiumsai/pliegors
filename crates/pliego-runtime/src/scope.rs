@@ -188,6 +188,8 @@ pub struct RuntimeReceipt {
     pub response_status: Option<u16>,
     pub response_bytes: u64,
     pub render_mode: Option<RenderMode>,
+    pub middleware: Vec<String>,
+    pub error_boundary: Option<String>,
     pub diagnostics: Vec<RuntimeDiagnostic>,
 }
 
@@ -207,6 +209,8 @@ struct ScopeInner {
     diagnostics: Mutex<Vec<RuntimeDiagnostic>>,
     response_status: Mutex<Option<u16>>,
     render_mode: Mutex<Option<RenderMode>>,
+    middleware: Mutex<Vec<String>>,
+    error_boundary: Mutex<Option<String>>,
     response_bytes: AtomicU64,
     receipt_recorded: AtomicBool,
     sink: Arc<dyn RuntimeReceiptSink>,
@@ -241,6 +245,8 @@ impl RequestScope {
                 diagnostics: Mutex::new(Vec::new()),
                 response_status: Mutex::new(None),
                 render_mode: Mutex::new(None),
+                middleware: Mutex::new(Vec::new()),
+                error_boundary: Mutex::new(None),
                 response_bytes: AtomicU64::new(0),
                 receipt_recorded: AtomicBool::new(false),
                 sink,
@@ -352,6 +358,14 @@ impl RequestScope {
 
     pub(crate) fn set_render_mode(&self, mode: RenderMode) {
         *lock(&self.inner.render_mode) = Some(mode);
+    }
+
+    pub(crate) fn record_middleware(&self, id: &str) {
+        lock(&self.inner.middleware).push(id.to_owned());
+    }
+
+    pub(crate) fn set_error_boundary(&self, id: &str) {
+        *lock(&self.inner.error_boundary) = Some(id.to_owned());
     }
 
     pub(crate) fn add_response_bytes(&self, bytes: usize) -> Result<(), ScopeError> {
@@ -478,6 +492,8 @@ impl RequestScope {
             response_status: *lock(&self.inner.response_status),
             response_bytes: self.inner.response_bytes.load(Ordering::Acquire),
             render_mode: *lock(&self.inner.render_mode),
+            middleware: lock(&self.inner.middleware).clone(),
+            error_boundary: lock(&self.inner.error_boundary).clone(),
             diagnostics: self.diagnostics(),
         }
     }

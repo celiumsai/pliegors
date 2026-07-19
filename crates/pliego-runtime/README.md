@@ -6,6 +6,12 @@ concurrency admission, LIFO cleanup, response commitment, streamed-body
 ownership, panic isolation, graceful-shutdown draining, diagnostics, and
 runtime receipts on top of Axum, Hyper, Tower, and Tokio.
 
+Route-local middleware and root/route error boundaries are sealed by
+`pliego-router`. Middleware uses a consume-once `MiddlewareNext`, unwinds
+responses before commitment, and remains active for recovered downstream
+errors. Error boundaries receive only a bounded public class, status, code,
+and optional route ID; internal diagnostic messages remain receipt-only.
+
 The source tree also contains bounded `complete` and `ordered` server-rendering
 modes over `pliego-dom`. They emit a typed HTML document or fragment, validate
 metadata and response status, preserve backpressure between ordered sibling
@@ -21,5 +27,6 @@ graceful-shutdown case with a pending streamed response. HTTP/2, TLS, proxy,
 slow-peer, and fixed-load evidence remain open gate work.
 
 This foundation is intentionally incomplete. It does not yet expose
-asynchronous boundary streaming, middleware phases, OpenTelemetry,
-multipart/decompression policies, or a production `pliego serve` command.
+asynchronous boundary streaming, pre-route/group/layout middleware,
+middleware capability declarations, OpenTelemetry, multipart/decompression
+policies, or a production `pliego serve` command.

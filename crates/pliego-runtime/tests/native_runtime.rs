@@ -70,6 +70,338 @@ async fn dispatches_real_axum_request_and_records_receipt() {
 }
 
 #[tokio::test]
+async fn middleware_unwinds_before_commit_and_records_entered_layers() {
+    let graph = RouteGraphBuilder::new()
+        .route(
+            route("home", RouteMethod::get(), "/")
+                .middleware("outer")
+                .unwrap()
+                .middleware("inner")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let order = Arc::new(Mutex::new(Vec::new()));
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "middleware-order")
+        .unwrap()
+        .middleware("outer", {
+            let order = order.clone();
+            move |_context, request, next: pliego_runtime::MiddlewareNext| {
+                let order = order.clone();
+                async move {
+                    order.lock().unwrap().push("outer-before");
+                    let mut response = next.run(request).await?;
+                    order.lock().unwrap().push("outer-after");
+                    response
+                        .headers_mut()
+                        .insert("x-outer", http::HeaderValue::from_static("set"));
+                    Ok(response)
+                }
+            }
+        })
+        .middleware("inner", {
+            let order = order.clone();
+            move |_context, request, next: pliego_runtime::MiddlewareNext| {
+                let order = order.clone();
+                async move {
+                    order.lock().unwrap().push("inner-before");
+                    let mut response = next.run(request).await?;
+                    order.lock().unwrap().push("inner-after");
+                    response
+                        .headers_mut()
+                        .insert("x-inner", http::HeaderValue::from_static("set"));
+                    Ok(response)
+                }
+            }
+        })
+        .handler("home", {
+            let order = order.clone();
+            move |_context, _request| {
+                let order = order.clone();
+                async move {
+                    order.lock().unwrap().push("handler");
+                    Ok(Response::new(Body::from("ok")))
+                }
+            }
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.headers()["x-outer"], "set");
+    assert_eq!(response.headers()["x-inner"], "set");
+    assert_eq!(to_bytes(response.into_body(), 16).await.unwrap(), "ok");
+    assert_eq!(
+        *order.lock().unwrap(),
+        vec![
+            "outer-before",
+            "inner-before",
+            "handler",
+            "inner-after",
+            "outer-after"
+        ]
+    );
+    assert_eq!(
+        sink.receipts()[0].middleware,
+        vec!["outer".to_owned(), "inner".to_owned()]
+    );
+}
+
+#[tokio::test]
+async fn middleware_can_short_circuit_without_entering_later_layers() {
+    let graph = RouteGraphBuilder::new()
+        .route(
+            route("private", RouteMethod::get(), "/private")
+                .middleware("guard")
+                .unwrap()
+                .middleware("never")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let handler_ran = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "middleware-short-circuit")
+        .unwrap()
+        .middleware("guard", |_context, _request, _next| async {
+            Ok(Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .body(Body::from("unauthorized"))
+                .unwrap())
+        })
+        .middleware(
+            "never",
+            |_context, request, next: pliego_runtime::MiddlewareNext| async {
+                next.run(request).await
+            },
+        )
+        .handler("private", {
+            let handler_ran = handler_ran.clone();
+            move |_context, _request| {
+                let handler_ran = handler_ran.clone();
+                async move {
+                    handler_ran.store(true, std::sync::atomic::Ordering::Release);
+                    Ok(Response::new(Body::empty()))
+                }
+            }
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .uri("/private")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        to_bytes(response.into_body(), 32).await.unwrap(),
+        "unauthorized"
+    );
+    assert!(!handler_ran.load(std::sync::atomic::Ordering::Acquire));
+    assert_eq!(sink.receipts()[0].middleware, vec!["guard".to_owned()]);
+}
+
+#[tokio::test]
+async fn error_boundaries_walk_outward_without_receiving_internal_messages() {
+    let graph = RouteGraphBuilder::new()
+        .error_boundary("root-error")
+        .unwrap()
+        .route(
+            route("fail", RouteMethod::get(), "/fail")
+                .middleware("outer")
+                .unwrap()
+                .error_boundary("route-error")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let order = Arc::new(Mutex::new(Vec::new()));
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "boundary-walk")
+        .unwrap()
+        .middleware(
+            "outer",
+            |_context, request, next: pliego_runtime::MiddlewareNext| async move {
+                let mut response = next.run(request).await?;
+                response
+                    .headers_mut()
+                    .insert("x-error-policy", http::HeaderValue::from_static("applied"));
+                Ok(response)
+            },
+        )
+        .error_boundary("route-error", {
+            let order = order.clone();
+            move |_context, error: pliego_runtime::PublicError| {
+                order.lock().unwrap().push("route");
+                async move {
+                    assert_eq!(
+                        error.class(),
+                        pliego_runtime::PublicErrorClass::InternalFailure
+                    );
+                    Ok(Response::new(Body::from("wrong status")))
+                }
+            }
+        })
+        .error_boundary("root-error", {
+            let order = order.clone();
+            move |context: pliego_runtime::ErrorBoundaryContext,
+                  error: pliego_runtime::PublicError| {
+                order.lock().unwrap().push("root");
+                async move {
+                    assert_eq!(context.route_id(), Some("fail"));
+                    assert_eq!(error.code(), "PLG-RUN-500");
+                    Ok(Response::builder()
+                        .status(error.status())
+                        .body(Body::from("public failure"))
+                        .unwrap())
+                }
+            }
+        })
+        .handler("fail", |_context, _request| async {
+            Err(pliego_runtime::HandlerError::internal(
+                "database password must remain private",
+            ))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(Request::builder().uri("/fail").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(response.headers()["x-error-policy"], "applied");
+    let body = to_bytes(response.into_body(), 64).await.unwrap();
+    assert_eq!(body, "public failure");
+    assert!(!String::from_utf8_lossy(&body).contains("password"));
+    assert_eq!(*order.lock().unwrap(), vec!["route", "root"]);
+    let receipt = &sink.receipts()[0];
+    assert_eq!(receipt.error_boundary.as_deref(), Some("root-error"));
+    assert_eq!(receipt.middleware, vec!["outer".to_owned()]);
+    assert!(
+        receipt
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PLG-RUN-505")
+    );
+}
+
+#[tokio::test]
+async fn boundary_errors_and_panics_reach_the_builtin_fallback_without_leaks() {
+    let graph = RouteGraphBuilder::new()
+        .error_boundary("failing-root")
+        .unwrap()
+        .route(
+            route("fail", RouteMethod::get(), "/fail")
+                .error_boundary("panicking-route")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "boundary-fallback")
+        .unwrap()
+        .error_boundary("panicking-route", |_context, _error| async move {
+            panic!("boundary secret must not escape");
+            #[allow(unreachable_code)]
+            Ok(Response::new(Body::empty()))
+        })
+        .error_boundary("failing-root", |_context, _error| async move {
+            Err(pliego_runtime::HandlerError::internal(
+                "secondary secret must remain receipt-only",
+            ))
+        })
+        .handler("fail", |_context, _request| async {
+            Err(pliego_runtime::HandlerError::internal(
+                "primary secret must remain receipt-only",
+            ))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(Request::builder().uri("/fail").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    let body = to_bytes(response.into_body(), 64).await.unwrap();
+    assert_eq!(body, "PLG-RUN-500\n");
+    let public = String::from_utf8_lossy(&body);
+    assert!(!public.contains("secret"));
+    let receipt = &sink.receipts()[0];
+    assert_eq!(receipt.error_boundary, None);
+    assert!(
+        receipt
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PLG-RUN-504")
+    );
+}
+
+#[tokio::test]
+async fn root_boundary_handles_not_found_without_route_context() {
+    let graph = RouteGraphBuilder::new()
+        .error_boundary("not-found")
+        .unwrap()
+        .route(route("home", RouteMethod::get(), "/"))
+        .seal()
+        .unwrap();
+    let runtime =
+        NativeRuntimeBuilder::new(graph, "root-boundary")
+            .unwrap()
+            .error_boundary(
+                "not-found",
+                |context: pliego_runtime::ErrorBoundaryContext,
+                 error: pliego_runtime::PublicError| async move {
+                    assert_eq!(context.route_id(), None);
+                    assert_eq!(error.class(), pliego_runtime::PublicErrorClass::NotFound);
+                    Ok(Response::builder()
+                        .status(error.status())
+                        .body(Body::from("authored 404"))
+                        .unwrap())
+                },
+            )
+            .handler("home", |_context, _request| async {
+                Ok(Response::new(Body::from("home")))
+            })
+            .build()
+            .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .uri("/missing")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        to_bytes(response.into_body(), 32).await.unwrap(),
+        "authored 404"
+    );
+}
+
+#[tokio::test]
 async fn rejects_oversized_declared_body_before_handler() {
     let graph = RouteGraphBuilder::new()
         .route(route("upload", RouteMethod::post(), "/upload"))
@@ -188,6 +520,128 @@ fn runtime_rejects_missing_or_unknown_handlers() {
             .build()
             .is_err()
     );
+}
+
+#[test]
+fn runtime_rejects_incomplete_or_extra_behavior_registries() {
+    let middleware_graph = RouteGraphBuilder::new()
+        .route(
+            route("home", RouteMethod::get(), "/")
+                .middleware("security")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let missing = NativeRuntimeBuilder::new(middleware_graph, "missing-middleware")
+        .unwrap()
+        .handler("home", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .build();
+    assert!(matches!(
+        missing,
+        Err(pliego_runtime::RuntimeBuildError::MissingMiddleware(id)) if id == "security"
+    ));
+
+    let plain_graph = RouteGraphBuilder::new()
+        .route(route("home", RouteMethod::get(), "/"))
+        .seal()
+        .unwrap();
+    let extra = NativeRuntimeBuilder::new(plain_graph, "extra-middleware")
+        .unwrap()
+        .middleware(
+            "ghost",
+            |_context, request, next: pliego_runtime::MiddlewareNext| async {
+                next.run(request).await
+            },
+        )
+        .handler("home", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .build();
+    assert!(matches!(
+        extra,
+        Err(pliego_runtime::RuntimeBuildError::UnknownMiddleware(id)) if id == "ghost"
+    ));
+
+    let boundary_graph = RouteGraphBuilder::new()
+        .error_boundary("root-error")
+        .unwrap()
+        .route(route("home", RouteMethod::get(), "/"))
+        .seal()
+        .unwrap();
+    let missing = NativeRuntimeBuilder::new(boundary_graph, "missing-boundary")
+        .unwrap()
+        .handler("home", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .build();
+    assert!(matches!(
+        missing,
+        Err(pliego_runtime::RuntimeBuildError::MissingErrorBoundary(id)) if id == "root-error"
+    ));
+
+    let duplicate_middleware_graph = RouteGraphBuilder::new()
+        .route(
+            route("home", RouteMethod::get(), "/")
+                .middleware("security")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let duplicate = NativeRuntimeBuilder::new(duplicate_middleware_graph, "duplicate-middleware")
+        .unwrap()
+        .middleware(
+            "security",
+            |_context, request, next: pliego_runtime::MiddlewareNext| async move {
+                next.run(request).await
+            },
+        )
+        .middleware(
+            "security",
+            |_context, request, next: pliego_runtime::MiddlewareNext| async move {
+                next.run(request).await
+            },
+        )
+        .handler("home", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .build();
+    assert!(matches!(
+        duplicate,
+        Err(pliego_runtime::RuntimeBuildError::DuplicateMiddlewareRegistration(id))
+            if id == "security"
+    ));
+
+    let duplicate_boundary_graph = RouteGraphBuilder::new()
+        .error_boundary("root-error")
+        .unwrap()
+        .route(route("home", RouteMethod::get(), "/"))
+        .seal()
+        .unwrap();
+    let duplicate = NativeRuntimeBuilder::new(duplicate_boundary_graph, "duplicate-boundary")
+        .unwrap()
+        .error_boundary("root-error", |_context, _error| async {
+            Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::empty())
+                .unwrap())
+        })
+        .error_boundary("root-error", |_context, _error| async {
+            Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::empty())
+                .unwrap())
+        })
+        .handler("home", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .build();
+    assert!(matches!(
+        duplicate,
+        Err(pliego_runtime::RuntimeBuildError::DuplicateErrorBoundaryRegistration(id))
+            if id == "root-error"
+    ));
 }
 
 #[tokio::test]

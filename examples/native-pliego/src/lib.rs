@@ -23,21 +23,40 @@ nav{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:2.5rem}nav a{padding:.8rem
 nav a:first-child{color:#11120f;background:#f3f2eb;border-color:#f3f2eb}
 .stream{display:grid;gap:1rem}.panel{padding:1.25rem;border:1px solid #3b3d36;background:#181a16}
 .signal{color:#a8d087;font-family:ui-monospace,monospace}code{font-family:ui-monospace,monospace}
+.error-code{display:inline-block;margin-top:1rem;padding:.35rem .5rem;color:#a8d087;border:1px solid #3b3d36;font-family:ui-monospace,monospace}
 @media(prefers-reduced-motion:no-preference){nav a{transition:transform 160ms ease,border-color 160ms ease}nav a:hover{transform:translateY(-2px);border-color:#a8d087}}
 "#;
 
 type AppResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
+
+fn apply_response_policy(response: &mut Response<Body>) {
+    response.headers_mut().insert(
+        "x-content-type-options",
+        "nosniff".parse().expect("static header is valid"),
+    );
+    response.headers_mut().insert(
+        "referrer-policy",
+        "no-referrer".parse().expect("static header is valid"),
+    );
+    response.headers_mut().insert(
+        "content-security-policy",
+        "default-src 'none'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+            .parse()
+            .expect("static header is valid"),
+    );
+}
 
 fn route(
     id: &str,
     method: RouteMethod,
     pattern: &str,
 ) -> Result<RouteSpec, pliego_router::RouteError> {
-    RouteSpec::new(id, method, pattern)
+    RouteSpec::new(id, method, pattern)?.middleware("response-policy")
 }
 
 pub fn build_runtime() -> AppResult<NativeRuntime> {
     let graph = RouteGraphBuilder::new()
+        .error_boundary("root-error")?
         .route(route("home", RouteMethod::get(), "/")?)
         .route(route("hello", RouteMethod::get(), "/hello/:name")?)
         .route(route("stream", RouteMethod::get(), "/stream")?)
@@ -46,6 +65,53 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
         .seal()?;
 
     let runtime = NativeRuntimeBuilder::new(graph, "native-pliego-preview")?
+        .middleware(
+            "response-policy",
+            |_context, request, next: pliego_runtime::MiddlewareNext| async move {
+                let mut response = next.run(request).await?;
+                apply_response_policy(&mut response);
+                Ok(response)
+            },
+        )
+        .error_boundary(
+            "root-error",
+            |_context, error: pliego_runtime::PublicError| async move {
+                let (title, message) = match error.class() {
+                    pliego_runtime::PublicErrorClass::NotFound => (
+                        "Page not found",
+                        "The requested route is not part of this sealed application graph.",
+                    ),
+                    pliego_runtime::PublicErrorClass::UnauthorizedOrForbidden => (
+                        "Access denied",
+                        "This request does not have access to the selected resource.",
+                    ),
+                    pliego_runtime::PublicErrorClass::InvalidRequest => (
+                        "Invalid request",
+                        "The runtime rejected this request before application execution.",
+                    ),
+                    pliego_runtime::PublicErrorClass::InternalFailure => (
+                        "Request failed",
+                        "The runtime stopped the request and recorded a private diagnostic.",
+                    ),
+                };
+                let body = el("main")
+                    .child(el("p").class("eyebrow").child("PLIEGORS / SAFE FAILURE"))
+                    .child(el("h1").child(title))
+                    .child(el("p").class("lede").child(message))
+                    .child(el("p").class("error-code").child(error.code().to_owned()))
+                    .child(el("nav").child(el("a").attr("href", "/").child("Return home")))
+                    .into_view();
+                let document = CompleteDocument::new(title, body)
+                    .language("en")
+                    .stylesheet("/assets/site.css");
+                let mut response = render_complete_document(
+                    &document,
+                    CompleteRenderOptions::default().status(error.status()),
+                )?;
+                apply_response_policy(&mut response);
+                Ok(response)
+            },
+        )
         .handler("home", |_context, _request| async {
             let body = el("main")
                 .child(el("p").class("eyebrow").child("PLIEGORS / NATIVE PREVIEW"))
@@ -179,6 +245,7 @@ mod tests {
             response.headers()["content-type"],
             "text/html; charset=utf-8"
         );
+        assert_eq!(response.headers()["x-content-type-options"], "nosniff");
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = std::str::from_utf8(&body).unwrap();
         assert!(body.starts_with("<!doctype html>"));
@@ -204,11 +271,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unknown_route_uses_the_runtime_failure_contract() {
+    async fn unknown_route_uses_the_authored_error_boundary() {
         let response = response("/missing").await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.headers()["x-content-type-options"], "nosniff");
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(&body[..], b"PLG-RTE-404\n");
+        let body = std::str::from_utf8(&body).unwrap();
+        assert!(body.starts_with("<!doctype html>"));
+        assert!(body.contains("Page not found"));
+        assert!(body.contains("PLG-RTE-404"));
+        assert!(!body.contains("route not found"));
     }
 
     #[test]

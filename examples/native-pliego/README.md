@@ -2,7 +2,8 @@
 
 This unreleased G1 application exercises `pliego-router`, `pliego-runtime`,
 `pliego-dom`, complete SSR, ordered sibling streaming, assets, health, and
-graceful shutdown in one native process.
+graceful shutdown in one native process. Its sealed graph also declares a
+response-policy middleware and a safe root error boundary.
 
 Run it from the workspace root:
 
@@ -15,6 +16,6 @@ with `PLIEGO_ADDR`. Binding a non-loopback address is rejected unless
 `PLIEGO_EXPOSE=1` is also present.
 
 This application is gate evidence, not a released starter. It does not yet
-prove middleware, authored error boundaries, asynchronous boundaries, HTTP/2,
-TLS, OpenTelemetry, multipart/decompression policy, fixed-load behavior, or
-production deployment.
+prove pre-route or nested middleware, middleware capability enforcement,
+asynchronous boundaries, HTTP/2, TLS, OpenTelemetry,
+multipart/decompression policy, fixed-load behavior, or production deployment.
