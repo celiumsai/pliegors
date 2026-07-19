@@ -15,7 +15,7 @@ not depend on Axum or a deployment provider.
 
 `pliego-runtime` owns request admission, scope lifecycle, deadlines,
 cancellation, cleanup, response commitment, response-body accounting,
-diagnostics, receipts, and the first complete server-rendering mode. Axum,
+diagnostics, receipts, and complete/ordered server-rendering modes. Axum,
 Hyper, Tower, and Tokio retain HTTP transport, service, and executor ownership.
 
 ## Complete rendering
@@ -60,6 +60,45 @@ let options = CompleteRenderOptions::default()
 markers. In either mode, text and attributes are escaped by their owning typed
 renderer, and the receipt records `renderMode: "complete"`.
 
+## Ordered rendering
+
+`OrderedDocument` emits the validated document shell first. Each
+`OrderedViewChunk` is a `Send` factory that constructs one `pliego-dom` view
+only when the response body is polled for its next frame. The view is rendered,
+released, and sent before the input stream is polled again.
+
+```rust
+use futures_util::stream;
+use pliego_dom::{IntoView, el};
+use pliego_runtime::{
+    OrderedDocument, OrderedRenderOptions, OrderedViewChunk,
+    render_ordered_document,
+};
+
+let document = OrderedDocument::new("Activity");
+let chunks = stream::iter([
+    OrderedViewChunk::new(|| el("h1").child("Activity").into_view()),
+    OrderedViewChunk::new(|| el("p").child("Ready").into_view()),
+]);
+
+let response = render_ordered_document(
+    &document,
+    chunks,
+    OrderedRenderOptions::default(),
+)?;
+```
+
+Ordered output has no `Content-Length`. The response owns at most one rendered
+sibling fragment at a time and does not poll the next factory until the body
+consumer requests another frame. The shell and every emitted fragment share
+one output-byte budget. Fragment depth and nodes are bounded, chunk count has a
+hard ceiling, and document metadata has count plus aggregate-byte limits.
+
+A panic in the input stream or chunk factory becomes a post-commit body error.
+It terminates the stream and produces a failed runtime receipt; it cannot
+replace the committed status. Ordered mode is intentionally plain SSR until a
+single adoption contract can span the streamed sibling sequence.
+
 ## Runtime limits
 
 `RequestLimits` currently bounds:
@@ -70,6 +109,7 @@ renderer, and the receipt records `renderMode: "complete"`.
 - response bytes;
 - diagnostics and application cleanup callbacks;
 - concurrent admitted requests;
+- ordered render chunks and document metadata;
 - request deadline; and
 - graceful-shutdown drain time.
 
@@ -91,14 +131,12 @@ The source implementation currently demonstrates:
 
 ## Deliberately absent
 
-There is no public ordered or boundary streaming API yet. The current
-`pliego-dom` walker returns one validated bounded string; slicing that string
-into chunks would still be buffering and is not described as streaming.
+There is no asynchronous boundary streaming API yet. Ordered mode streams
+independent body siblings and buffers at most one bounded sibling view; it does
+not claim incremental output inside one DOM tree.
 
 The following remain gate work:
 
-- a backpressure-aware renderer sink;
-- ordered shell/body emission;
 - declared asynchronous boundaries;
 - middleware and authored error-boundary graphs;
 - OpenTelemetry with redaction and cardinality tests;

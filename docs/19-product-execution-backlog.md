@@ -35,7 +35,7 @@ API status, or release of the preview crate.
 | Gate | Status | Exit evidence |
 | --- | --- | --- |
 | G0 Product truth | Complete | [Accepted G0 evidence](evidence/g0-product-truth.md) covers the canonical manifest, public-surface consistency checker, runtime/route/data RFCs, threat model, Linux site build, and external release/registry snapshot. |
-| G1 Native runtime and dynamic rendering | In progress | [Runtime evidence](evidence/g1-native-runtime-foundation.md) and [complete-render evidence](evidence/g1-complete-render-foundation.md) cover the unreleased route graph, native lifecycle, and first bounded SSR mode. Gate closure still requires ordered/boundary rendering, middleware/errors, the dynamic reference application under fixed load, bounded memory, OTel, security evidence, and no unresolved P0. |
+| G1 Native runtime and dynamic rendering | In progress | [Runtime](evidence/g1-native-runtime-foundation.md), [complete-render](evidence/g1-complete-render-foundation.md), and [ordered-render](evidence/g1-ordered-render-foundation.md) evidence cover the unreleased route graph, lifecycle, and two bounded SSR modes. Gate closure still requires async boundaries, middleware/errors, the dynamic reference application under fixed load, bounded memory, OTel, security evidence, and no unresolved P0. |
 | G2 Data, actions, and cache | Not started | Progressive authenticated mutation across two instances with idempotency, cancellation, cache isolation, and bounded invalidation lag. |
 | G3 Portable deployment | Not started | The same sealed build and conformance corpus pass native/OCI and Cloudflare hosts. |
 | G4 Adoption | Not started | An unaffiliated team completes a greenfield application and partial migration using public resources only. |

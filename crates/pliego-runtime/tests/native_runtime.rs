@@ -425,3 +425,56 @@ async fn complete_server_render_is_escaped_and_bound_to_the_receipt() {
     assert!(body.contains("&lt;trusted by construction&gt;"));
     assert_eq!(sink.receipts()[0].render_mode, Some(RenderMode::Complete));
 }
+
+#[tokio::test]
+async fn ordered_server_render_streams_siblings_and_binds_the_receipt() {
+    use pliego_dom::{IntoView, el};
+    use pliego_runtime::{
+        OrderedDocument, OrderedRenderOptions, OrderedViewChunk, RenderMode,
+        render_ordered_document,
+    };
+
+    let graph = RouteGraphBuilder::new()
+        .route(route("ordered", RouteMethod::get(), "/ordered"))
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "ordered-render-test")
+        .unwrap()
+        .handler("ordered", |_context, _request| {
+            let document = OrderedDocument::new("Ordered");
+            let chunks = futures_util::stream::iter([
+                OrderedViewChunk::new(|| el("h1").child("First").into_view()),
+                OrderedViewChunk::new(|| el("p").child("Second").into_view()),
+            ]);
+            std::future::ready(render_ordered_document(
+                &document,
+                chunks,
+                OrderedRenderOptions::default(),
+            ))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .uri("/ordered")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        response
+            .headers()
+            .get(http::header::CONTENT_LENGTH)
+            .is_none()
+    );
+    let body = to_bytes(response.into_body(), 4096).await.unwrap();
+    let body = std::str::from_utf8(&body).unwrap();
+    assert!(body.contains("</head><body><h1>First</h1><p>Second</p></body></html>"));
+    assert_eq!(sink.receipts()[0].render_mode, Some(RenderMode::Ordered));
+}

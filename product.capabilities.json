@@ -97,10 +97,10 @@
       "stability": "none",
       "gate": "G1",
       "summary": "Request-time synchronous, asynchronous, and streamed server rendering with explicit boundaries.",
-      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md"],
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md"],
       "limitations": [
         "No request-time SSR or streaming API is part of the current public release.",
-        "Unreleased source implements bounded complete rendering only; ordered streaming, async boundaries, middleware, authored errors, load evidence, and conformance remain incomplete."
+        "Unreleased source implements bounded complete and ordered-sibling rendering; async boundaries, middleware, authored errors, load evidence, and conformance remain incomplete."
       ]
     },
     {
