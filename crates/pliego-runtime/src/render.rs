@@ -1,18 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Body, HandlerError, Response, RuntimeDiagnostic, StatusCode};
+use axum::body::Bytes;
+use futures_util::Stream;
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use pliego_dom::{RenderLimits, View, try_render_adoptable_html, try_render_html};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 const DOCTYPE: &str = "<!doctype html>";
 const DOCUMENT_SUFFIX: &str = "</body></html>";
+const MAX_DOCUMENT_ASSETS: usize = 128;
+const MAX_DOCUMENT_METADATA_BYTES: usize = 64 * 1_024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum RenderMode {
     Complete,
+    Ordered,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -67,19 +75,87 @@ impl Default for CompleteRenderOptions {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OrderedRenderOptions {
+    limits: RenderLimits,
+    max_chunks: usize,
+    status: StatusCode,
+}
+
+impl OrderedRenderOptions {
+    pub const DEFAULT_MAX_CHUNKS: usize = 256;
+    pub const HARD_MAX_CHUNKS: usize = 4_096;
+
+    pub fn new(limits: RenderLimits) -> Self {
+        Self {
+            limits,
+            max_chunks: Self::DEFAULT_MAX_CHUNKS,
+            status: StatusCode::OK,
+        }
+    }
+
+    pub fn with_max_chunks(mut self, maximum: usize) -> Result<Self, ServerRenderError> {
+        if maximum == 0 || maximum > Self::HARD_MAX_CHUNKS {
+            return Err(ServerRenderError::InvalidChunkLimit(maximum));
+        }
+        self.max_chunks = maximum;
+        Ok(self)
+    }
+
+    pub fn status(mut self, status: StatusCode) -> Self {
+        self.status = status;
+        self
+    }
+}
+
+impl Default for OrderedRenderOptions {
+    fn default() -> Self {
+        Self::new(RenderLimits::default())
+    }
+}
+
+type OrderedFactory = Box<dyn FnOnce() -> Result<View, ServerRenderError> + Send + 'static>;
+
+pub struct OrderedViewChunk {
+    factory: Option<OrderedFactory>,
+}
+
+impl OrderedViewChunk {
+    pub fn new<F>(factory: F) -> Self
+    where
+        F: FnOnce() -> View + Send + 'static,
+    {
+        Self::try_new(move || Ok(factory()))
+    }
+
+    pub fn try_new<F>(factory: F) -> Self
+    where
+        F: FnOnce() -> Result<View, ServerRenderError> + Send + 'static,
+    {
+        Self {
+            factory: Some(Box::new(factory)),
+        }
+    }
+
+    fn render(mut self) -> Result<View, ServerRenderError> {
+        self.factory
+            .take()
+            .expect("ordered view factory is consumed exactly once")()
+    }
+}
+
 #[derive(Clone)]
-pub struct CompleteDocument {
+struct DocumentMetadata {
     language: String,
     title: String,
     description: Option<String>,
     canonical: Option<String>,
     stylesheets: Vec<String>,
     module_scripts: Vec<String>,
-    body: View,
 }
 
-impl CompleteDocument {
-    pub fn new(title: impl Into<String>, body: View) -> Self {
+impl DocumentMetadata {
+    fn new(title: impl Into<String>) -> Self {
         Self {
             language: "en".to_owned(),
             title: title.into(),
@@ -87,32 +163,84 @@ impl CompleteDocument {
             canonical: None,
             stylesheets: Vec::new(),
             module_scripts: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct CompleteDocument {
+    metadata: DocumentMetadata,
+    body: View,
+}
+
+impl CompleteDocument {
+    pub fn new(title: impl Into<String>, body: View) -> Self {
+        Self {
+            metadata: DocumentMetadata::new(title),
             body,
         }
     }
 
     pub fn language(mut self, language: impl Into<String>) -> Self {
-        self.language = language.into();
+        self.metadata.language = language.into();
         self
     }
 
     pub fn description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
+        self.metadata.description = Some(description.into());
         self
     }
 
     pub fn canonical(mut self, canonical: impl Into<String>) -> Self {
-        self.canonical = Some(canonical.into());
+        self.metadata.canonical = Some(canonical.into());
         self
     }
 
     pub fn stylesheet(mut self, path: impl Into<String>) -> Self {
-        self.stylesheets.push(path.into());
+        self.metadata.stylesheets.push(path.into());
         self
     }
 
     pub fn module_script(mut self, path: impl Into<String>) -> Self {
-        self.module_scripts.push(path.into());
+        self.metadata.module_scripts.push(path.into());
+        self
+    }
+}
+
+#[derive(Clone)]
+pub struct OrderedDocument {
+    metadata: DocumentMetadata,
+}
+
+impl OrderedDocument {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            metadata: DocumentMetadata::new(title),
+        }
+    }
+
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.metadata.language = language.into();
+        self
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.metadata.description = Some(description.into());
+        self
+    }
+
+    pub fn canonical(mut self, canonical: impl Into<String>) -> Self {
+        self.metadata.canonical = Some(canonical.into());
+        self
+    }
+
+    pub fn stylesheet(mut self, path: impl Into<String>) -> Self {
+        self.metadata.stylesheets.push(path.into());
+        self
+    }
+
+    pub fn module_script(mut self, path: impl Into<String>) -> Self {
+        self.metadata.module_scripts.push(path.into());
         self
     }
 }
@@ -129,7 +257,8 @@ pub fn render_complete_document(
     document: &CompleteDocument,
     options: CompleteRenderOptions,
 ) -> Result<Response<Body>, HandlerError> {
-    let prefix = document_prefix(document).map_err(ServerRenderError::into_handler_error)?;
+    let prefix =
+        document_prefix(&document.metadata).map_err(ServerRenderError::into_handler_error)?;
     let overhead = prefix
         .len()
         .checked_add(DOCUMENT_SUFFIX.len())
@@ -157,7 +286,143 @@ pub fn render_complete_document(
     html_response(html, options.response_status()).map_err(ServerRenderError::into_handler_error)
 }
 
-fn document_prefix(document: &CompleteDocument) -> Result<String, ServerRenderError> {
+pub fn render_ordered_document<S>(
+    document: &OrderedDocument,
+    chunks: S,
+    options: OrderedRenderOptions,
+) -> Result<Response<Body>, HandlerError>
+where
+    S: Stream<Item = OrderedViewChunk> + Send + 'static,
+{
+    validate_body_status(options.status).map_err(ServerRenderError::into_handler_error)?;
+    let prefix =
+        document_prefix(&document.metadata).map_err(ServerRenderError::into_handler_error)?;
+    let overhead = prefix
+        .len()
+        .checked_add(DOCUMENT_SUFFIX.len())
+        .ok_or(ServerRenderError::OutputLimitTooSmall)
+        .map_err(ServerRenderError::into_handler_error)?;
+    let remaining = options
+        .limits
+        .max_output_bytes()
+        .checked_sub(overhead)
+        .ok_or(ServerRenderError::OutputLimitTooSmall)
+        .map_err(ServerRenderError::into_handler_error)?;
+    let stream = OrderedBodyStream {
+        input: Box::pin(chunks),
+        phase: OrderedPhase::Prefix,
+        prefix: Some(Bytes::from(prefix)),
+        remaining,
+        chunks: 0,
+        options,
+    };
+    let mut response = Response::new(Body::from_stream(stream));
+    *response.status_mut() = options.status;
+    response.headers_mut().insert(
+        CONTENT_TYPE,
+        http::HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    response.extensions_mut().insert(RenderMode::Ordered);
+    Ok(response)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum OrderedPhase {
+    Prefix,
+    Chunks,
+    Suffix,
+    Done,
+}
+
+struct OrderedBodyStream<S> {
+    input: Pin<Box<S>>,
+    phase: OrderedPhase,
+    prefix: Option<Bytes>,
+    remaining: usize,
+    chunks: usize,
+    options: OrderedRenderOptions,
+}
+
+impl<S> Stream for OrderedBodyStream<S>
+where
+    S: Stream<Item = OrderedViewChunk>,
+{
+    type Item = Result<Bytes, ServerRenderError>;
+
+    fn poll_next(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let state = self.get_mut();
+        loop {
+            match state.phase {
+                OrderedPhase::Prefix => {
+                    state.phase = OrderedPhase::Chunks;
+                    return Poll::Ready(state.prefix.take().map(Ok));
+                }
+                OrderedPhase::Chunks => {
+                    let polled =
+                        catch_unwind(AssertUnwindSafe(|| state.input.as_mut().poll_next(context)));
+                    let chunk = match polled {
+                        Ok(Poll::Ready(Some(chunk))) => chunk,
+                        Ok(Poll::Ready(None)) => {
+                            state.phase = OrderedPhase::Suffix;
+                            continue;
+                        }
+                        Ok(Poll::Pending) => return Poll::Pending,
+                        Err(_) => {
+                            state.phase = OrderedPhase::Done;
+                            return Poll::Ready(Some(Err(ServerRenderError::OrderedStreamPanic)));
+                        }
+                    };
+                    state.chunks += 1;
+                    if state.chunks > state.options.max_chunks {
+                        state.phase = OrderedPhase::Done;
+                        return Poll::Ready(Some(Err(ServerRenderError::TooManyChunks {
+                            maximum: state.options.max_chunks,
+                        })));
+                    }
+                    let limits = match RenderLimits::new(
+                        state.options.limits.max_depth(),
+                        state.options.limits.max_nodes(),
+                        state.remaining,
+                    ) {
+                        Ok(limits) => limits,
+                        Err(error) => {
+                            state.phase = OrderedPhase::Done;
+                            return Poll::Ready(Some(Err(ServerRenderError::InvalidLimits(error))));
+                        }
+                    };
+                    let rendered = catch_unwind(AssertUnwindSafe(|| {
+                        let view = chunk.render()?;
+                        render_view(&view, CompleteRenderOptions::new(limits))
+                    }));
+                    let rendered = match rendered {
+                        Ok(Ok(rendered)) => rendered,
+                        Ok(Err(error)) => {
+                            state.phase = OrderedPhase::Done;
+                            return Poll::Ready(Some(Err(error)));
+                        }
+                        Err(_) => {
+                            state.phase = OrderedPhase::Done;
+                            return Poll::Ready(Some(Err(ServerRenderError::OrderedChunkPanic)));
+                        }
+                    };
+                    state.remaining -= rendered.len();
+                    if rendered.is_empty() {
+                        continue;
+                    }
+                    return Poll::Ready(Some(Ok(Bytes::from(rendered))));
+                }
+                OrderedPhase::Suffix => {
+                    state.phase = OrderedPhase::Done;
+                    return Poll::Ready(Some(Ok(Bytes::from_static(DOCUMENT_SUFFIX.as_bytes()))));
+                }
+                OrderedPhase::Done => return Poll::Ready(None),
+            }
+        }
+    }
+}
+
+fn document_prefix(document: &DocumentMetadata) -> Result<String, ServerRenderError> {
+    validate_document_budget(document)?;
     validate_language(&document.language)?;
     validate_text("title", &document.title, 1_024)?;
     if let Some(description) = &document.description {
@@ -202,6 +467,47 @@ fn document_prefix(document: &CompleteDocument) -> Result<String, ServerRenderEr
     }
     output.push_str("</head><body>");
     Ok(output)
+}
+
+fn validate_document_budget(document: &DocumentMetadata) -> Result<(), ServerRenderError> {
+    let asset_count = document
+        .stylesheets
+        .len()
+        .checked_add(document.module_scripts.len())
+        .ok_or(ServerRenderError::DocumentMetadataLimit {
+            maximum: MAX_DOCUMENT_ASSETS,
+        })?;
+    if asset_count > MAX_DOCUMENT_ASSETS {
+        return Err(ServerRenderError::DocumentMetadataLimit {
+            maximum: MAX_DOCUMENT_ASSETS,
+        });
+    }
+    let mut bytes = document
+        .language
+        .len()
+        .checked_add(document.title.len())
+        .ok_or(ServerRenderError::DocumentMetadataLimit {
+            maximum: MAX_DOCUMENT_METADATA_BYTES,
+        })?;
+    for value in document
+        .description
+        .iter()
+        .chain(document.canonical.iter())
+        .chain(document.stylesheets.iter())
+        .chain(document.module_scripts.iter())
+    {
+        bytes = bytes
+            .checked_add(value.len())
+            .ok_or(ServerRenderError::DocumentMetadataLimit {
+                maximum: MAX_DOCUMENT_METADATA_BYTES,
+            })?;
+    }
+    if bytes > MAX_DOCUMENT_METADATA_BYTES {
+        return Err(ServerRenderError::DocumentMetadataLimit {
+            maximum: MAX_DOCUMENT_METADATA_BYTES,
+        });
+    }
+    Ok(())
 }
 
 fn render_view(view: &View, options: CompleteRenderOptions) -> Result<String, ServerRenderError> {
@@ -303,14 +609,7 @@ fn push_escaped_attribute(output: &mut String, value: &str) {
 }
 
 fn html_response(html: String, status: StatusCode) -> Result<Response<Body>, ServerRenderError> {
-    if status.is_informational()
-        || matches!(
-            status,
-            StatusCode::NO_CONTENT | StatusCode::RESET_CONTENT | StatusCode::NOT_MODIFIED
-        )
-    {
-        return Err(ServerRenderError::InvalidResponseStatus(status));
-    }
+    validate_body_status(status)?;
     let length = html.len();
     let mut response = Response::new(Body::from(html));
     *response.status_mut() = status;
@@ -326,12 +625,29 @@ fn html_response(html: String, status: StatusCode) -> Result<Response<Body>, Ser
     Ok(response)
 }
 
+fn validate_body_status(status: StatusCode) -> Result<(), ServerRenderError> {
+    if status.is_informational()
+        || matches!(
+            status,
+            StatusCode::NO_CONTENT | StatusCode::RESET_CONTENT | StatusCode::NOT_MODIFIED
+        )
+    {
+        return Err(ServerRenderError::InvalidResponseStatus(status));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ServerRenderError {
     InvalidDocumentField(&'static str),
     InvalidCanonicalUrl,
     InvalidAssetPath,
     InvalidResponseStatus(StatusCode),
+    InvalidChunkLimit(usize),
+    DocumentMetadataLimit { maximum: usize },
+    TooManyChunks { maximum: usize },
+    OrderedChunkPanic,
+    OrderedStreamPanic,
     OutputLimitTooSmall,
     InvalidLimits(pliego_dom::RenderLimitsError),
     Dom(pliego_dom::RenderError),
@@ -344,6 +660,11 @@ impl ServerRenderError {
             Self::OutputLimitTooSmall | Self::InvalidLimits(_) => "PLG-REN-002",
             Self::InvalidCanonicalUrl | Self::InvalidAssetPath => "PLG-REN-003",
             Self::InvalidResponseStatus(_) => "PLG-REN-004",
+            Self::InvalidChunkLimit(_) => "PLG-REN-005",
+            Self::DocumentMetadataLimit { .. } => "PLG-REN-006",
+            Self::TooManyChunks { .. } => "PLG-REN-202",
+            Self::OrderedChunkPanic => "PLG-REN-203",
+            Self::OrderedStreamPanic => "PLG-REN-204",
             Self::Dom(_) => "PLG-REN-201",
         }
     }
@@ -371,6 +692,20 @@ impl Display for ServerRenderError {
             Self::InvalidResponseStatus(status) => {
                 write!(formatter, "HTTP status {status} cannot carry rendered HTML")
             }
+            Self::InvalidChunkLimit(maximum) => {
+                write!(formatter, "invalid ordered render chunk limit: {maximum}")
+            }
+            Self::DocumentMetadataLimit { maximum } => {
+                write!(
+                    formatter,
+                    "document metadata exceeded bounded limit {maximum}"
+                )
+            }
+            Self::TooManyChunks { maximum } => {
+                write!(formatter, "ordered render exceeded {maximum} chunks")
+            }
+            Self::OrderedChunkPanic => formatter.write_str("ordered render chunk panicked"),
+            Self::OrderedStreamPanic => formatter.write_str("ordered render input stream panicked"),
             Self::OutputLimitTooSmall => {
                 formatter.write_str("render output limit cannot contain the HTML doctype")
             }
@@ -398,7 +733,10 @@ fn bounded(value: &str, maximum: usize) -> String {
 mod tests {
     use super::*;
     use http_body::Body as _;
+    use http_body_util::BodyExt;
     use pliego_dom::{IntoView, el, text};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[tokio::test]
     async fn complete_document_is_bounded_escaped_and_tagged() {
@@ -463,6 +801,14 @@ mod tests {
         )
         .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        let mut oversized = CompleteDocument::new("Title", el("main").into_view());
+        for index in 0..=MAX_DOCUMENT_ASSETS {
+            oversized = oversized.stylesheet(format!("/assets/{index}.css"));
+        }
+        let error =
+            render_complete_document(&oversized, CompleteRenderOptions::default()).unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-006");
     }
 
     #[test]
@@ -477,5 +823,74 @@ mod tests {
         let error =
             render_complete_fragment(&view, CompleteRenderOptions::new(limits)).unwrap_err();
         assert_eq!(error.diagnostic().code, "PLG-REN-201");
+    }
+
+    #[tokio::test]
+    async fn ordered_render_pulls_one_factory_per_body_frame() {
+        let rendered = Arc::new(AtomicUsize::new(0));
+        let chunks = futures_util::stream::iter((0..2).map({
+            let rendered = rendered.clone();
+            move |index| {
+                let rendered = rendered.clone();
+                OrderedViewChunk::new(move || {
+                    rendered.fetch_add(1, Ordering::AcqRel);
+                    el("p").child(format!("chunk-{index}")).into_view()
+                })
+            }
+        }));
+        let document = OrderedDocument::new("Stream").language("en");
+        let response =
+            render_ordered_document(&document, chunks, OrderedRenderOptions::default()).unwrap();
+        assert_eq!(
+            response.extensions().get::<RenderMode>(),
+            Some(&RenderMode::Ordered)
+        );
+        assert!(response.headers().get(CONTENT_LENGTH).is_none());
+        assert_eq!(rendered.load(Ordering::Acquire), 0);
+
+        let mut body = response.into_body();
+        let prefix = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert!(prefix.starts_with(DOCTYPE.as_bytes()));
+        assert_eq!(rendered.load(Ordering::Acquire), 0);
+        let first = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(first, "<p>chunk-0</p>");
+        assert_eq!(rendered.load(Ordering::Acquire), 1);
+        let second = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(second, "<p>chunk-1</p>");
+        assert_eq!(rendered.load(Ordering::Acquire), 2);
+        let suffix = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(suffix, DOCUMENT_SUFFIX);
+        assert!(body.frame().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn ordered_render_bounds_chunks_output_and_panics() {
+        let document = OrderedDocument::new("Bounded");
+        let chunks = futures_util::stream::repeat_with(|| {
+            OrderedViewChunk::new(|| el("span").child("x").into_view())
+        });
+        let options = OrderedRenderOptions::default().with_max_chunks(1).unwrap();
+        let response = render_ordered_document(&document, chunks, options).unwrap();
+        assert!(
+            axum::body::to_bytes(response.into_body(), 8 * 1024)
+                .await
+                .is_err()
+        );
+
+        let chunks =
+            futures_util::stream::iter([OrderedViewChunk::new(|| panic!("ordered factory panic"))]);
+        let response =
+            render_ordered_document(&document, chunks, OrderedRenderOptions::default()).unwrap();
+        assert!(
+            axum::body::to_bytes(response.into_body(), 8 * 1024)
+                .await
+                .is_err()
+        );
+
+        assert!(
+            OrderedRenderOptions::default()
+                .with_max_chunks(OrderedRenderOptions::HARD_MAX_CHUNKS + 1)
+                .is_err()
+        );
     }
 }

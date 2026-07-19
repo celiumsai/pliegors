@@ -18,8 +18,9 @@ pub use host::{
 };
 pub use limits::{LimitError, RequestLimits};
 pub use render::{
-    CompleteDocument, CompleteRenderOptions, RenderMode, RenderSeedMode, ServerRenderError,
-    render_complete_document, render_complete_fragment,
+    CompleteDocument, CompleteRenderOptions, OrderedDocument, OrderedRenderOptions,
+    OrderedViewChunk, RenderMode, RenderSeedMode, ServerRenderError, render_complete_document,
+    render_complete_fragment, render_ordered_document,
 };
 pub use scope::{
     CancelReason, InMemoryReceiptSink, RequestContext, RequestIdentity, RequestOutcome,
