@@ -564,6 +564,7 @@ fn validate_route_id(id: &str) -> Result<(), RouteError> {
 pub struct RouteGraphBuilder {
     max_routes: usize,
     routes: Vec<RouteSpec>,
+    pre_route_middleware: Vec<String>,
     middleware_capabilities: BTreeMap<String, MiddlewareCapabilities>,
     error_boundaries: Vec<String>,
 }
@@ -579,6 +580,7 @@ impl RouteGraphBuilder {
         Self {
             max_routes: DEFAULT_MAX_ROUTES,
             routes: Vec::new(),
+            pre_route_middleware: Vec::new(),
             middleware_capabilities: BTreeMap::new(),
             error_boundaries: Vec::new(),
         }
@@ -591,6 +593,7 @@ impl RouteGraphBuilder {
         Ok(Self {
             max_routes,
             routes: Vec::new(),
+            pre_route_middleware: Vec::new(),
             middleware_capabilities: BTreeMap::new(),
             error_boundaries: Vec::new(),
         })
@@ -610,6 +613,19 @@ impl RouteGraphBuilder {
         {
             return Err(RouteError::DuplicateMiddlewareDeclaration(id));
         }
+        Ok(self)
+    }
+
+    pub fn pre_route_middleware(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_behavior_id(&id, BehaviorKind::Middleware)?;
+        if self.pre_route_middleware.len() >= MAX_ROUTE_MIDDLEWARE {
+            return Err(RouteError::TooManyMiddleware(MAX_ROUTE_MIDDLEWARE));
+        }
+        if self.pre_route_middleware.contains(&id) {
+            return Err(RouteError::DuplicateMiddleware(id));
+        }
+        self.pre_route_middleware.push(id);
         Ok(self)
     }
 
@@ -663,10 +679,22 @@ impl RouteGraphBuilder {
             }
         }
 
-        let referenced_middleware: BTreeSet<_> = self
+        let route_middleware: BTreeSet<_> = self
             .routes
             .iter()
             .flat_map(|route| route.middleware.iter().cloned())
+            .collect();
+        if let Some(id) = self
+            .pre_route_middleware
+            .iter()
+            .find(|id| route_middleware.contains(*id))
+        {
+            return Err(RouteError::MiddlewarePhaseConflict(id.clone()));
+        }
+        let referenced_middleware: BTreeSet<_> = route_middleware
+            .iter()
+            .cloned()
+            .chain(self.pre_route_middleware.iter().cloned())
             .collect();
         if let Some(id) = referenced_middleware
             .iter()
@@ -684,12 +712,14 @@ impl RouteGraphBuilder {
 
         let digest = graph_digest(
             &self.routes,
+            &self.pre_route_middleware,
             &self.middleware_capabilities,
             &self.error_boundaries,
         );
         self.routes.sort_by(match_order);
         Ok(RouteGraph {
             routes: self.routes,
+            pre_route_middleware: self.pre_route_middleware,
             middleware_capabilities: self.middleware_capabilities,
             error_boundaries: self.error_boundaries,
             digest,
@@ -715,11 +745,13 @@ fn match_order(left: &RouteSpec, right: &RouteSpec) -> Ordering {
 
 fn graph_digest(
     routes: &[RouteSpec],
+    pre_route_middleware: &[String],
     middleware_capabilities: &BTreeMap<String, MiddlewareCapabilities>,
     error_boundaries: &[String],
 ) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"pliego-route-graph-v3\0");
+    digest.update(b"pliego-route-graph-v4\0");
+    digest_sequence(&mut digest, b"pre-route-middleware", pre_route_middleware);
     digest_sequence(&mut digest, b"root-error-boundaries", error_boundaries);
     for (id, capabilities) in middleware_capabilities {
         digest.update((id.len() as u64).to_be_bytes());
@@ -773,6 +805,7 @@ fn encode_hex(bytes: &[u8]) -> String {
 #[derive(Clone, Debug)]
 pub struct RouteGraph {
     routes: Vec<RouteSpec>,
+    pre_route_middleware: Vec<String>,
     middleware_capabilities: BTreeMap<String, MiddlewareCapabilities>,
     error_boundaries: Vec<String>,
     digest: String,
@@ -785,6 +818,10 @@ impl RouteGraph {
 
     pub fn routes(&self) -> &[RouteSpec] {
         &self.routes
+    }
+
+    pub fn pre_route_middleware_ids(&self) -> &[String] {
+        &self.pre_route_middleware
     }
 
     pub fn middleware_capabilities(&self, id: &str) -> Option<&MiddlewareCapabilities> {
@@ -959,6 +996,7 @@ pub enum RouteError {
     DuplicateMiddlewareDeclaration(String),
     MissingMiddlewareDeclaration(String),
     UnreferencedMiddlewareDeclaration(String),
+    MiddlewarePhaseConflict(String),
     InvalidErrorBoundaryId(String),
     DuplicateErrorBoundary(String),
     TooManyErrorBoundaries(usize),
@@ -990,7 +1028,8 @@ impl RouteError {
             | Self::TooManyMiddleware(_) => "PLG-RTE-011",
             Self::DuplicateMiddlewareDeclaration(_)
             | Self::MissingMiddlewareDeclaration(_)
-            | Self::UnreferencedMiddlewareDeclaration(_) => "PLG-RTE-013",
+            | Self::UnreferencedMiddlewareDeclaration(_)
+            | Self::MiddlewarePhaseConflict(_) => "PLG-RTE-013",
             Self::InvalidErrorBoundaryId(_)
             | Self::DuplicateErrorBoundary(_)
             | Self::TooManyErrorBoundaries(_) => "PLG-RTE-012",
@@ -1050,6 +1089,10 @@ impl Display for RouteError {
                     "middleware declaration {value} is not referenced"
                 )
             }
+            Self::MiddlewarePhaseConflict(value) => write!(
+                formatter,
+                "middleware {value} cannot use both pre-route and route phases"
+            ),
             Self::InvalidErrorBoundaryId(value) => {
                 write!(formatter, "invalid error boundary ID {value:?}")
             }
@@ -1415,6 +1458,52 @@ mod tests {
             .seal()
             .unwrap();
         assert_ne!(baseline.digest(), elevated.digest());
+    }
+
+    #[test]
+    fn pre_route_middleware_is_ordered_digest_bound_and_phase_exclusive() {
+        let capabilities = MiddlewareCapabilities::none()
+            .allowing(MiddlewareCapability::RewritePath)
+            .allowing(MiddlewareCapability::MutateResponseHeaders);
+        let graph = RouteGraphBuilder::new()
+            .declare_middleware("canonicalize", capabilities.clone())
+            .unwrap()
+            .pre_route_middleware("canonicalize")
+            .unwrap()
+            .route(route("home", RouteMethod::get(), "/"))
+            .seal()
+            .unwrap();
+        assert_eq!(
+            graph.pre_route_middleware_ids(),
+            &["canonicalize".to_owned()]
+        );
+        assert_eq!(
+            graph.middleware_capabilities("canonicalize"),
+            Some(&capabilities)
+        );
+
+        let without_pre_route = RouteGraphBuilder::new()
+            .route(route("home", RouteMethod::get(), "/"))
+            .seal()
+            .unwrap();
+        assert_ne!(graph.digest(), without_pre_route.digest());
+
+        let conflict = RouteGraphBuilder::new()
+            .declare_middleware("canonicalize", capabilities)
+            .unwrap()
+            .pre_route_middleware("canonicalize")
+            .unwrap()
+            .route(
+                route("home", RouteMethod::get(), "/")
+                    .middleware("canonicalize")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap_err();
+        assert_eq!(
+            conflict,
+            RouteError::MiddlewarePhaseConflict("canonicalize".to_owned())
+        );
     }
 
     #[test]

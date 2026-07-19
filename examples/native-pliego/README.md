@@ -6,6 +6,8 @@ graceful shutdown in one native process. Its sealed graph also declares a
 response-policy middleware and a safe root error boundary.
 The graph and runtime registry both declare its
 `mutate-response-headers` capability; a mismatch prevents startup.
+The `canonical-entry` pre-route layer rewrites `/start` to the sealed `/`
+route before matching and declares only `rewrite-path`.
 
 Run it from the workspace root:
 
@@ -18,6 +20,6 @@ with `PLIEGO_ADDR`. Binding a non-loopback address is rejected unless
 `PLIEGO_EXPOSE=1` is also present.
 
 This application is gate evidence, not a released starter. It does not yet
-prove pre-route or nested middleware, typed behavioral effect mediation,
+prove group/layout middleware, typed behavioral effect mediation,
 asynchronous boundaries, HTTP/2, TLS, OpenTelemetry,
 multipart/decompression policy, fixed-load behavior, or production deployment.

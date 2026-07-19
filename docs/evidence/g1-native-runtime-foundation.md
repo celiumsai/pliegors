@@ -71,8 +71,8 @@ This evidence does **not** close G1 and does not promote either crate or its
 capabilities to a released state. The following acceptance work remains:
 
 - PliegoRS complete, ordered, and boundary server rendering;
-- pre-route, group, and layout middleware plus capability declarations (the
-  route-local and root/route boundary slice is recorded in
+- group and layout middleware plus typed capability effect mediation (the
+  pre-route, route-local, and root/route boundary slice is recorded in
   [`g1-middleware-error-foundation.md`](g1-middleware-error-foundation.md));
 - normalized query and generated typed parameter contracts;
 - multipart and decompression limits;

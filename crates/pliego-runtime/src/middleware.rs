@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Body, HandlerError, HandlerFuture, Request, RequestContext, Response};
+use crate::{
+    Body, HandlerError, HandlerFuture, PreRouteContext, Request, RequestContext, Response,
+};
 use std::future::Future;
 
 type NextFn = Box<dyn FnOnce(Request<Body>) -> HandlerFuture + Send + 'static>;
@@ -40,6 +42,48 @@ where
         context: RequestContext,
         request: Request<Body>,
         next: MiddlewareNext,
+    ) -> HandlerFuture {
+        Box::pin(self(context, request, next))
+    }
+}
+
+type PreRouteNextFn = Box<dyn FnOnce(Request<Body>) -> HandlerFuture + Send + 'static>;
+
+pub struct PreRouteNext {
+    next: Option<PreRouteNextFn>,
+}
+
+impl PreRouteNext {
+    pub(crate) fn new(next: PreRouteNextFn) -> Self {
+        Self { next: Some(next) }
+    }
+
+    pub fn run(mut self, request: Request<Body>) -> HandlerFuture {
+        self.next
+            .take()
+            .expect("pre-route middleware next is consumed exactly once")(request)
+    }
+}
+
+pub trait RuntimePreRouteMiddleware: Send + Sync + 'static {
+    fn call(
+        &self,
+        context: PreRouteContext,
+        request: Request<Body>,
+        next: PreRouteNext,
+    ) -> HandlerFuture;
+}
+
+impl<F, Fut> RuntimePreRouteMiddleware for F
+where
+    F: Fn(PreRouteContext, Request<Body>, PreRouteNext) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result<Response<Body>, HandlerError>> + Send + 'static,
+{
+    fn call(
+        &self,
+        context: PreRouteContext,
+        request: Request<Body>,
+        next: PreRouteNext,
     ) -> HandlerFuture {
         Box::pin(self(context, request, next))
     }

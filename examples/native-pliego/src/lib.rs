@@ -59,9 +59,14 @@ fn route(
 pub fn build_runtime() -> AppResult<NativeRuntime> {
     let graph = RouteGraphBuilder::new()
         .declare_middleware(
+            "canonical-entry",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::RewritePath),
+        )?
+        .declare_middleware(
             "response-policy",
             MiddlewareCapabilities::none().allowing(MiddlewareCapability::MutateResponseHeaders),
         )?
+        .pre_route_middleware("canonical-entry")?
         .error_boundary("root-error")?
         .route(route("home", RouteMethod::get(), "/")?)
         .route(route("hello", RouteMethod::get(), "/hello/:name")?)
@@ -71,6 +76,16 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
         .seal()?;
 
     let runtime = NativeRuntimeBuilder::new(graph, "native-pliego-preview")?
+        .pre_route_middleware(
+            "canonical-entry",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::RewritePath),
+            |_context, mut request: pliego_runtime::Request<Body>, next: pliego_runtime::PreRouteNext| async move {
+                if request.uri().path() == "/start" {
+                    *request.uri_mut() = "/".parse().expect("static rewrite URI is valid");
+                }
+                next.run(request).await
+            },
+        )
         .middleware_with_capabilities(
             "response-policy",
             MiddlewareCapabilities::none()
@@ -259,6 +274,19 @@ mod tests {
         assert!(body.starts_with("<!doctype html>"));
         assert!(body.contains("One runtime. Explicit ownership."));
         assert!(body.ends_with("</body></html>"));
+    }
+
+    #[tokio::test]
+    async fn pre_route_rewrite_reaches_the_canonical_entry() {
+        let response = response("/start").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["x-content-type-options"], "nosniff");
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(
+            std::str::from_utf8(&body)
+                .unwrap()
+                .contains("One runtime. Explicit ownership.")
+        );
     }
 
     #[tokio::test]

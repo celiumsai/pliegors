@@ -246,6 +246,121 @@ async fn middleware_can_short_circuit_without_entering_later_layers() {
 }
 
 #[tokio::test]
+async fn pre_route_middleware_rewrites_before_resolution_and_unwinds_before_commit() {
+    let capabilities = MiddlewareCapabilities::none()
+        .allowing(MiddlewareCapability::RewritePath)
+        .allowing(MiddlewareCapability::MutateResponseHeaders);
+    let graph = RouteGraphBuilder::new()
+        .declare_middleware("canonicalize", capabilities.clone())
+        .unwrap()
+        .pre_route_middleware("canonicalize")
+        .unwrap()
+        .route(route("hello", RouteMethod::get(), "/hello"))
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "pre-route-rewrite")
+        .unwrap()
+        .pre_route_middleware(
+            "canonicalize",
+            capabilities,
+            |_context, mut request: http::Request<Body>, next: pliego_runtime::PreRouteNext| async move {
+                *request.uri_mut() = "/hello".parse().unwrap();
+                let mut response = next.run(request).await?;
+                response.headers_mut().insert(
+                    "x-pre-route",
+                    http::HeaderValue::from_static("canonicalized"),
+                );
+                Ok(response)
+            },
+        )
+        .handler("hello", |context: pliego_runtime::RequestContext, request: http::Request<Body>| async move {
+            assert_eq!(context.route().route_id(), "hello");
+            assert_eq!(request.uri().path(), "/hello");
+            Ok(Response::new(Body::from("rewritten")))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            http::Request::builder()
+                .uri("/alias")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()["x-pre-route"], "canonicalized");
+    assert_eq!(
+        to_bytes(response.into_body(), 32).await.unwrap(),
+        "rewritten"
+    );
+    let receipt = &sink.receipts()[0];
+    assert_eq!(receipt.route_id.as_deref(), Some("hello"));
+    assert_eq!(receipt.middleware, vec!["canonicalize".to_owned()]);
+}
+
+#[tokio::test]
+async fn pre_route_middleware_can_redirect_without_resolving_a_route() {
+    let capabilities = MiddlewareCapabilities::none().allowing(MiddlewareCapability::Redirect);
+    let graph = RouteGraphBuilder::new()
+        .declare_middleware("legacy-redirect", capabilities.clone())
+        .unwrap()
+        .pre_route_middleware("legacy-redirect")
+        .unwrap()
+        .route(route("home", RouteMethod::get(), "/"))
+        .seal()
+        .unwrap();
+    let handler_ran = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "pre-route-redirect")
+        .unwrap()
+        .pre_route_middleware(
+            "legacy-redirect",
+            capabilities,
+            |_context, _request, _next| async {
+                Ok(Response::builder()
+                    .status(StatusCode::PERMANENT_REDIRECT)
+                    .header(http::header::LOCATION, "/")
+                    .body(Body::empty())
+                    .unwrap())
+            },
+        )
+        .handler("home", {
+            let handler_ran = handler_ran.clone();
+            move |_context, _request| {
+                handler_ran.store(true, std::sync::atomic::Ordering::Release);
+                async { Ok(Response::new(Body::empty())) }
+            }
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            http::Request::builder()
+                .uri("/legacy")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+    assert_eq!(response.headers()[http::header::LOCATION], "/");
+    to_bytes(response.into_body(), 1).await.unwrap();
+    assert!(!handler_ran.load(std::sync::atomic::Ordering::Acquire));
+    let receipt = &sink.receipts()[0];
+    assert_eq!(receipt.route_id, None);
+    assert_eq!(receipt.middleware, vec!["legacy-redirect".to_owned()]);
+}
+
+#[tokio::test]
 async fn error_boundaries_walk_outward_without_receiving_internal_messages() {
     let graph = RouteGraphBuilder::new()
         .declare_middleware(
@@ -561,6 +676,29 @@ fn runtime_rejects_missing_or_unknown_handlers() {
 
 #[test]
 fn runtime_rejects_incomplete_or_extra_behavior_registries() {
+    let pre_route_graph = RouteGraphBuilder::new()
+        .declare_middleware(
+            "canonicalize",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::RewritePath),
+        )
+        .unwrap()
+        .pre_route_middleware("canonicalize")
+        .unwrap()
+        .route(route("home", RouteMethod::get(), "/"))
+        .seal()
+        .unwrap();
+    let missing_pre_route = NativeRuntimeBuilder::new(pre_route_graph, "missing-pre-route")
+        .unwrap()
+        .handler("home", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .build();
+    assert!(matches!(
+        missing_pre_route,
+        Err(pliego_runtime::RuntimeBuildError::MissingPreRouteMiddleware(id))
+            if id == "canonicalize"
+    ));
+
     let middleware_graph = RouteGraphBuilder::new()
         .declare_middleware("security", MiddlewareCapabilities::none())
         .unwrap()

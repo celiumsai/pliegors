@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    CancelReason, ErrorBoundaryContext, LimitError, MiddlewareNext, PublicError, PublicErrorClass,
-    RequestContext, RequestIdentity, RequestLimits, RequestScope, RequestState, RuntimeDiagnostic,
-    RuntimeErrorBoundary, RuntimeMiddleware, RuntimeReceipt, RuntimeReceiptSink, ScopeError,
+    CancelReason, ErrorBoundaryContext, LimitError, MiddlewareNext, PreRouteContext, PreRouteNext,
+    PublicError, PublicErrorClass, RequestContext, RequestIdentity, RequestLimits, RequestScope,
+    RequestState, RuntimeDiagnostic, RuntimeErrorBoundary, RuntimeMiddleware,
+    RuntimePreRouteMiddleware, RuntimeReceipt, RuntimeReceiptSink, ScopeError,
 };
 use axum::Router;
 use axum::body::{Body, Bytes};
@@ -92,8 +93,10 @@ pub struct NativeRuntimeBuilder {
     limits: RequestLimits,
     handlers: BTreeMap<String, Arc<dyn RuntimeHandler>>,
     middleware: BTreeMap<String, MiddlewareRegistration>,
+    pre_route_middleware: BTreeMap<String, PreRouteMiddlewareRegistration>,
     error_boundaries: BTreeMap<String, Arc<dyn RuntimeErrorBoundary>>,
     duplicate_middleware: BTreeSet<String>,
+    duplicate_pre_route_middleware: BTreeSet<String>,
     duplicate_error_boundaries: BTreeSet<String>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
 }
@@ -111,8 +114,10 @@ impl NativeRuntimeBuilder {
             limits: RequestLimits::default(),
             handlers: BTreeMap::new(),
             middleware: BTreeMap::new(),
+            pre_route_middleware: BTreeMap::new(),
             error_boundaries: BTreeMap::new(),
             duplicate_middleware: BTreeSet::new(),
+            duplicate_pre_route_middleware: BTreeSet::new(),
             duplicate_error_boundaries: BTreeSet::new(),
             receipt_sink: Arc::new(|_: RuntimeReceipt| {}),
         })
@@ -176,6 +181,32 @@ impl NativeRuntimeBuilder {
         }
     }
 
+    pub fn pre_route_middleware<M>(
+        mut self,
+        id: impl Into<String>,
+        capabilities: MiddlewareCapabilities,
+        middleware: M,
+    ) -> Self
+    where
+        M: RuntimePreRouteMiddleware,
+    {
+        let id = id.into();
+        if self
+            .pre_route_middleware
+            .insert(
+                id.clone(),
+                PreRouteMiddlewareRegistration {
+                    capabilities,
+                    handler: Arc::new(middleware),
+                },
+            )
+            .is_some()
+        {
+            self.duplicate_pre_route_middleware.insert(id);
+        }
+        self
+    }
+
     pub fn error_boundary<B>(mut self, id: impl Into<String>, boundary: B) -> Self
     where
         B: RuntimeErrorBoundary,
@@ -203,6 +234,11 @@ impl NativeRuntimeBuilder {
         self.limits.validate()?;
         if let Some(id) = self.duplicate_middleware.iter().next() {
             return Err(RuntimeBuildError::DuplicateMiddlewareRegistration(
+                id.clone(),
+            ));
+        }
+        if let Some(id) = self.duplicate_pre_route_middleware.iter().next() {
+            return Err(RuntimeBuildError::DuplicatePreRouteMiddlewareRegistration(
                 id.clone(),
             ));
         }
@@ -239,12 +275,29 @@ impl NativeRuntimeBuilder {
             RuntimeBuildError::MissingMiddleware,
             RuntimeBuildError::UnknownMiddleware,
         )?;
+        let pre_route_ids: BTreeSet<_> = self
+            .graph
+            .pre_route_middleware_ids()
+            .iter()
+            .cloned()
+            .collect();
+        validate_behavior_registry(
+            &pre_route_ids,
+            self.pre_route_middleware.keys(),
+            RuntimeBuildError::MissingPreRouteMiddleware,
+            RuntimeBuildError::UnknownPreRouteMiddleware,
+        )?;
         for (id, declared) in self.graph.middleware_declarations() {
-            let registered = &self
+            let registered = self
                 .middleware
                 .get(id)
-                .expect("middleware registry completeness was validated")
-                .capabilities;
+                .map(|registration| &registration.capabilities)
+                .or_else(|| {
+                    self.pre_route_middleware
+                        .get(id)
+                        .map(|registration| &registration.capabilities)
+                })
+                .expect("middleware registry completeness was validated");
             if registered != declared {
                 return Err(RuntimeBuildError::MiddlewareCapabilityMismatch {
                     id: id.clone(),
@@ -279,6 +332,7 @@ impl NativeRuntimeBuilder {
                 limits: self.limits,
                 handlers: self.handlers,
                 middleware: self.middleware,
+                pre_route_middleware: self.pre_route_middleware,
                 error_boundaries: self.error_boundaries,
                 receipt_sink: self.receipt_sink,
                 request_sequence: AtomicU64::new(0),
@@ -315,6 +369,7 @@ struct RuntimeState {
     limits: RequestLimits,
     handlers: BTreeMap<String, Arc<dyn RuntimeHandler>>,
     middleware: BTreeMap<String, MiddlewareRegistration>,
+    pre_route_middleware: BTreeMap<String, PreRouteMiddlewareRegistration>,
     error_boundaries: BTreeMap<String, Arc<dyn RuntimeErrorBoundary>>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
     request_sequence: AtomicU64,
@@ -325,6 +380,12 @@ struct RuntimeState {
 struct MiddlewareRegistration {
     capabilities: MiddlewareCapabilities,
     handler: Arc<dyn RuntimeMiddleware>,
+}
+
+#[derive(Clone)]
+struct PreRouteMiddlewareRegistration {
+    capabilities: MiddlewareCapabilities,
+    handler: Arc<dyn RuntimePreRouteMiddleware>,
 }
 
 struct RequestRegistry {
@@ -489,6 +550,36 @@ async fn dispatch(
         return lifecycle_failure_response(scope);
     }
 
+    let request_scope = scope.clone();
+    let limited = Limited::new(body, state.limits.max_body_bytes).map_err(move |error| {
+        request_scope.cancel(CancelReason::RequestBodyLimit);
+        error
+    });
+    let request = Request::from_parts(parts, Body::new(limited));
+    let cancellation = scope.cancellation_token();
+    let response = tokio::select! {
+        biased;
+        _ = cancellation.cancelled() => plain_cancelled_response(&scope),
+        result = pre_route_future(state.clone(), scope.clone(), request) => {
+            match result {
+                Ok(response) => response,
+                Err(error) => {
+                    warn!(code = %error.diagnostic.code, "PliegoRS pre-route middleware failed");
+                    let public = public_handler_error(&error);
+                    recover_error(&state, &scope, None, public, error.diagnostic).await
+                }
+            }
+        }
+    };
+    wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response())
+}
+
+async fn routed_response(
+    state: Arc<RuntimeState>,
+    scope: RequestScope,
+    request: Request<Body>,
+) -> Response<Body> {
+    let (parts, body) = request.into_parts();
     let method = match RouteMethod::new(parts.method.as_str()) {
         Ok(method) => method,
         Err(error) => {
@@ -500,7 +591,7 @@ async fn dispatch(
                 error.code(),
             );
             let response = recover_error(&state, &scope, None, public, diagnostic).await;
-            return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
+            return response;
         }
     };
     let path = match decode_path(parts.uri.path()) {
@@ -512,7 +603,7 @@ async fn dispatch(
                 "PLG-RUN-106",
             );
             let response = recover_error(&state, &scope, None, public, diagnostic).await;
-            return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
+            return response;
         }
     };
     let matched = match state.graph.resolve(&method, &path) {
@@ -533,25 +624,20 @@ async fn dispatch(
                     response.headers_mut().insert(http::header::ALLOW, value);
                 }
             }
-            return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
+            return response;
         }
     };
     if scope.transition(RequestState::RouteResolved).is_err()
         || scope.transition(RequestState::ScopeOpen).is_err()
     {
-        return lifecycle_failure_response(scope);
+        return lifecycle_failure_uncommitted(&scope);
     }
     scope.set_route(matched.route_id());
 
-    let request_scope = scope.clone();
-    let limited = Limited::new(body, state.limits.max_body_bytes).map_err(move |error| {
-        request_scope.cancel(CancelReason::RequestBodyLimit);
-        error
-    });
-    let request = Request::from_parts(parts, Body::new(limited));
+    let request = Request::from_parts(parts, body);
     let context = RequestContext::new(scope.clone(), matched.clone());
     if scope.transition(RequestState::HandlerRunning).is_err() {
-        return lifecycle_failure_response(scope);
+        return lifecycle_failure_uncommitted(&scope);
     }
 
     let handler_future = match catch_unwind(AssertUnwindSafe(|| {
@@ -570,35 +656,28 @@ async fn dispatch(
                 "PLG-RUN-502",
             );
             let response = recover_error(&state, &scope, Some(&matched), public, diagnostic).await;
-            return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
+            return response;
         }
     };
     let cancellation = scope.cancellation_token();
     let response = tokio::select! {
         biased;
         _ = cancellation.cancelled() => {
-            let (status, code) = match scope.cancel_reason() {
-                Some(CancelReason::Deadline) => (StatusCode::GATEWAY_TIMEOUT, "PLG-RUN-408"),
-                Some(CancelReason::Shutdown) => (StatusCode::SERVICE_UNAVAILABLE, "PLG-RUN-503"),
-                _ => (StatusCode::REQUEST_TIMEOUT, "PLG-RUN-499"),
-            };
-            scoped_response(scope, status, code).unwrap_or_else(|_| fallback_response())
+            plain_cancelled_response(&scope)
         }
         result = AssertUnwindSafe(handler_future).catch_unwind() => {
             match result {
-                Ok(Ok(response)) => wrap_handler_response(scope, response)
-                    .unwrap_or_else(|_| fallback_response()),
+                Ok(Ok(response)) => response,
                 Ok(Err(error)) => {
                     warn!(code = %error.diagnostic.code, "PliegoRS handler failed");
                     let public = public_handler_error(&error);
-                    let response = recover_error(
+                    recover_error(
                         &state,
                         &scope,
                         Some(&matched),
                         public,
                         error.diagnostic.clone(),
-                    ).await;
-                    wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response())
+                    ).await
                 }
                 Err(_) => {
                     let diagnostic = RuntimeDiagnostic::new(
@@ -611,19 +690,105 @@ async fn dispatch(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         "PLG-RUN-502",
                     );
-                    let response = recover_error(
+                    recover_error(
                         &state,
                         &scope,
                         Some(&matched),
                         public,
                         diagnostic,
-                    ).await;
-                    wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response())
+                    ).await
                 }
             }
         }
     };
     response
+}
+
+type PreRouteMiddlewareLayer = (String, Arc<dyn RuntimePreRouteMiddleware>);
+
+fn pre_route_future(
+    state: Arc<RuntimeState>,
+    scope: RequestScope,
+    request: Request<Body>,
+) -> HandlerFuture {
+    let layers: Vec<PreRouteMiddlewareLayer> = state
+        .graph
+        .pre_route_middleware_ids()
+        .iter()
+        .map(|id| {
+            (
+                id.clone(),
+                state
+                    .pre_route_middleware
+                    .get(id)
+                    .expect("pre-route registry was sealed with the route graph")
+                    .handler
+                    .clone(),
+            )
+        })
+        .collect();
+    run_pre_route_middleware(state, scope, Arc::new(layers), 0, request)
+}
+
+fn run_pre_route_middleware(
+    state: Arc<RuntimeState>,
+    scope: RequestScope,
+    layers: Arc<Vec<PreRouteMiddlewareLayer>>,
+    index: usize,
+    request: Request<Body>,
+) -> HandlerFuture {
+    Box::pin(async move {
+        let future = if let Some((id, middleware)) = layers.get(index).cloned() {
+            scope.record_middleware(&id);
+            let next_state = state.clone();
+            let next_scope = scope.clone();
+            let next_layers = layers.clone();
+            let next = PreRouteNext::new(Box::new(move |request| {
+                run_pre_route_middleware(next_state, next_scope, next_layers, index + 1, request)
+            }));
+            let context = PreRouteContext::new(scope.clone());
+            catch_unwind(AssertUnwindSafe(|| middleware.call(context, request, next)))
+        } else {
+            return Ok(routed_response(state, scope, request).await);
+        };
+        let future = match future {
+            Ok(future) => future,
+            Err(_) => {
+                let diagnostic = RuntimeDiagnostic::new(
+                    "PLG-RUN-506",
+                    "pre-route middleware panicked before returning its future",
+                )
+                .expect("static diagnostic is valid");
+                let public = PublicError::new(
+                    PublicErrorClass::InternalFailure,
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "PLG-RUN-506",
+                );
+                return Ok(recover_error(&state, &scope, None, public, diagnostic).await);
+            }
+        };
+        match AssertUnwindSafe(future).catch_unwind().await {
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(error)) => {
+                warn!(code = %error.diagnostic.code, "PliegoRS pre-route layer failed");
+                let public = public_handler_error(&error);
+                Ok(recover_error(&state, &scope, None, public, error.diagnostic).await)
+            }
+            Err(_) => {
+                let diagnostic = RuntimeDiagnostic::new(
+                    "PLG-RUN-506",
+                    "pre-route middleware panicked while being polled",
+                )
+                .expect("static diagnostic is valid");
+                let public = PublicError::new(
+                    PublicErrorClass::InternalFailure,
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "PLG-RUN-506",
+                );
+                Ok(recover_error(&state, &scope, None, public, diagnostic).await)
+            }
+        }
+    })
 }
 
 type MiddlewareLayer = (String, Arc<dyn RuntimeMiddleware>);
@@ -866,12 +1031,13 @@ fn wrap_handler_response(
     if let Some(mode) = response.extensions().get::<crate::RenderMode>().copied() {
         scope.set_render_mode(mode);
     }
+    let terminal = scope.is_cancelled();
     let (parts, body) = response.into_parts();
     commit_response_or_close(&scope, parts.status.as_u16())?;
     debug!(request_id = %scope.identity().request_id, status = parts.status.as_u16(), "PliegoRS response committed");
     Ok(Response::from_parts(
         parts,
-        Body::new(ScopedBody::new(body, scope, false)),
+        Body::new(ScopedBody::new(body, scope, terminal)),
     ))
 }
 
@@ -909,14 +1075,18 @@ fn fallback_response() -> Response<Body> {
 }
 
 fn lifecycle_failure_response(scope: RequestScope) -> Response<Body> {
+    let response = lifecycle_failure_uncommitted(&scope);
+    wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response())
+}
+
+fn lifecycle_failure_uncommitted(scope: &RequestScope) -> Response<Body> {
     let diagnostic = RuntimeDiagnostic::new(
         "PLG-RUN-500",
         "request lifecycle entered an invalid transition",
     )
     .expect("static diagnostic is valid");
     scope.fail(diagnostic.clone());
-    scoped_response(scope, StatusCode::INTERNAL_SERVER_ERROR, diagnostic.code)
-        .unwrap_or_else(|_| fallback_response())
+    plain_error_response(StatusCode::INTERNAL_SERVER_ERROR, diagnostic.code)
 }
 
 fn commit_response_or_close(scope: &RequestScope, status: u16) -> Result<(), ScopeError> {
@@ -1142,6 +1312,9 @@ pub enum RuntimeBuildError {
     MissingMiddleware(String),
     UnknownMiddleware(String),
     DuplicateMiddlewareRegistration(String),
+    MissingPreRouteMiddleware(String),
+    UnknownPreRouteMiddleware(String),
+    DuplicatePreRouteMiddlewareRegistration(String),
     MiddlewareCapabilityMismatch {
         id: String,
         declared: MiddlewareCapabilities,
@@ -1175,6 +1348,22 @@ impl Display for RuntimeBuildError {
                     "middleware ID {id} was registered more than once"
                 )
             }
+            Self::MissingPreRouteMiddleware(id) => {
+                write!(
+                    formatter,
+                    "route graph references missing pre-route middleware {id}"
+                )
+            }
+            Self::UnknownPreRouteMiddleware(id) => {
+                write!(
+                    formatter,
+                    "pre-route middleware registry contains unknown ID {id}"
+                )
+            }
+            Self::DuplicatePreRouteMiddlewareRegistration(id) => write!(
+                formatter,
+                "pre-route middleware ID {id} was registered more than once"
+            ),
             Self::MiddlewareCapabilityMismatch {
                 id,
                 declared,

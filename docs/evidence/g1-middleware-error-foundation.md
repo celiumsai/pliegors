@@ -8,8 +8,8 @@
 
 ## Sealed contract
 
-`pliego-router` now binds ordered route middleware, its exact capability sets,
-and root/route error boundary IDs into route graph digest v3. IDs are portable and bounded,
+`pliego-router` now binds ordered pre-route and route middleware, their exact
+capability sets, and root/route error boundary IDs into route graph digest v4. IDs are portable and bounded,
 duplicates fail before sealing, and `NativeRuntimeBuilder` rejects missing or
 extra registrations before a socket can be served.
 
@@ -25,6 +25,13 @@ middleware API and OpenSDK component boundary.
 root-to-leaf and successful or recovered responses unwind leaf-to-root before
 the runtime commits headers. A short-circuit cannot accidentally call the next
 layer or handler twice.
+
+Pre-route middleware uses a separate `PreRouteContext` with no invented route
+authority. It can rewrite the admitted request before matching or return a
+response without resolving a route. Its layers share the same receipt order,
+panic isolation, cancellation, outward error recovery, and single post-unwind
+response commit. One middleware ID cannot occupy both pre-route and route
+phases.
 
 Errors are reduced to four public classes: not found, unauthorized or
 forbidden, invalid request, and internal failure. An application boundary
@@ -54,10 +61,10 @@ cargo audit --deny warnings --ignore RUSTSEC-2026-0173
 
 Observed focused result:
 
-- `pliego-router`: 20 tests passed;
-- `pliego-runtime`: 13 unit, 17 in-process integration, and two real-socket
+- `pliego-router`: 21 tests passed;
+- `pliego-runtime`: 13 unit, 19 in-process integration, and two real-socket
   tests passed;
-- `native-pliego`: four tests passed;
+- `native-pliego`: five tests passed;
 - Clippy with warnings denied passed; and
 - doc tests passed.
 
@@ -75,9 +82,9 @@ server. Observed response bodies were 790 bytes for `/`, 815 bytes for
 
 ## Evidence boundary
 
-This slice does not implement root pre-route, group, or layout middleware. It
-admits exact declared capabilities but does not yet mediate their behavioral
-effects inside trusted native Rust middleware. Nested layouts, asynchronous render
+This slice does not implement group or layout middleware. It admits exact
+declared capabilities but does not yet mediate their behavioral effects inside
+trusted native Rust middleware. Nested layouts, asynchronous render
 boundaries, HTTP/2, middleware fuzzing, fixed-load memory/latency, and
 OpenTelemetry evidence remain open. This evidence does not close G1 or change
 any capability from `not-released`.
