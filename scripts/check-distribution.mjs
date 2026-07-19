@@ -188,7 +188,6 @@ const publicProjectFiles = [
   'TRADEMARKS.md',
   '.github/PULL_REQUEST_TEMPLATE.md',
   '.github/workflows/codeql.yml',
-  '.github/dependabot.yml',
   '.github/ISSUE_TEMPLATE/bug_report.yml',
   '.github/ISSUE_TEMPLATE/feature_request.yml',
   '.github/ISSUE_TEMPLATE/config.yml',

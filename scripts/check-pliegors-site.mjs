@@ -180,6 +180,33 @@ for (const asset of ["/media/pliegors/fold-hero.webp", "/media/pliegors/ledger-w
 for (const statement of ["R0-R7", "public preview"]) {
   if (!homeHtml.toLowerCase().includes(statement.toLowerCase())) failures.push(`home: missing current release statement ${statement}`);
 }
+if (!homeHtml.includes("PLIEGORS / 0.0.2 / PUBLIC PREVIEW")) {
+  failures.push("home: current release marker is not 0.0.2");
+}
+
+const changelogPages = [
+  ["/changelog", path.join(root, "changelog/index.html"), "OpenSDK becomes executable."],
+  ["/es/changelog", path.join(root, "es/changelog/index.html"), "OpenSDK se vuelve ejecutable."],
+];
+for (const [route, file, localizedTitle] of changelogPages) {
+  const html = await readFile(file, "utf8").catch(() => "");
+  const document = parse(html);
+  const entries = elements(document, "article")
+    .map((node) => attribute(node, "data-change-entry"))
+    .filter(Boolean);
+  if (JSON.stringify(entries) !== JSON.stringify(["unreleased", "v0-0-2", "v0-0-1"])) {
+    failures.push(`${route}: changelog entries are incomplete or out of order`);
+  }
+  for (const required of [
+    localizedTitle,
+    "0.0.2",
+    "2026-07-18",
+    "https://github.com/celiumsai/pliegors/releases/tag/v0.0.2",
+    "https://github.com/celiumsai/pliegors/blob/main/CHANGELOG.md",
+  ]) {
+    if (!html.includes(required)) failures.push(`${route}: missing current changelog contract ${required}`);
+  }
+}
 
 const docsHtml = await readFile(path.join(root, "docs/index.html"), "utf8").catch(() => "");
 const docsDocument = parse(docsHtml);
