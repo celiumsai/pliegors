@@ -12,6 +12,13 @@
 <p align="center"><strong>A Rust-native web framework for verifiable, replayable, durable interfaces.</strong></p>
 
 <p align="center">
+  <a href="https://pliegors.dev/">Website</a> &middot;
+  <a href="https://pliegors.dev/docs/">Documentation</a> &middot;
+  <a href="https://pliegors.dev/changelog/">Changelog</a> &middot;
+  <a href="https://pliegors.dev/security/">Security</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/celiumsai/pliegors/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/celiumsai/pliegors/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/celiumsai/pliegors/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/celiumsai/pliegors/actions/workflows/codeql.yml/badge.svg"></a>
   <a href="https://crates.io/crates/pliego-cli"><img alt="crates.io" src="https://img.shields.io/crates/v/pliego-cli.svg"></a>
@@ -28,9 +35,27 @@ the same result. Useful HTML is emitted first; Rust/WASM resumes only the
 behavior the document needs. Mature browser libraries such as GSAP, Lenis, and
 Three.js remain JavaScript behind explicit lifecycle adapters.
 
-The current public preview release is `0.0.1`. PliegoRS is pre-1.0 software: the
-documented contracts are deliberate, while APIs may still evolve between minor
-releases.
+The current public release is [`v0.0.2`](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2),
+published on 2026-07-18. Fifteen framework crates are available on crates.io at
+`0.0.2`. PliegoRS remains pre-1.0 public-preview software: documented contracts
+are deliberate, while incompatible changes may still arrive in a new minor
+version with a changelog entry and migration guidance.
+
+`main` also contains the unreleased OpenSDK `0.1.0-preview.1` implementation.
+It is executable and covered by conformance suites, but `pliego-sdk` is not yet
+published on crates.io. RFC-006 and RFC-007 remain Draft, and ADR-006 remains
+Proposed; the preview must not be presented as a stable or accepted API. The
+current `main` MSRV is Rust `1.86`.
+
+## Project status
+
+| Surface | Status | Evidence |
+| --- | --- | --- |
+| PliegoRS `v0.0.2` | Current signed public release | [Release](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) and [changelog](CHANGELOG.md) |
+| R0-R7 framework hardening | Complete; preserved as regression gates | [Hardening roadmap](docs/28-hardening-roadmap.md) |
+| P8 trust and adoption | Complete for `v0.0.2` | [P8 contract](docs/35-p8-trust-and-adoption-contract.md) and [signed release evidence](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) |
+| OpenSDK `0.1.0-preview.1` | Implemented on `main`; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
+| Hyphae integration | Optional verified protocol boundary | [Verified sync guide](docs/29-hyphae-verified-sync-guide.md); no production gateway claim |
 
 ## What exists
 
@@ -51,11 +76,20 @@ releases.
   replayable default, minimal, editorial, and cinematic starters;
 - default-disabled, identifier-free voluntary funnel telemetry with local
   preview, explicit export, a 64-event bound, and complete deletion;
-- a five-target, two-replica release pipeline with a signed exact-set
-  manifest and a distribution-only golden path;
+- `pliego doctor`, deterministic redacted support bundles, and read-only
+  compatibility checks through `pliego upgrade --check`;
+- six maintained libFuzzer targets, reproducible build/browser/memory
+  benchmarks, and a release-only nine-environment golden matrix;
+- a five-target, two-replica release pipeline with reproducible archives, a
+  signed exact-set manifest, CycloneDX SBOM, SLSA-compatible provenance,
+  Sigstore identity, and a distribution-only golden path;
 - an independently committed external flagship that exercises durable events,
   replay, forks, effects, receipts, provenance, audit, and selective sync;
-- an official bilingual site authored by PliegoRS itself.
+- an official bilingual site, documentation system, security center, and
+  evidence-linked changelog authored by PliegoRS itself;
+- an experimental OpenSDK preview with typed Wasm Component admission,
+  resource budgets, effect receipts, Rust/TypeScript/Python conformance,
+  React/Svelte/Lit fixtures, and JSON-RPC/MCP tooling contracts.
 
 ## Direction
 
@@ -64,14 +98,25 @@ the trust model across events, folds, effects, artifacts, and lifecycles.
 Hyphae is the first-class durable data plane when a project needs it, but static
 projects do not require Hyphae.
 
-The R0-R7 hardening sequence is complete: reactive safety, artifact
-trust, verified sync, snapshots and schemas, DOM lifecycle, developer golden
-path, reproducible distribution, and an external flagship. See the
-[hardening roadmap](docs/28-hardening-roadmap.md) and the bounded
+R0-R7 and P8 are complete and remain regression gates: reactive safety,
+artifact trust, verified sync, snapshots and schemas, DOM lifecycle, developer
+golden path, reproducible distribution, external proof, diagnostics,
+adversarial validation, benchmarks, clean environments, and voluntary-only
+telemetry. See the [execution backlog](docs/19-product-execution-backlog.md),
+[hardening roadmap](docs/28-hardening-roadmap.md), and bounded
 [R7 evidence](docs/evidence/r7-external-flagship.md). Production Hyphae
 operation remains a separate system boundary.
 
+The next public boundary is OpenSDK: provider-neutral extension contracts,
+capability admission, portable build output, and conformance across languages
+and browser ecosystems. Its current implementation is evidence for governance,
+not permission to call the API stable.
+
 ## Packages
+
+The fifteen release packages below are published at `0.0.2`. `pliego-sdk` is an
+unreleased repository preview at `0.1.0-preview.1` and is listed separately so
+the registry boundary stays explicit.
 
 | Package | Responsibility |
 | --- | --- |
@@ -88,16 +133,19 @@ operation remains a separate system boundary.
 | `pliego-assets` | Adaptive media plans, budgets, and manifests |
 | `pliego-inspect` | Artifact integrity and budget inspection |
 | `pliego-hyphae` | Protocol v2 attestations, authority policy, and type-gated verified replay |
-| `pliego-sdk` | OpenSDK manifests, capability admission, Wasm Component runtime, effect receipts, and tooling protocols |
 | `pliego-starters` | Maintained embedded starter projects |
 | `pliego-cli` | Project creation, build, dev server, preview, and inspection |
+
+| Unreleased package | Responsibility | Status |
+| --- | --- | --- |
+| `pliego-sdk` | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | `0.1.0-preview.1` on `main`; not on crates.io |
 
 ## Install
 
 Install the CLI from crates.io:
 
 ```sh
-cargo install pliego-cli --version 0.0.1 --locked
+cargo install pliego-cli --version 0.0.2 --locked
 pliego new my-site
 cd my-site
 pliego check
@@ -114,27 +162,49 @@ pliego upgrade --check
 pliego telemetry status
 ```
 
-Inspect the provider-neutral OpenSDK contract or validate an extension outside
-any project:
+The commands above are part of the published `0.0.2` CLI. They run locally and
+do not upload project data.
+
+## Evaluate OpenSDK from `main`
+
+OpenSDK landed after `v0.0.2`, so evaluate it from a source checkout rather
+than expecting it in the crates.io CLI:
 
 ```sh
-pliego sdk compatibility
-pliego sdk check path/to/pliego-extension.json --grant dom
-pliego sdk test path/to/pliego-extension.json --input path/to/transform.json
+git clone https://github.com/celiumsai/pliegors.git
+cd pliegors
+cargo run -p pliego-cli --locked -- sdk compatibility
+npm ci
+npm run check:opensdk:all
 ```
 
-The delegated `pliego css check` surface is experimental interoperability with a
-separately installed executable. PliegoCSS research is paused, is not published,
-and is not part of the supported PliegoRS quickstart. PliegoRS accepts standard
-CSS and remains independent of any CSS toolchain.
+The compatibility report is portable. The complete conformance path compiles a
+Rust Wasm Component and runs real browser fixtures; it is a release-blocking
+Linux CI gate and can be reproduced from Linux or WSL.
 
-Linux production binaries and macOS/Windows development binaries are also
-published in the [GitHub Release](https://github.com/celiumsai/pliegors/releases/tag/v0.0.1).
-Installers require Node.js and verify their selected payload against the signed
-release manifest before extraction. Download installers to disk and verify the
-complete release bundle before running them; never pipe a network response
-directly into a shell. See the
-[distribution guide](docs/27-distribution-and-release.md).
+The Rust Wasm Component toolchain is the reference sandboxed implementation.
+The TypeScript and Python process bridges are conformance implementations, not
+sandboxed Component Model SDKs. Browser fixtures prove the explicit adapter
+lifecycle for React, Svelte, and Lit without replacing those ecosystems.
+
+## Release trust
+
+The `v0.0.2` release contains 28 assets covering five platform targets, two
+installer formats, checksums, a reproducible source archive, verification
+tools, a CycloneDX SBOM, SLSA-compatible provenance, and the signed P8 golden
+matrix. Linux x86_64 and ARM64 are production targets; macOS x86_64/ARM64 and
+Windows x86_64 are development targets.
+
+Installers verify the pinned Ed25519 release identity, manifest, selected
+archive, checksum sidecar, and exact asset set before extraction. Separate
+Sigstore bundles bind the supply-chain attestations and nine-environment golden
+evidence. Review the [distribution guide](docs/27-distribution-and-release.md),
+[supply-chain contract](docs/37-supply-chain-attestations.md), and
+[security policy](SECURITY.md) before production use.
+
+Installers require Node.js. Download them to disk and verify the complete
+release bundle before running them; never pipe a network response directly into
+a shell.
 
 ## Local development
 
@@ -152,7 +222,7 @@ from a trusted local network.
 ## Quality gates
 
 ```sh
-cargo fmt --check
+cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --all-targets --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
@@ -168,10 +238,20 @@ npm run check:distribution
 npm run check:phase-1
 npm run test:phase-1
 npm run check:site
+npm run check:site-deployment
+npm run check:wasm-lifetimes
 ```
+
+The complete OpenSDK Component and browser conformance gate runs on Linux in
+CI. Windows contributors can reproduce that exact path through WSL while still
+using the native Windows CLI for normal project development.
 
 ## Core documents
 
+- [Online documentation](https://pliegors.dev/docs/)
+- [Public changelog](https://pliegors.dev/changelog/)
+- [Security and trust center](https://pliegors.dev/security/)
+- [Current execution backlog](docs/19-product-execution-backlog.md)
 - [Founding specification](docs/00-pliegors-spec.md)
 - [PliegoRS and Hyphae target protocol](docs/01-hyphae-protocol.md)
 - [Hyphae verified sync guide](docs/29-hyphae-verified-sync-guide.md)
@@ -203,12 +283,16 @@ npm run check:site
 - [Framework API boundaries](docs/15-framework-api-boundaries.md)
 - [Native migration gate](docs/16-native-migration-gate.md)
 - [Framework readiness review](docs/17-framework-readiness-review.md)
-- [Execution backlog](docs/19-product-execution-backlog.md)
 - [Security, plugins, and adaptive media](docs/26-security-plugins-and-adaptive-media.md)
 - [Distribution and release](docs/27-distribution-and-release.md)
 - [Hardening roadmap](docs/28-hardening-roadmap.md)
 
 ## Project policies
+
+`main` is the repository's sole persistent branch. Contributions use
+short-lived pull-request branches, pass the protected checks, merge linearly,
+and delete the branch immediately after integration. Automated security alerts,
+CodeQL, secret scanning, `cargo audit`, and `npm audit` remain active.
 
 - [Changelog](CHANGELOG.md)
 - [Governance](GOVERNANCE.md)

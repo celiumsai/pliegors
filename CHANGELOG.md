@@ -24,6 +24,9 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 - Keep `main` as the sole persistent repository branch by replacing automated
   dependency-update branches with maintainer-batched, short-lived updates;
   dependency alerts and security scanners remain active.
+- Rewrite the repository README around the published `v0.0.2` and P8 evidence,
+  distinguish the unreleased OpenSDK preview from crates.io artifacts, and add
+  current release-trust, documentation, platform, and branch-policy guidance.
 
 ### Security
 
