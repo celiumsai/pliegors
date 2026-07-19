@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.product-capabilities.schema.json",
+  "title": "PliegoRS product capability manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema", "framework", "support", "surfaces"],
+  "properties": {
+    "$schema": { "const": "./schemas/pliego.product-capabilities.schema.json" },
+    "schema": { "const": "dev.pliegors.product-capabilities/v1" },
+    "framework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "channel",
+        "releasedVersion",
+        "workspaceVersion",
+        "openSdkVersion",
+        "license",
+        "releasedCrateCount",
+        "unreleasedCrates"
+      ],
+      "properties": {
+        "name": { "const": "PliegoRS" },
+        "channel": { "const": "public-preview" },
+        "releasedVersion": { "$ref": "#/$defs/version" },
+        "workspaceVersion": { "$ref": "#/$defs/version" },
+        "openSdkVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+-preview\\.[0-9]+$" },
+        "license": { "const": "Apache-2.0" },
+        "releasedCrateCount": { "type": "integer", "minimum": 1, "maximum": 128 },
+        "unreleasedCrates": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rust", "targets", "browsers", "telemetry"],
+      "properties": {
+        "rust": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["msrv", "releaseToolchain"],
+          "properties": {
+            "msrv": { "$ref": "#/$defs/version" },
+            "releaseToolchain": { "$ref": "#/$defs/version" }
+          }
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "role", "status"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "role": { "enum": ["production", "development", "compatibility-candidate"] },
+              "status": { "enum": ["released", "validated", "candidate", "not-released"] }
+            }
+          }
+        },
+        "browsers": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "status", "evidence"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "status": { "enum": ["release-blocking", "compatibility-candidate", "unsupported"] },
+              "evidence": { "$ref": "#/$defs/path" }
+            }
+          }
+        },
+        "telemetry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["default", "networkSubmission"],
+          "properties": {
+            "default": { "const": "disabled" },
+            "networkSubmission": { "const": "none" }
+          }
+        }
+      }
+    },
+    "surfaces": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "domain",
+          "availability",
+          "stability",
+          "gate",
+          "summary",
+          "evidence",
+          "limitations"
+        ],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "label": { "type": "string", "minLength": 3, "maxLength": 96 },
+          "domain": {
+            "enum": ["browser", "build", "data", "deployment", "extension", "operations", "server", "tooling"]
+          },
+          "availability": { "enum": ["released", "source-preview", "partial", "not-released", "external"] },
+          "stability": { "enum": ["preview", "experimental", "none"] },
+          "gate": { "enum": ["preserved", "G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7"] },
+          "summary": { "type": "string", "minLength": 12, "maxLength": 320 },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/path" }
+          },
+          "limitations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 8, "maxLength": 240 }
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "availability": { "enum": ["not-released", "external"] } }, "required": ["availability"] },
+            "then": { "properties": { "stability": { "const": "none" } } }
+          },
+          {
+            "if": { "properties": { "availability": { "enum": ["released", "source-preview", "partial"] } }, "required": ["availability"] },
+            "then": { "properties": { "stability": { "enum": ["preview", "experimental"] } } }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", "maxLength": 64 },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+    },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+  }
+}

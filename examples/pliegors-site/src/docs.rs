@@ -305,6 +305,7 @@ pub fn index(locale: Locale) -> View {
                 .child(link_list(
                     locale,
                     &[
+                        ("https://pliegors.dev/capabilities.json", "Inspect current capabilities", "Inspeccionar capacidades actuales"),
                         ("/docs/opensdk", "Evaluate OpenSDK", "Evaluar OpenSDK"),
                         ("/changelog", "Read the release boundary", "Leer el límite de release"),
                     ],

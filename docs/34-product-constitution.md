@@ -62,6 +62,19 @@ Current classification:
 | OpenSDK, server runtime, PBOC, and Pliego.run provider adapter | Not released |
 | Any `stable` public API | None before its explicit promotion record |
 
+## Canonical capability authority
+
+[`product.capabilities.json`](../product.capabilities.json) is the
+machine-readable authority for current availability, stability, support
+targets, and evidence. Its vocabulary and change rules are defined in the
+[product capability manifest](47-product-capability-manifest.md).
+
+README prose, the framework contract, website, release metadata, crates.io
+state, and roadmap documents may explain that manifest but may not contradict
+it. `npm run check:product-truth` validates the schema and public surfaces in
+CI. A Draft RFC, private deployment implementation, or source file cannot
+promote a capability by itself.
+
 ## Release channels
 
 The channel identifies promotion and support; it does not silently upgrade the

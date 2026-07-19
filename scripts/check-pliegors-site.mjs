@@ -126,6 +126,7 @@ for (const route of expected) {
 }
 
 for (const asset of [
+  "capabilities.json",
   "assets/pliegors.css",
   "assets/pliegors_site_boot.js",
   "assets/pliegors_site_client.js",
@@ -147,6 +148,12 @@ for (const asset of [
   } catch {
     failures.push(`${asset}: missing`);
   }
+}
+
+const canonicalCapabilities = await readFile(path.join(repository, "product.capabilities.json"));
+const publishedCapabilities = await readFile(path.join(root, "capabilities.json")).catch(() => Buffer.alloc(0));
+if (!publishedCapabilities.equals(canonicalCapabilities)) {
+  failures.push("capabilities.json: published bytes differ from the repository authority");
 }
 
 const homeHtml = await readFile(path.join(root, "index.html"), "utf8").catch(() => "");
@@ -220,6 +227,7 @@ if (docsItems.length !== 26) failures.push(`docs index: expected 26 topics, foun
 for (const required of [
   "RELEASE / 0.0.2 + OPENSDK / PREVIEW",
   "pliego-sdk is not on crates.io",
+  "/capabilities.json",
   "/docs/opensdk",
 ]) {
   if (!docsHtml.includes(required)) failures.push(`docs index: missing release boundary ${required}`);
