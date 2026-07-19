@@ -43,7 +43,7 @@ publish = ["crates-io"]
 
 [workspace.dependencies]
 # The log's hash chain — same primitive family as Hyphae's journal.
-sha2 = "0.10"
+sha2 = "0.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 toml = "0.8"
