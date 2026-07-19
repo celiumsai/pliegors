@@ -1,0 +1,5 @@
+key = "docs-browser-framework-conformance"
+title = { en = "React, Svelte and Lit Conformance | PliegoRS", es = "Conformidad de React, Svelte y Lit | PliegoRS" }
+description = { en = "Integrate React, Svelte, and Lit through explicit PliegoRS adapter lifecycles with reduced-motion, HMR, and cleanup evidence.", es = "Integra React, Svelte y Lit mediante lifecycles explícitos de PliegoRS con evidencia de reduced motion, HMR y cleanup." }
+image = "/media/pliegors/fold-portrait.webp"
+imageAlt = { en = "A folded structure representing explicit browser framework lifecycles", es = "Una estructura plegada que representa lifecycles explícitos de frameworks web" }

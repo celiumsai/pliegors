@@ -1,0 +1,5 @@
+key = "docs-opensdk"
+title = { en = "OpenSDK Preview | PliegoRS Extension Contracts", es = "Preview de OpenSDK | Contratos de extensiones PliegoRS" }
+description = { en = "Evaluate PliegoRS OpenSDK 0.1.0-preview.1 from main: exact-byte admission, capabilities, effect receipts, resource budgets, and governance status.", es = "Evalúa PliegoRS OpenSDK 0.1.0-preview.1 desde main: admisión de bytes exactos, capabilities, recibos de efectos, presupuestos y gobernanza." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A precision ledger representing OpenSDK admission and capability evidence", es = "Un ledger de precisión que representa admisión y evidencia de capabilities OpenSDK" }

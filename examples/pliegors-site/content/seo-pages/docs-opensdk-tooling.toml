@@ -1,0 +1,5 @@
+key = "docs-opensdk-tooling"
+title = { en = "JSON-RPC and MCP Tooling | PliegoRS OpenSDK", es = "Tooling JSON-RPC y MCP | PliegoRS OpenSDK" }
+description = { en = "Build bounded PliegoRS editor and MCP clients through the OpenSDK JSON-RPC handshake, initialization, and capability contract.", es = "Construye clientes limitados de editor y MCP mediante el handshake, initialization y contrato de capabilities de OpenSDK." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A precision ledger representing bounded OpenSDK tooling protocols", es = "Un ledger de precisión que representa protocolos limitados de tooling OpenSDK" }
