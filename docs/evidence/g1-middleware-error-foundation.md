@@ -17,9 +17,18 @@ Every referenced middleware must have one reachable declaration. The sealed
 set distinguishes `rewrite-path`, `redirect`, `reject`, `read-body`, and
 `mutate-response-headers`; changing it changes the graph digest. The native
 runtime requires the registered implementation to present the exact same set
-before startup. This is authority admission for trusted native Rust code, not
-a sandbox: behavioral effect enforcement remains future work for the typed
-middleware API and OpenSDK component boundary.
+before startup.
+
+The runtime also mediates those effects at the `Next` boundary. Request method
+changes always fail; path changes require `rewrite-path` and cannot alter
+scheme, authority, or query. A private poll counter makes request body reads
+observable and requires `read-body`, while replacing its tracker fails closed.
+Short-circuit redirects and error responses require `redirect` and `reject`.
+Downstream response snapshots make header changes require
+`mutate-response-headers`. Violations become private `PLG-RUN-507` diagnostics
+and a bounded public failure before commitment. This is native framework
+mediation, not a sandbox against arbitrary side effects elsewhere in trusted
+application code.
 
 `pliego-runtime` provides a consume-once `MiddlewareNext`. Entered layers run
 root-to-leaf and successful or recovered responses unwind leaf-to-root before
@@ -62,7 +71,7 @@ cargo audit --deny warnings --ignore RUSTSEC-2026-0173
 Observed focused result:
 
 - `pliego-router`: 21 tests passed;
-- `pliego-runtime`: 13 unit, 19 in-process integration, and two real-socket
+- `pliego-runtime`: 13 unit, 23 in-process integration, and two real-socket
   tests passed;
 - `native-pliego`: five tests passed;
 - Clippy with warnings denied passed; and
@@ -82,9 +91,7 @@ server. Observed response bodies were 790 bytes for `/`, 815 bytes for
 
 ## Evidence boundary
 
-This slice does not implement group or layout middleware. It admits exact
-declared capabilities but does not yet mediate their behavioral effects inside
-trusted native Rust middleware. Nested layouts, asynchronous render
+This slice does not implement group or layout middleware. Nested layouts, asynchronous render
 boundaries, HTTP/2, middleware fuzzing, fixed-load memory/latency, and
 OpenTelemetry evidence remain open. This evidence does not close G1 or change
 any capability from `not-released`.

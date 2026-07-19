@@ -13,7 +13,9 @@ use futures_util::FutureExt;
 use http::{Request, Response, StatusCode};
 use http_body::{Body as HttpBody, Frame, SizeHint};
 use http_body_util::{BodyExt, Limited};
-use pliego_router::{MiddlewareCapabilities, ResolveError, RouteGraph, RouteMatch, RouteMethod};
+use pliego_router::{
+    MiddlewareCapabilities, MiddlewareCapability, ResolveError, RouteGraph, RouteMatch, RouteMethod,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
@@ -555,7 +557,10 @@ async fn dispatch(
         request_scope.cancel(CancelReason::RequestBodyLimit);
         error
     });
-    let request = Request::from_parts(parts, Body::new(limited));
+    let tracker = BodyReadTracker::new();
+    let tracked = TrackedRequestBody::new(Body::new(limited), tracker.clone());
+    let mut request = Request::from_parts(parts, Body::new(tracked));
+    request.extensions_mut().insert(tracker);
     let cancellation = scope.cancellation_token();
     let response = tokio::select! {
         biased;
@@ -704,7 +709,159 @@ async fn routed_response(
     response
 }
 
-type PreRouteMiddlewareLayer = (String, Arc<dyn RuntimePreRouteMiddleware>);
+#[derive(Clone)]
+struct PreRouteMiddlewareLayer {
+    id: String,
+    capabilities: MiddlewareCapabilities,
+    handler: Arc<dyn RuntimePreRouteMiddleware>,
+}
+
+struct MiddlewareEnforcement {
+    capabilities: MiddlewareCapabilities,
+    next_called: Arc<AtomicBool>,
+    downstream: Arc<Mutex<Option<ResponseObservation>>>,
+    body_tracker: BodyReadTracker,
+    body_reads_at_entry: u64,
+}
+
+#[derive(Clone)]
+struct ResponseObservation {
+    status: StatusCode,
+    headers: http::HeaderMap,
+}
+
+impl From<&Response<Body>> for ResponseObservation {
+    fn from(response: &Response<Body>) -> Self {
+        Self {
+            status: response.status(),
+            headers: response.headers().clone(),
+        }
+    }
+}
+
+fn validate_forwarded_request(
+    original_method: &http::Method,
+    original_uri: &http::Uri,
+    request: &Request<Body>,
+    capabilities: &MiddlewareCapabilities,
+    body_tracker: &BodyReadTracker,
+    body_reads_at_entry: u64,
+) -> Result<(), HandlerError> {
+    let forwarded_tracker = request.extensions().get::<BodyReadTracker>();
+    if forwarded_tracker.is_none_or(|tracker| !tracker.same(body_tracker)) {
+        return Err(middleware_capability_error(
+            "middleware removed or replaced the request body tracker",
+        ));
+    }
+    if body_tracker.reads() > body_reads_at_entry
+        && !capabilities.allows(MiddlewareCapability::ReadBody)
+    {
+        return Err(middleware_capability_error(
+            "middleware read the request body without read-body",
+        ));
+    }
+    if request.method() != original_method {
+        return Err(middleware_capability_error(
+            "middleware changed the request method",
+        ));
+    }
+    let forwarded_uri = request.uri();
+    if forwarded_uri == original_uri {
+        return Ok(());
+    }
+    if !capabilities.allows(MiddlewareCapability::RewritePath) {
+        return Err(middleware_capability_error(
+            "middleware rewrote the request without rewrite-path",
+        ));
+    }
+    if forwarded_uri.scheme() != original_uri.scheme()
+        || forwarded_uri.authority() != original_uri.authority()
+        || forwarded_uri.query() != original_uri.query()
+    {
+        return Err(middleware_capability_error(
+            "rewrite-path cannot change scheme, authority, or query",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_response_effects(
+    response: Response<Body>,
+    enforcement: Option<&MiddlewareEnforcement>,
+) -> Result<Response<Body>, HandlerError> {
+    let Some(enforcement) = enforcement else {
+        return Ok(response);
+    };
+    let next_called = enforcement.next_called.load(Ordering::Acquire);
+    if !next_called {
+        if enforcement.body_tracker.reads() > enforcement.body_reads_at_entry
+            && !enforcement
+                .capabilities
+                .allows(MiddlewareCapability::ReadBody)
+        {
+            return Err(middleware_capability_error(
+                "middleware read the request body without read-body",
+            ));
+        }
+        require_status_capability(response.status(), &enforcement.capabilities)?;
+        return Ok(response);
+    }
+    let downstream = lock(&enforcement.downstream).clone();
+    if let Some(downstream) = downstream {
+        if response.headers() != &downstream.headers
+            && !enforcement
+                .capabilities
+                .allows(MiddlewareCapability::MutateResponseHeaders)
+        {
+            return Err(middleware_capability_error(
+                "middleware changed response headers without mutate-response-headers",
+            ));
+        }
+        if response.status() != downstream.status {
+            require_status_capability(response.status(), &enforcement.capabilities)?;
+            if !response.status().is_redirection()
+                && !response.status().is_client_error()
+                && !response.status().is_server_error()
+            {
+                return Err(middleware_capability_error(
+                    "middleware changed the downstream success status",
+                ));
+            }
+        }
+    }
+    Ok(response)
+}
+
+fn require_status_capability(
+    status: StatusCode,
+    capabilities: &MiddlewareCapabilities,
+) -> Result<(), HandlerError> {
+    let required = if status.is_redirection() {
+        Some(MiddlewareCapability::Redirect)
+    } else if status.is_client_error() || status.is_server_error() {
+        Some(MiddlewareCapability::Reject)
+    } else {
+        None
+    };
+    if let Some(required) = required {
+        if !capabilities.allows(required) {
+            return Err(middleware_capability_error(format!(
+                "middleware returned {} without {}",
+                status,
+                required.as_str()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn middleware_capability_error(message: impl Into<String>) -> HandlerError {
+    HandlerError::new(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        RuntimeDiagnostic::new("PLG-RUN-507", bounded(&message.into(), 320))
+            .expect("capability diagnostics are bounded"),
+    )
+}
 
 fn pre_route_future(
     state: Arc<RuntimeState>,
@@ -716,15 +873,15 @@ fn pre_route_future(
         .pre_route_middleware_ids()
         .iter()
         .map(|id| {
-            (
-                id.clone(),
-                state
-                    .pre_route_middleware
-                    .get(id)
-                    .expect("pre-route registry was sealed with the route graph")
-                    .handler
-                    .clone(),
-            )
+            let registration = state
+                .pre_route_middleware
+                .get(id)
+                .expect("pre-route registry was sealed with the route graph");
+            PreRouteMiddlewareLayer {
+                id: id.clone(),
+                capabilities: registration.capabilities.clone(),
+                handler: registration.handler.clone(),
+            }
         })
         .collect();
     run_pre_route_middleware(state, scope, Arc::new(layers), 0, request)
@@ -738,16 +895,65 @@ fn run_pre_route_middleware(
     request: Request<Body>,
 ) -> HandlerFuture {
     Box::pin(async move {
-        let future = if let Some((id, middleware)) = layers.get(index).cloned() {
-            scope.record_middleware(&id);
+        let (future, enforcement) = if let Some(layer) = layers.get(index).cloned() {
+            scope.record_middleware(&layer.id);
             let next_state = state.clone();
             let next_scope = scope.clone();
             let next_layers = layers.clone();
+            let original_method = request.method().clone();
+            let original_uri = request.uri().clone();
+            let body_tracker = request
+                .extensions()
+                .get::<BodyReadTracker>()
+                .expect("admitted requests carry a body tracker")
+                .clone();
+            let body_reads_at_entry = body_tracker.reads();
+            let forwarded_capabilities = layer.capabilities.clone();
+            let forwarded_body_tracker = body_tracker.clone();
+            let next_called = Arc::new(AtomicBool::new(false));
+            let next_observer = next_called.clone();
+            let downstream: Arc<Mutex<Option<ResponseObservation>>> = Arc::new(Mutex::new(None));
+            let downstream_observer = downstream.clone();
             let next = PreRouteNext::new(Box::new(move |request| {
-                run_pre_route_middleware(next_state, next_scope, next_layers, index + 1, request)
+                next_observer.store(true, Ordering::Release);
+                if let Err(error) = validate_forwarded_request(
+                    &original_method,
+                    &original_uri,
+                    &request,
+                    &forwarded_capabilities,
+                    &forwarded_body_tracker,
+                    body_reads_at_entry,
+                ) {
+                    return Box::pin(async move { Err(error) });
+                }
+                let future = run_pre_route_middleware(
+                    next_state,
+                    next_scope,
+                    next_layers,
+                    index + 1,
+                    request,
+                );
+                Box::pin(async move {
+                    let result = future.await;
+                    if let Ok(response) = &result {
+                        *lock(&downstream_observer) = Some(ResponseObservation::from(response));
+                    }
+                    result
+                })
             }));
             let context = PreRouteContext::new(scope.clone());
-            catch_unwind(AssertUnwindSafe(|| middleware.call(context, request, next)))
+            (
+                catch_unwind(AssertUnwindSafe(|| {
+                    layer.handler.call(context, request, next)
+                })),
+                Some(MiddlewareEnforcement {
+                    capabilities: layer.capabilities,
+                    next_called,
+                    downstream,
+                    body_tracker,
+                    body_reads_at_entry,
+                }),
+            )
         } else {
             return Ok(routed_response(state, scope, request).await);
         };
@@ -768,7 +974,13 @@ fn run_pre_route_middleware(
             }
         };
         match AssertUnwindSafe(future).catch_unwind().await {
-            Ok(Ok(response)) => Ok(response),
+            Ok(Ok(response)) => match validate_response_effects(response, enforcement.as_ref()) {
+                Ok(response) => Ok(response),
+                Err(error) => {
+                    let public = public_handler_error(&error);
+                    Ok(recover_error(&state, &scope, None, public, error.diagnostic).await)
+                }
+            },
             Ok(Err(error)) => {
                 warn!(code = %error.diagnostic.code, "PliegoRS pre-route layer failed");
                 let public = public_handler_error(&error);
@@ -791,7 +1003,12 @@ fn run_pre_route_middleware(
     })
 }
 
-type MiddlewareLayer = (String, Arc<dyn RuntimeMiddleware>);
+#[derive(Clone)]
+struct MiddlewareLayer {
+    id: String,
+    capabilities: MiddlewareCapabilities,
+    handler: Arc<dyn RuntimeMiddleware>,
+}
 
 fn route_handler_future(
     state: Arc<RuntimeState>,
@@ -803,15 +1020,15 @@ fn route_handler_future(
         .middleware_ids()
         .iter()
         .map(|id| {
-            (
-                id.clone(),
-                state
-                    .middleware
-                    .get(id)
-                    .expect("middleware registry was sealed with the route graph")
-                    .handler
-                    .clone(),
-            )
+            let registration = state
+                .middleware
+                .get(id)
+                .expect("middleware registry was sealed with the route graph");
+            MiddlewareLayer {
+                id: id.clone(),
+                capabilities: registration.capabilities.clone(),
+                handler: registration.handler.clone(),
+            }
         })
         .collect();
     let handler = state
@@ -841,15 +1058,40 @@ fn run_middleware(
 ) -> HandlerFuture {
     Box::pin(async move {
         let scope = context.scope().clone();
-        let future = if let Some((id, middleware)) = layers.get(index).cloned() {
-            scope.record_middleware(&id);
+        let (future, enforcement) = if let Some(layer) = layers.get(index).cloned() {
+            scope.record_middleware(&layer.id);
             let next_state = state.clone();
             let next_route = route.clone();
             let next_layers = layers.clone();
             let next_handler = handler.clone();
             let next_context = context.clone();
+            let original_method = request.method().clone();
+            let original_uri = request.uri().clone();
+            let body_tracker = request
+                .extensions()
+                .get::<BodyReadTracker>()
+                .expect("admitted requests carry a body tracker")
+                .clone();
+            let body_reads_at_entry = body_tracker.reads();
+            let forwarded_capabilities = layer.capabilities.clone();
+            let forwarded_body_tracker = body_tracker.clone();
+            let next_called = Arc::new(AtomicBool::new(false));
+            let next_observer = next_called.clone();
+            let downstream: Arc<Mutex<Option<ResponseObservation>>> = Arc::new(Mutex::new(None));
+            let downstream_observer = downstream.clone();
             let next = MiddlewareNext::new(Box::new(move |request| {
-                run_middleware(
+                next_observer.store(true, Ordering::Release);
+                if let Err(error) = validate_forwarded_request(
+                    &original_method,
+                    &original_uri,
+                    &request,
+                    &forwarded_capabilities,
+                    &forwarded_body_tracker,
+                    body_reads_at_entry,
+                ) {
+                    return Box::pin(async move { Err(error) });
+                }
+                let future = run_middleware(
                     next_state,
                     next_route,
                     next_layers,
@@ -857,11 +1099,32 @@ fn run_middleware(
                     index + 1,
                     next_context,
                     request,
-                )
+                );
+                Box::pin(async move {
+                    let result = future.await;
+                    if let Ok(response) = &result {
+                        *lock(&downstream_observer) = Some(ResponseObservation::from(response));
+                    }
+                    result
+                })
             }));
-            catch_unwind(AssertUnwindSafe(|| middleware.call(context, request, next)))
+            (
+                catch_unwind(AssertUnwindSafe(|| {
+                    layer.handler.call(context, request, next)
+                })),
+                Some(MiddlewareEnforcement {
+                    capabilities: layer.capabilities,
+                    next_called,
+                    downstream,
+                    body_tracker,
+                    body_reads_at_entry,
+                }),
+            )
         } else {
-            catch_unwind(AssertUnwindSafe(|| handler.call(context, request)))
+            (
+                catch_unwind(AssertUnwindSafe(|| handler.call(context, request))),
+                None,
+            )
         };
         let future = match future {
             Ok(future) => future,
@@ -880,7 +1143,13 @@ fn run_middleware(
             }
         };
         match AssertUnwindSafe(future).catch_unwind().await {
-            Ok(Ok(response)) => Ok(response),
+            Ok(Ok(response)) => match validate_response_effects(response, enforcement.as_ref()) {
+                Ok(response) => Ok(response),
+                Err(error) => {
+                    let public = public_handler_error(&error);
+                    Ok(recover_error(&state, &scope, Some(&route), public, error.diagnostic).await)
+                }
+            },
             Ok(Err(error)) => {
                 warn!(code = %error.diagnostic.code, "PliegoRS route layer failed");
                 let public = public_handler_error(&error);
@@ -1190,6 +1459,59 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[derive(Clone)]
+struct BodyReadTracker {
+    polls: Arc<AtomicU64>,
+}
+
+impl BodyReadTracker {
+    fn new() -> Self {
+        Self {
+            polls: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    fn reads(&self) -> u64 {
+        self.polls.load(Ordering::Acquire)
+    }
+
+    fn same(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.polls, &other.polls)
+    }
+}
+
+struct TrackedRequestBody {
+    inner: Body,
+    tracker: BodyReadTracker,
+}
+
+impl TrackedRequestBody {
+    fn new(inner: Body, tracker: BodyReadTracker) -> Self {
+        Self { inner, tracker }
+    }
+}
+
+impl HttpBody for TrackedRequestBody {
+    type Data = Bytes;
+    type Error = axum::Error;
+
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        self.tracker.polls.fetch_add(1, Ordering::AcqRel);
+        Pin::new(&mut self.inner).poll_frame(context)
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.inner.is_end_stream()
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        self.inner.size_hint()
+    }
 }
 
 struct ScopedBody {

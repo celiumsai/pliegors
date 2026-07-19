@@ -12,8 +12,11 @@ responses before commitment, and remains active for recovered downstream
 errors. Error boundaries receive only a bounded public class, status, code,
 and optional route ID; internal diagnostic messages remain receipt-only.
 Middleware capability sets are part of route graph v4 and must exactly match
-the native registry before startup. This admission contract does not yet
-sandbox behavioral effects performed by trusted Rust application code.
+the native registry before startup. The runtime then mediates path rewrites,
+redirects, rejection, request-body reads, and downstream response-header
+changes at the `Next` boundary; undeclared effects fail before commitment with
+`PLG-RUN-507`. This is a framework boundary, not a general sandbox for trusted
+application code.
 Root pre-route middleware has a distinct context without route authority and
 runs before matching; it may rewrite or short-circuit while preserving the
 single post-unwind response commitment.
@@ -33,6 +36,6 @@ graceful-shutdown case with a pending streamed response. HTTP/2, TLS, proxy,
 slow-peer, and fixed-load evidence remain open gate work.
 
 This foundation is intentionally incomplete. It does not yet expose
-asynchronous boundary streaming, group/layout middleware inheritance, typed
-middleware effect mediation, OpenTelemetry, multipart/decompression
+asynchronous boundary streaming, group/layout middleware inheritance,
+OpenTelemetry, multipart/decompression
 policies, or a production `pliego serve` command.

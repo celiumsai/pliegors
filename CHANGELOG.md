@@ -11,7 +11,7 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 - Add the unreleased G1 native runtime foundation with a sealed dynamic route
   graph, bounded complete and ordered SSR, raw HTTP/1.1 lifecycle evidence,
-  pre-route and route middleware, exact capability admission, safe authored
+  pre-route and route middleware, exact capability admission and effect mediation, safe authored
   error boundaries, receipts, cancellation, and a launchable reference app.
 - Add the OpenSDK `0.1.0-preview.1` contracts, conformance CLI, typed Wasmtime
   Component host, effect broker, multilang/browser/tooling fixtures, and

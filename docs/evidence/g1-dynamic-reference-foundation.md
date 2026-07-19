@@ -61,7 +61,7 @@ responses, and `SIGINT` completed a clean process exit.
 
 This application has not passed the fixed-load acceptance profile. It does not
 yet prove p50/p95/p99 latency, peak RSS, memory plateau, slow peers, overload,
-HTTP/2, TLS, group/layout middleware, typed capability effect mediation,
+HTTP/2, TLS, group/layout middleware,
 asynchronous render boundaries, OpenTelemetry, multipart/decompression policy,
 or deployment from a sealed release candidate. It does not close G1 or change
 any capability from `not-released`.

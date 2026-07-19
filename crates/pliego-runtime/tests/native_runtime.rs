@@ -361,6 +361,269 @@ async fn pre_route_middleware_can_redirect_without_resolving_a_route() {
 }
 
 #[tokio::test]
+async fn undeclared_pre_route_rewrite_fails_closed_before_resolution() {
+    let graph = RouteGraphBuilder::new()
+        .declare_middleware("rewrite", MiddlewareCapabilities::none())
+        .unwrap()
+        .pre_route_middleware("rewrite")
+        .unwrap()
+        .route(route("home", RouteMethod::get(), "/"))
+        .seal()
+        .unwrap();
+    let handler_ran = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "undeclared-rewrite")
+        .unwrap()
+        .pre_route_middleware(
+            "rewrite",
+            MiddlewareCapabilities::none(),
+            |_context, mut request: http::Request<Body>, next: pliego_runtime::PreRouteNext| async move {
+                *request.uri_mut() = "/".parse().unwrap();
+                next.run(request).await
+            },
+        )
+        .handler("home", {
+            let handler_ran = handler_ran.clone();
+            move |_context, _request| {
+                handler_ran.store(true, std::sync::atomic::Ordering::Release);
+                async { Ok(Response::new(Body::empty())) }
+            }
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            http::Request::builder()
+                .uri("/alias")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        to_bytes(response.into_body(), 32).await.unwrap(),
+        "PLG-RUN-507\n"
+    );
+    assert!(!handler_ran.load(std::sync::atomic::Ordering::Acquire));
+    assert_eq!(sink.receipts()[0].diagnostics[0].code, "PLG-RUN-507");
+}
+
+#[tokio::test]
+async fn undeclared_response_header_mutation_is_replaced_before_commit() {
+    let graph = RouteGraphBuilder::new()
+        .declare_middleware("headers", MiddlewareCapabilities::none())
+        .unwrap()
+        .route(
+            route("home", RouteMethod::get(), "/")
+                .middleware("headers")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "undeclared-headers")
+        .unwrap()
+        .middleware(
+            "headers",
+            |_context, request, next: pliego_runtime::MiddlewareNext| async move {
+                let mut response = next.run(request).await?;
+                response
+                    .headers_mut()
+                    .insert("x-hidden", http::HeaderValue::from_static("denied"));
+                Ok(response)
+            },
+        )
+        .handler("home", |_context, _request| async {
+            Ok(Response::new(Body::from("must not escape")))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            http::Request::builder()
+                .uri("/")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(response.headers().get("x-hidden").is_none());
+    assert_eq!(
+        to_bytes(response.into_body(), 32).await.unwrap(),
+        "PLG-RUN-507\n"
+    );
+    assert_eq!(sink.receipts()[0].diagnostics[0].code, "PLG-RUN-507");
+}
+
+#[tokio::test]
+async fn request_body_reads_require_the_sealed_capability() {
+    let graph = RouteGraphBuilder::new()
+        .declare_middleware("body-reader", MiddlewareCapabilities::none())
+        .unwrap()
+        .route(
+            route("submit", RouteMethod::post(), "/submit")
+                .middleware("body-reader")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "undeclared-body-read")
+        .unwrap()
+        .middleware(
+            "body-reader",
+            |_context, request: http::Request<Body>, next: pliego_runtime::MiddlewareNext| async move {
+                let (parts, body) = request.into_parts();
+                let bytes = to_bytes(body, 64)
+                    .await
+                    .map_err(|_| pliego_runtime::HandlerError::internal("body read failed"))?;
+                next.run(http::Request::from_parts(parts, Body::from(bytes)))
+                    .await
+            },
+        )
+        .handler("submit", |_context, _request| async {
+            Ok(Response::new(Body::from("must not run")))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            http::Request::builder()
+                .method("POST")
+                .uri("/submit")
+                .body(Body::from("payload"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        to_bytes(response.into_body(), 32).await.unwrap(),
+        "PLG-RUN-507\n"
+    );
+    assert_eq!(sink.receipts()[0].diagnostics[0].code, "PLG-RUN-507");
+
+    let capabilities = MiddlewareCapabilities::none().allowing(MiddlewareCapability::ReadBody);
+    let graph = RouteGraphBuilder::new()
+        .declare_middleware("body-reader", capabilities.clone())
+        .unwrap()
+        .route(
+            route("submit", RouteMethod::post(), "/submit")
+                .middleware("body-reader")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let runtime = NativeRuntimeBuilder::new(graph, "declared-body-read")
+        .unwrap()
+        .middleware_with_capabilities(
+            "body-reader",
+            capabilities,
+            |_context, request: http::Request<Body>, next: pliego_runtime::MiddlewareNext| async move {
+                let (parts, body) = request.into_parts();
+                let bytes = to_bytes(body, 64)
+                    .await
+                    .map_err(|_| pliego_runtime::HandlerError::internal("body read failed"))?;
+                next.run(http::Request::from_parts(parts, Body::from(bytes)))
+                    .await
+            },
+        )
+        .handler("submit", |_context, request: http::Request<Body>| async move {
+            let body = to_bytes(request.into_body(), 64)
+                .await
+                .map_err(|_| pliego_runtime::HandlerError::internal("handler body read failed"))?;
+            Ok(Response::new(Body::from(body)))
+        })
+        .build()
+        .unwrap();
+    let response = runtime
+        .router()
+        .oneshot(
+            http::Request::builder()
+                .method("POST")
+                .uri("/submit")
+                .body(Body::from("payload"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(to_bytes(response.into_body(), 32).await.unwrap(), "payload");
+}
+
+#[tokio::test]
+async fn redirects_and_rejections_require_their_sealed_capabilities() {
+    let graph = RouteGraphBuilder::new()
+        .declare_middleware("policy", MiddlewareCapabilities::none())
+        .unwrap()
+        .route(
+            route("redirect", RouteMethod::get(), "/redirect")
+                .middleware("policy")
+                .unwrap(),
+        )
+        .route(
+            route("reject", RouteMethod::get(), "/reject")
+                .middleware("policy")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let runtime = NativeRuntimeBuilder::new(graph, "undeclared-status-effects")
+        .unwrap()
+        .middleware(
+            "policy",
+            |_context, request: http::Request<Body>, _next| async move {
+                let status = if request.uri().path() == "/redirect" {
+                    StatusCode::TEMPORARY_REDIRECT
+                } else {
+                    StatusCode::FORBIDDEN
+                };
+                Ok(Response::builder()
+                    .status(status)
+                    .body(Body::empty())
+                    .unwrap())
+            },
+        )
+        .handler("redirect", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .handler("reject", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .build()
+        .unwrap();
+
+    for path in ["/redirect", "/reject"] {
+        let response = runtime
+            .router()
+            .oneshot(
+                http::Request::builder()
+                    .uri(path)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            to_bytes(response.into_body(), 32).await.unwrap(),
+            "PLG-RUN-507\n"
+        );
+    }
+}
+
+#[tokio::test]
 async fn error_boundaries_walk_outward_without_receiving_internal_messages() {
     let graph = RouteGraphBuilder::new()
         .declare_middleware(
