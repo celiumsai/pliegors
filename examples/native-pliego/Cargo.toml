@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "native-pliego"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+futures-util = { workspace = true }
+pliego-dom = { path = "../../crates/pliego-dom" }
+pliego-router = { path = "../../crates/pliego-router" }
+pliego-runtime = { path = "../../crates/pliego-runtime" }
+tokio = { workspace = true }
+
+[dev-dependencies]
+http-body-util = { workspace = true }
+tower = { workspace = true }

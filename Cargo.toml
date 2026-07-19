@@ -27,6 +27,7 @@ members = [
     "examples/content-collections-pliegors",
     "examples/pliegors-site",
     "examples/pliegors-site-client",
+    "examples/native-pliego",
 ]
 
 [workspace.package]

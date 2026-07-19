@@ -130,6 +130,17 @@ The source implementation currently demonstrates:
 - exactly-once bounded receipts; and
 - pre-commit complete-render failures with stable `PLG-REN-*` diagnostics.
 
+## Dynamic reference application
+
+[`examples/native-pliego`](../examples/native-pliego/) seals five native
+routes in one graph: complete SSR, a typed parameter route, ordered SSR, a
+JSON health response, and a stylesheet asset. The executable binds to
+`127.0.0.1:4310` by default, rejects non-loopback addresses unless
+`PLIEGO_EXPOSE=1` is explicit, and drains through the runtime on `Ctrl+C`.
+
+The application is reproducible G1 evidence, not a released starter or a
+production-readiness claim.
+
 ## Deliberately absent
 
 There is no asynchronous boundary streaming API yet. Ordered mode streams
