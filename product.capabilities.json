@@ -9,7 +9,7 @@
     "openSdkVersion": "0.1.0-preview.1",
     "license": "Apache-2.0",
     "releasedCrateCount": 15,
-    "unreleasedCrates": ["pliego-sdk"]
+    "unreleasedCrates": ["pliego-router", "pliego-runtime", "pliego-sdk"]
   },
   "support": {
     "rust": {
@@ -108,8 +108,11 @@
       "stability": "none",
       "gate": "G1",
       "summary": "Nested layouts, typed dynamic parameters, route handlers, middleware, and authored error boundaries.",
-      "evidence": ["docs/rfc/RFC-009-route-graph.md"],
-      "limitations": ["The current route graph owns static output paths and does not dispatch production HTTP requests."]
+      "evidence": ["docs/rfc/RFC-009-route-graph.md", "docs/evidence/g1-native-runtime-foundation.md"],
+      "limitations": [
+        "Unreleased source implements the bounded core grammar, collision admission, deterministic digest, parameter matching, and HTTP method dispatch.",
+        "Layouts, middleware, error boundaries, generated parameter types, fuzzing, and host conformance remain incomplete."
+      ]
     },
     {
       "id": "hyphae-client",
@@ -130,8 +133,11 @@
       "stability": "none",
       "gate": "G1",
       "summary": "A production Axum, Hyper, Tower, and Tokio host with bounded requests, cancellation, streaming, and graceful shutdown.",
-      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md"],
-      "limitations": ["tiny_http is used only by development and preview commands for static output."]
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md"],
+      "limitations": [
+        "The unreleased source is a lifecycle foundation, not a production-conformant server release.",
+        "Rendering, middleware, OpenTelemetry, load evidence, and the threat-model corpus remain incomplete; tiny_http remains limited to development and static preview commands."
+      ]
     },
     {
       "id": "opensdk-browser-tooling",

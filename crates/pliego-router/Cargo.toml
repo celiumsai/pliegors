@@ -1,24 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
 [package]
-name = "pliego-artifact"
-version.workspace = true
+name = "pliego-router"
+version = "0.1.0-preview.1"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-readme.workspace = true
-keywords.workspace = true
-categories.workspace = true
-description = "Portable artifact namespaces and verifiable build receipts for PliegoRS."
+readme = "README.md"
+keywords = ["routing", "http", "rust", "web", "framework"]
+categories = ["web-programming", "development-tools"]
+description = "Sealed, deterministic full-stack route graph for PliegoRS."
 publish.workspace = true
 
 [dependencies]
-cap-fs-ext = "=4.0.2"
-cap-std = "=4.0.2"
 serde = { workspace = true }
-serde_json = { workspace = true }
 sha2 = { workspace = true }
 unicode-casefold = { workspace = true }
 unicode-normalization = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
