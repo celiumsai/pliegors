@@ -133,6 +133,8 @@ The source implementation currently demonstrates:
   admission against the native registry;
 - root pre-route middleware that can rewrite before matching or terminate
   without creating false route context;
+- fail-closed mediation of path rewrites, redirects, rejection, body reads,
+  and downstream response-header changes with `PLG-RUN-507`;
 - root and route error boundaries that receive no internal diagnostic message;
 - exactly-once bounded receipts; and
 - pre-commit complete-render failures with stable `PLG-REN-*` diagnostics.
@@ -166,8 +168,7 @@ not claim incremental output inside one DOM tree.
 The following remain gate work:
 
 - declared asynchronous boundaries;
-- group and layout middleware plus behavioral mediation of the
-  declared rewrite, redirect, reject, body-read, and response-mutation effects;
+- group and layout middleware inheritance;
 - OpenTelemetry with redaction and cardinality tests;
 - multipart and decompression policies;
 - real socket HTTP/2 conformance; and

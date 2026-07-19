@@ -20,6 +20,6 @@ with `PLIEGO_ADDR`. Binding a non-loopback address is rejected unless
 `PLIEGO_EXPOSE=1` is also present.
 
 This application is gate evidence, not a released starter. It does not yet
-prove group/layout middleware, typed behavioral effect mediation,
+prove group/layout middleware,
 asynchronous boundaries, HTTP/2, TLS, OpenTelemetry,
 multipart/decompression policy, fixed-load behavior, or production deployment.
