@@ -113,8 +113,8 @@
       "summary": "Nested layouts, typed dynamic parameters, route handlers, middleware, and authored error boundaries.",
       "evidence": ["docs/rfc/RFC-009-route-graph.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md"],
       "limitations": [
-        "Unreleased source implements the bounded core grammar, collision admission, deterministic digest, parameter matching, HTTP method dispatch, route middleware, exact capability admission, and root/route error boundaries.",
-        "Layouts, pre-route and nested middleware, typed effect mediation, generated parameter types, fuzzing, and host conformance remain incomplete."
+        "Unreleased source implements the bounded core grammar, collision admission, deterministic digest, parameter matching, HTTP method dispatch, pre-route and route middleware, exact capability admission, and root/route error boundaries.",
+        "Layouts, group/layout middleware, typed effect mediation, generated parameter types, fuzzing, and host conformance remain incomplete."
       ]
     },
     {

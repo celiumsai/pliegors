@@ -126,6 +126,21 @@ pub struct RequestContext {
     route: RouteMatch,
 }
 
+#[derive(Clone)]
+pub struct PreRouteContext {
+    scope: RequestScope,
+}
+
+impl PreRouteContext {
+    pub(crate) fn new(scope: RequestScope) -> Self {
+        Self { scope }
+    }
+
+    pub fn scope(&self) -> &RequestScope {
+        &self.scope
+    }
+}
+
 impl RequestContext {
     pub(crate) fn new(scope: RequestScope, route: RouteMatch) -> Self {
         Self { scope, route }
@@ -523,7 +538,10 @@ fn transition_allowed(from: &RequestState, to: &RequestState) -> bool {
     matches!(
         (from, to),
         (Accepted, HeadAdmitted | Rejected | Cancelled | Failed)
-            | (HeadAdmitted, RouteResolved | Rejected | Cancelled | Failed)
+            | (
+                HeadAdmitted,
+                RouteResolved | ResponseCommitted | Rejected | Cancelled | Failed
+            )
             | (RouteResolved, ScopeOpen | Rejected | Cancelled | Failed)
             | (ScopeOpen, HandlerRunning | Rejected | Cancelled | Failed)
             | (HandlerRunning, ResponseCommitted | Cancelled | Failed)
@@ -664,7 +682,12 @@ mod tests {
             ..RequestLimits::default()
         };
         let request = scope(limits, Arc::new(InMemoryReceiptSink::default()));
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            request.cancellation_token().cancelled(),
+        )
+        .await
+        .expect("deadline cancellation should be observable");
         assert!(request.is_cancelled());
         assert_eq!(request.cancel_reason(), Some(CancelReason::Deadline));
         request.drain_and_close();

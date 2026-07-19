@@ -131,6 +131,8 @@ The source implementation currently demonstrates:
   unwinding before commitment;
 - graph-digested middleware capability declarations with exact startup
   admission against the native registry;
+- root pre-route middleware that can rewrite before matching or terminate
+  without creating false route context;
 - root and route error boundaries that receive no internal diagnostic message;
 - exactly-once bounded receipts; and
 - pre-commit complete-render failures with stable `PLG-REN-*` diagnostics.
@@ -146,7 +148,8 @@ JSON health response, and a stylesheet asset. The executable binds to
 The application is reproducible G1 evidence, not a released starter or a
 production-readiness claim.
 
-Every reference route declares `response-policy` middleware and its
+The reference graph declares a `canonical-entry` pre-route rewrite and every
+route declares `response-policy` middleware and its
 `mutate-response-headers` capability in the sealed graph. The runtime admits
 the implementation only when its registered capability set matches. It adds
 CSP, referrer, and content-type protections before commitment.
@@ -163,7 +166,7 @@ not claim incremental output inside one DOM tree.
 The following remain gate work:
 
 - declared asynchronous boundaries;
-- pre-route, group, and layout middleware plus behavioral mediation of the
+- group and layout middleware plus behavioral mediation of the
   declared rewrite, redirect, reject, body-read, and response-mutation effects;
 - OpenTelemetry with redaction and cardinality tests;
 - multipart and decompression policies;
