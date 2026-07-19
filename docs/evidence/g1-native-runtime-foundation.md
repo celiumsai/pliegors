@@ -76,7 +76,8 @@ capabilities to a released state. The following acceptance work remains:
 - multipart and decompression limits;
 - OpenTelemetry spans, metrics, redaction, and cardinality tests;
 - differential request-target corpus, property tests, and fuzz targets;
-- real socket HTTP/1.1 and HTTP/2 conformance;
+- real socket HTTP/2 conformance (HTTP/1.1 loopback evidence is recorded in
+  [`g1-native-socket-foundation.md`](g1-native-socket-foundation.md));
 - slowloris, slow-reader, overload, disconnect, and shutdown load evidence;
 - fixed-load latency and peak RSS measurements with a memory plateau;
 - dependency audit and an updated threat-control map; and

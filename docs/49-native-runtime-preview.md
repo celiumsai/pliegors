@@ -126,6 +126,7 @@ The source implementation currently demonstrates:
 - handler panic isolation when unwinding is available;
 - cancellation wakeups for pending response streams;
 - client-disconnect and shutdown cleanup;
+- raw TCP HTTP/1.1 loopback dispatch and graceful shutdown;
 - exactly-once bounded receipts; and
 - pre-commit complete-render failures with stable `PLG-REN-*` diagnostics.
 
@@ -141,6 +142,6 @@ The following remain gate work:
 - middleware and authored error-boundary graphs;
 - OpenTelemetry with redaction and cardinality tests;
 - multipart and decompression policies;
-- real socket HTTP/1.1 and HTTP/2 conformance; and
+- real socket HTTP/2 conformance; and
 - fixed-load latency, RSS, disconnect, slow-peer, overload, and shutdown
   evidence.

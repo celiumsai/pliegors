@@ -77,7 +77,7 @@ http = "=1.4.2"
 http-body = "=1.1.0"
 http-body-util = "=0.1.4"
 hyper = { version = "=1.10.1", default-features = false, features = ["http1", "http2", "server"] }
-tokio = { version = "=1.53.0", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "=1.53.0", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-util = { version = "=0.7.18", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["limit", "load-shed", "timeout", "util"] }
 tracing = "=0.1.44"

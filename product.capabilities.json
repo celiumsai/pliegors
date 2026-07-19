@@ -136,7 +136,7 @@
       "stability": "none",
       "gate": "G1",
       "summary": "A production Axum, Hyper, Tower, and Tokio host with bounded requests, cancellation, streaming, and graceful shutdown.",
-      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md"],
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-native-socket-foundation.md"],
       "limitations": [
         "The unreleased source is a lifecycle foundation, not a production-conformant server release.",
         "Rendering, middleware, OpenTelemetry, load evidence, and the threat-model corpus remain incomplete; tiny_http remains limited to development and static preview commands."
