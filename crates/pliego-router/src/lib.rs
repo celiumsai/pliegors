@@ -24,6 +24,51 @@ pub const MAX_ROUTE_MIDDLEWARE: usize = 32;
 pub const MAX_ERROR_BOUNDARIES: usize = 16;
 pub const DEFAULT_MAX_ROUTES: usize = 4_096;
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MiddlewareCapability {
+    RewritePath,
+    Redirect,
+    Reject,
+    ReadBody,
+    MutateResponseHeaders,
+}
+
+impl MiddlewareCapability {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::RewritePath => "rewrite-path",
+            Self::Redirect => "redirect",
+            Self::Reject => "reject",
+            Self::ReadBody => "read-body",
+            Self::MutateResponseHeaders => "mutate-response-headers",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct MiddlewareCapabilities(BTreeSet<MiddlewareCapability>);
+
+impl MiddlewareCapabilities {
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    pub fn allowing(mut self, capability: MiddlewareCapability) -> Self {
+        self.0.insert(capability);
+        self
+    }
+
+    pub fn allows(&self, capability: MiddlewareCapability) -> bool {
+        self.0.contains(&capability)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = MiddlewareCapability> + '_ {
+        self.0.iter().copied()
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct RouteMethod(String);
@@ -519,6 +564,7 @@ fn validate_route_id(id: &str) -> Result<(), RouteError> {
 pub struct RouteGraphBuilder {
     max_routes: usize,
     routes: Vec<RouteSpec>,
+    middleware_capabilities: BTreeMap<String, MiddlewareCapabilities>,
     error_boundaries: Vec<String>,
 }
 
@@ -533,6 +579,7 @@ impl RouteGraphBuilder {
         Self {
             max_routes: DEFAULT_MAX_ROUTES,
             routes: Vec::new(),
+            middleware_capabilities: BTreeMap::new(),
             error_boundaries: Vec::new(),
         }
     }
@@ -544,8 +591,26 @@ impl RouteGraphBuilder {
         Ok(Self {
             max_routes,
             routes: Vec::new(),
+            middleware_capabilities: BTreeMap::new(),
             error_boundaries: Vec::new(),
         })
+    }
+
+    pub fn declare_middleware(
+        mut self,
+        id: impl Into<String>,
+        capabilities: MiddlewareCapabilities,
+    ) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_behavior_id(&id, BehaviorKind::Middleware)?;
+        if self
+            .middleware_capabilities
+            .insert(id.clone(), capabilities)
+            .is_some()
+        {
+            return Err(RouteError::DuplicateMiddlewareDeclaration(id));
+        }
+        Ok(self)
     }
 
     pub fn error_boundary(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
@@ -598,10 +663,34 @@ impl RouteGraphBuilder {
             }
         }
 
-        let digest = graph_digest(&self.routes, &self.error_boundaries);
+        let referenced_middleware: BTreeSet<_> = self
+            .routes
+            .iter()
+            .flat_map(|route| route.middleware.iter().cloned())
+            .collect();
+        if let Some(id) = referenced_middleware
+            .iter()
+            .find(|id| !self.middleware_capabilities.contains_key(*id))
+        {
+            return Err(RouteError::MissingMiddlewareDeclaration(id.clone()));
+        }
+        if let Some(id) = self
+            .middleware_capabilities
+            .keys()
+            .find(|id| !referenced_middleware.contains(*id))
+        {
+            return Err(RouteError::UnreferencedMiddlewareDeclaration(id.clone()));
+        }
+
+        let digest = graph_digest(
+            &self.routes,
+            &self.middleware_capabilities,
+            &self.error_boundaries,
+        );
         self.routes.sort_by(match_order);
         Ok(RouteGraph {
             routes: self.routes,
+            middleware_capabilities: self.middleware_capabilities,
             error_boundaries: self.error_boundaries,
             digest,
         })
@@ -624,10 +713,23 @@ fn match_order(left: &RouteSpec, right: &RouteSpec) -> Ordering {
         .then_with(|| left.id.cmp(&right.id))
 }
 
-fn graph_digest(routes: &[RouteSpec], error_boundaries: &[String]) -> String {
+fn graph_digest(
+    routes: &[RouteSpec],
+    middleware_capabilities: &BTreeMap<String, MiddlewareCapabilities>,
+    error_boundaries: &[String],
+) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"pliego-route-graph-v2\0");
+    digest.update(b"pliego-route-graph-v3\0");
     digest_sequence(&mut digest, b"root-error-boundaries", error_boundaries);
+    for (id, capabilities) in middleware_capabilities {
+        digest.update((id.len() as u64).to_be_bytes());
+        digest.update(id.as_bytes());
+        let values: Vec<_> = capabilities
+            .iter()
+            .map(|capability| capability.as_str().to_owned())
+            .collect();
+        digest_sequence(&mut digest, b"middleware-capabilities", &values);
+    }
     for route in routes {
         for value in [
             route.method.as_str(),
@@ -671,6 +773,7 @@ fn encode_hex(bytes: &[u8]) -> String {
 #[derive(Clone, Debug)]
 pub struct RouteGraph {
     routes: Vec<RouteSpec>,
+    middleware_capabilities: BTreeMap<String, MiddlewareCapabilities>,
     error_boundaries: Vec<String>,
     digest: String,
 }
@@ -682,6 +785,14 @@ impl RouteGraph {
 
     pub fn routes(&self) -> &[RouteSpec] {
         &self.routes
+    }
+
+    pub fn middleware_capabilities(&self, id: &str) -> Option<&MiddlewareCapabilities> {
+        self.middleware_capabilities.get(id)
+    }
+
+    pub fn middleware_declarations(&self) -> &BTreeMap<String, MiddlewareCapabilities> {
+        &self.middleware_capabilities
     }
 
     pub fn error_boundary_ids(&self) -> &[String] {
@@ -845,6 +956,9 @@ pub enum RouteError {
     InvalidMiddlewareId(String),
     DuplicateMiddleware(String),
     TooManyMiddleware(usize),
+    DuplicateMiddlewareDeclaration(String),
+    MissingMiddlewareDeclaration(String),
+    UnreferencedMiddlewareDeclaration(String),
     InvalidErrorBoundaryId(String),
     DuplicateErrorBoundary(String),
     TooManyErrorBoundaries(usize),
@@ -874,6 +988,9 @@ impl RouteError {
             Self::InvalidMiddlewareId(_)
             | Self::DuplicateMiddleware(_)
             | Self::TooManyMiddleware(_) => "PLG-RTE-011",
+            Self::DuplicateMiddlewareDeclaration(_)
+            | Self::MissingMiddlewareDeclaration(_)
+            | Self::UnreferencedMiddlewareDeclaration(_) => "PLG-RTE-013",
             Self::InvalidErrorBoundaryId(_)
             | Self::DuplicateErrorBoundary(_)
             | Self::TooManyErrorBoundaries(_) => "PLG-RTE-012",
@@ -917,6 +1034,21 @@ impl Display for RouteError {
             }
             Self::TooManyMiddleware(maximum) => {
                 write!(formatter, "route exceeds {maximum} middleware entries")
+            }
+            Self::DuplicateMiddlewareDeclaration(value) => {
+                write!(formatter, "duplicate middleware declaration: {value}")
+            }
+            Self::MissingMiddlewareDeclaration(value) => {
+                write!(
+                    formatter,
+                    "middleware {value} has no capability declaration"
+                )
+            }
+            Self::UnreferencedMiddlewareDeclaration(value) => {
+                write!(
+                    formatter,
+                    "middleware declaration {value} is not referenced"
+                )
             }
             Self::InvalidErrorBoundaryId(value) => {
                 write!(formatter, "invalid error boundary ID {value:?}")
@@ -1190,6 +1322,13 @@ mod tests {
             .error_boundary("account-error")
             .unwrap();
         let graph = RouteGraphBuilder::new()
+            .declare_middleware("request-id", MiddlewareCapabilities::none())
+            .unwrap()
+            .declare_middleware(
+                "authorization",
+                MiddlewareCapabilities::none().allowing(MiddlewareCapability::Reject),
+            )
+            .unwrap()
             .error_boundary("root-error")
             .unwrap()
             .route(guarded)
@@ -1204,6 +1343,13 @@ mod tests {
         assert_eq!(graph.error_boundary_ids(), &["root-error".to_owned()]);
 
         let changed = RouteGraphBuilder::new()
+            .declare_middleware(
+                "authorization",
+                MiddlewareCapabilities::none().allowing(MiddlewareCapability::Reject),
+            )
+            .unwrap()
+            .declare_middleware("request-id", MiddlewareCapabilities::none())
+            .unwrap()
             .error_boundary("root-error")
             .unwrap()
             .route(
@@ -1218,6 +1364,57 @@ mod tests {
             .seal()
             .unwrap();
         assert_ne!(graph.digest(), changed.digest());
+        assert!(
+            graph
+                .middleware_capabilities("authorization")
+                .unwrap()
+                .allows(MiddlewareCapability::Reject)
+        );
+    }
+
+    #[test]
+    fn middleware_capabilities_are_explicit_reachable_and_digest_bound() {
+        let guarded = route("home", RouteMethod::get(), "/")
+            .middleware("security")
+            .unwrap();
+        let missing = RouteGraphBuilder::new()
+            .route(guarded.clone())
+            .seal()
+            .unwrap_err();
+        assert_eq!(
+            missing,
+            RouteError::MissingMiddlewareDeclaration("security".to_owned())
+        );
+
+        let unreferenced = RouteGraphBuilder::new()
+            .declare_middleware("security", MiddlewareCapabilities::none())
+            .unwrap()
+            .route(route("home", RouteMethod::get(), "/"))
+            .seal()
+            .unwrap_err();
+        assert_eq!(
+            unreferenced,
+            RouteError::UnreferencedMiddlewareDeclaration("security".to_owned())
+        );
+
+        let baseline = RouteGraphBuilder::new()
+            .declare_middleware("security", MiddlewareCapabilities::none())
+            .unwrap()
+            .route(guarded.clone())
+            .seal()
+            .unwrap();
+        let elevated = RouteGraphBuilder::new()
+            .declare_middleware(
+                "security",
+                MiddlewareCapabilities::none()
+                    .allowing(MiddlewareCapability::Reject)
+                    .allowing(MiddlewareCapability::MutateResponseHeaders),
+            )
+            .unwrap()
+            .route(guarded)
+            .seal()
+            .unwrap();
+        assert_ne!(baseline.digest(), elevated.digest());
     }
 
     #[test]

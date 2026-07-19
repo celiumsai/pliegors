@@ -2,7 +2,9 @@
 
 use futures_util::stream;
 use pliego_dom::{IntoView, el};
-use pliego_router::{RouteGraphBuilder, RouteMethod, RouteSpec};
+use pliego_router::{
+    MiddlewareCapabilities, MiddlewareCapability, RouteGraphBuilder, RouteMethod, RouteSpec,
+};
 use pliego_runtime::{
     Body, CompleteDocument, CompleteRenderOptions, NativeRuntime, NativeRuntimeBuilder,
     OrderedDocument, OrderedRenderOptions, OrderedViewChunk, Response, StatusCode,
@@ -56,6 +58,10 @@ fn route(
 
 pub fn build_runtime() -> AppResult<NativeRuntime> {
     let graph = RouteGraphBuilder::new()
+        .declare_middleware(
+            "response-policy",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::MutateResponseHeaders),
+        )?
         .error_boundary("root-error")?
         .route(route("home", RouteMethod::get(), "/")?)
         .route(route("hello", RouteMethod::get(), "/hello/:name")?)
@@ -65,8 +71,10 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
         .seal()?;
 
     let runtime = NativeRuntimeBuilder::new(graph, "native-pliego-preview")?
-        .middleware(
+        .middleware_with_capabilities(
             "response-policy",
+            MiddlewareCapabilities::none()
+                .allowing(MiddlewareCapability::MutateResponseHeaders),
             |_context, request, next: pliego_runtime::MiddlewareNext| async move {
                 let mut response = next.run(request).await?;
                 apply_response_policy(&mut response);
