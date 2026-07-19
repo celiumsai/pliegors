@@ -129,6 +129,8 @@ The source implementation currently demonstrates:
 - raw TCP HTTP/1.1 loopback dispatch and graceful shutdown;
 - graph-bound route middleware with consume-once `Next` and reverse response
   unwinding before commitment;
+- graph-digested middleware capability declarations with exact startup
+  admission against the native registry;
 - root and route error boundaries that receive no internal diagnostic message;
 - exactly-once bounded receipts; and
 - pre-commit complete-render failures with stable `PLG-REN-*` diagnostics.
@@ -144,8 +146,10 @@ JSON health response, and a stylesheet asset. The executable binds to
 The application is reproducible G1 evidence, not a released starter or a
 production-readiness claim.
 
-Every reference route declares `response-policy` middleware in the sealed
-graph. It adds CSP, referrer, and content-type protections before commitment.
+Every reference route declares `response-policy` middleware and its
+`mutate-response-headers` capability in the sealed graph. The runtime admits
+the implementation only when its registered capability set matches. It adds
+CSP, referrer, and content-type protections before commitment.
 The root boundary renders bounded no-JavaScript HTML for not-found, access,
 invalid-request, and internal failures. A socket smoke verifies the policy on
 both successful and authored 404 responses.
@@ -159,8 +163,8 @@ not claim incremental output inside one DOM tree.
 The following remain gate work:
 
 - declared asynchronous boundaries;
-- pre-route, group, and layout middleware with declared rewrite, redirect,
-  reject, body-read, and response-mutation capabilities;
+- pre-route, group, and layout middleware plus behavioral mediation of the
+  declared rewrite, redirect, reject, body-read, and response-mutation effects;
 - OpenTelemetry with redaction and cardinality tests;
 - multipart and decompression policies;
 - real socket HTTP/2 conformance; and

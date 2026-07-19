@@ -2,7 +2,9 @@
 
 use axum::body::to_bytes;
 use http::{Request, Response, StatusCode};
-use pliego_router::{RouteGraphBuilder, RouteMethod, RouteSpec};
+use pliego_router::{
+    MiddlewareCapabilities, MiddlewareCapability, RouteGraphBuilder, RouteMethod, RouteSpec,
+};
 use pliego_runtime::{Body, InMemoryReceiptSink, NativeRuntimeBuilder, RequestLimits};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -72,6 +74,16 @@ async fn dispatches_real_axum_request_and_records_receipt() {
 #[tokio::test]
 async fn middleware_unwinds_before_commit_and_records_entered_layers() {
     let graph = RouteGraphBuilder::new()
+        .declare_middleware(
+            "outer",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::MutateResponseHeaders),
+        )
+        .unwrap()
+        .declare_middleware(
+            "inner",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::MutateResponseHeaders),
+        )
+        .unwrap()
         .route(
             route("home", RouteMethod::get(), "/")
                 .middleware("outer")
@@ -85,36 +97,44 @@ async fn middleware_unwinds_before_commit_and_records_entered_layers() {
     let sink = InMemoryReceiptSink::default();
     let runtime = NativeRuntimeBuilder::new(graph, "middleware-order")
         .unwrap()
-        .middleware("outer", {
-            let order = order.clone();
-            move |_context, request, next: pliego_runtime::MiddlewareNext| {
+        .middleware_with_capabilities(
+            "outer",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::MutateResponseHeaders),
+            {
                 let order = order.clone();
-                async move {
-                    order.lock().unwrap().push("outer-before");
-                    let mut response = next.run(request).await?;
-                    order.lock().unwrap().push("outer-after");
-                    response
-                        .headers_mut()
-                        .insert("x-outer", http::HeaderValue::from_static("set"));
-                    Ok(response)
+                move |_context, request, next: pliego_runtime::MiddlewareNext| {
+                    let order = order.clone();
+                    async move {
+                        order.lock().unwrap().push("outer-before");
+                        let mut response = next.run(request).await?;
+                        order.lock().unwrap().push("outer-after");
+                        response
+                            .headers_mut()
+                            .insert("x-outer", http::HeaderValue::from_static("set"));
+                        Ok(response)
+                    }
                 }
-            }
-        })
-        .middleware("inner", {
-            let order = order.clone();
-            move |_context, request, next: pliego_runtime::MiddlewareNext| {
+            },
+        )
+        .middleware_with_capabilities(
+            "inner",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::MutateResponseHeaders),
+            {
                 let order = order.clone();
-                async move {
-                    order.lock().unwrap().push("inner-before");
-                    let mut response = next.run(request).await?;
-                    order.lock().unwrap().push("inner-after");
-                    response
-                        .headers_mut()
-                        .insert("x-inner", http::HeaderValue::from_static("set"));
-                    Ok(response)
+                move |_context, request, next: pliego_runtime::MiddlewareNext| {
+                    let order = order.clone();
+                    async move {
+                        order.lock().unwrap().push("inner-before");
+                        let mut response = next.run(request).await?;
+                        order.lock().unwrap().push("inner-after");
+                        response
+                            .headers_mut()
+                            .insert("x-inner", http::HeaderValue::from_static("set"));
+                        Ok(response)
+                    }
                 }
-            }
-        })
+            },
+        )
         .handler("home", {
             let order = order.clone();
             move |_context, _request| {
@@ -156,6 +176,13 @@ async fn middleware_unwinds_before_commit_and_records_entered_layers() {
 #[tokio::test]
 async fn middleware_can_short_circuit_without_entering_later_layers() {
     let graph = RouteGraphBuilder::new()
+        .declare_middleware(
+            "guard",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::Reject),
+        )
+        .unwrap()
+        .declare_middleware("never", MiddlewareCapabilities::none())
+        .unwrap()
         .route(
             route("private", RouteMethod::get(), "/private")
                 .middleware("guard")
@@ -169,12 +196,16 @@ async fn middleware_can_short_circuit_without_entering_later_layers() {
     let sink = InMemoryReceiptSink::default();
     let runtime = NativeRuntimeBuilder::new(graph, "middleware-short-circuit")
         .unwrap()
-        .middleware("guard", |_context, _request, _next| async {
-            Ok(Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .body(Body::from("unauthorized"))
-                .unwrap())
-        })
+        .middleware_with_capabilities(
+            "guard",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::Reject),
+            |_context, _request, _next| async {
+                Ok(Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .body(Body::from("unauthorized"))
+                    .unwrap())
+            },
+        )
         .middleware(
             "never",
             |_context, request, next: pliego_runtime::MiddlewareNext| async {
@@ -217,6 +248,11 @@ async fn middleware_can_short_circuit_without_entering_later_layers() {
 #[tokio::test]
 async fn error_boundaries_walk_outward_without_receiving_internal_messages() {
     let graph = RouteGraphBuilder::new()
+        .declare_middleware(
+            "outer",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::MutateResponseHeaders),
+        )
+        .unwrap()
         .error_boundary("root-error")
         .unwrap()
         .route(
@@ -232,8 +268,9 @@ async fn error_boundaries_walk_outward_without_receiving_internal_messages() {
     let sink = InMemoryReceiptSink::default();
     let runtime = NativeRuntimeBuilder::new(graph, "boundary-walk")
         .unwrap()
-        .middleware(
+        .middleware_with_capabilities(
             "outer",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::MutateResponseHeaders),
             |_context, request, next: pliego_runtime::MiddlewareNext| async move {
                 let mut response = next.run(request).await?;
                 response
@@ -525,6 +562,8 @@ fn runtime_rejects_missing_or_unknown_handlers() {
 #[test]
 fn runtime_rejects_incomplete_or_extra_behavior_registries() {
     let middleware_graph = RouteGraphBuilder::new()
+        .declare_middleware("security", MiddlewareCapabilities::none())
+        .unwrap()
         .route(
             route("home", RouteMethod::get(), "/")
                 .middleware("security")
@@ -541,6 +580,37 @@ fn runtime_rejects_incomplete_or_extra_behavior_registries() {
     assert!(matches!(
         missing,
         Err(pliego_runtime::RuntimeBuildError::MissingMiddleware(id)) if id == "security"
+    ));
+
+    let capability_graph = RouteGraphBuilder::new()
+        .declare_middleware(
+            "security",
+            MiddlewareCapabilities::none().allowing(MiddlewareCapability::Reject),
+        )
+        .unwrap()
+        .route(
+            route("home", RouteMethod::get(), "/")
+                .middleware("security")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let mismatch = NativeRuntimeBuilder::new(capability_graph, "capability-mismatch")
+        .unwrap()
+        .middleware(
+            "security",
+            |_context, request, next: pliego_runtime::MiddlewareNext| async move {
+                next.run(request).await
+            },
+        )
+        .handler("home", |_context, _request| async {
+            Ok(Response::new(Body::empty()))
+        })
+        .build();
+    assert!(matches!(
+        mismatch,
+        Err(pliego_runtime::RuntimeBuildError::MiddlewareCapabilityMismatch { id, .. })
+            if id == "security"
     ));
 
     let plain_graph = RouteGraphBuilder::new()
@@ -582,6 +652,8 @@ fn runtime_rejects_incomplete_or_extra_behavior_registries() {
     ));
 
     let duplicate_middleware_graph = RouteGraphBuilder::new()
+        .declare_middleware("security", MiddlewareCapabilities::none())
+        .unwrap()
         .route(
             route("home", RouteMethod::get(), "/")
                 .middleware("security")

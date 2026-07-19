@@ -2,16 +2,24 @@
 
 **Gate:** G1 Native runtime and dynamic rendering
 
-**State:** Route middleware and root/route error slice; gate remains open
+**State:** Route middleware, capability admission, and root/route error slice; gate remains open
 
 **Toolchain:** Rust 1.86.0 under Debian WSL2
 
 ## Sealed contract
 
-`pliego-router` now binds ordered route middleware and root/route error
-boundary IDs into route graph digest v2. IDs are portable and bounded,
+`pliego-router` now binds ordered route middleware, its exact capability sets,
+and root/route error boundary IDs into route graph digest v3. IDs are portable and bounded,
 duplicates fail before sealing, and `NativeRuntimeBuilder` rejects missing or
 extra registrations before a socket can be served.
+
+Every referenced middleware must have one reachable declaration. The sealed
+set distinguishes `rewrite-path`, `redirect`, `reject`, `read-body`, and
+`mutate-response-headers`; changing it changes the graph digest. The native
+runtime requires the registered implementation to present the exact same set
+before startup. This is authority admission for trusted native Rust code, not
+a sandbox: behavioral effect enforcement remains future work for the typed
+middleware API and OpenSDK component boundary.
 
 `pliego-runtime` provides a consume-once `MiddlewareNext`. Entered layers run
 root-to-leaf and successful or recovered responses unwind leaf-to-root before
@@ -46,7 +54,7 @@ cargo audit --deny warnings --ignore RUSTSEC-2026-0173
 
 Observed focused result:
 
-- `pliego-router`: 19 tests passed;
+- `pliego-router`: 20 tests passed;
 - `pliego-runtime`: 13 unit, 17 in-process integration, and two real-socket
   tests passed;
 - `native-pliego`: four tests passed;
@@ -68,8 +76,8 @@ server. Observed response bodies were 790 bytes for `/`, 815 bytes for
 ## Evidence boundary
 
 This slice does not implement root pre-route, group, or layout middleware. It
-does not yet declare or enforce rewrite, redirect, reject, request-body-read,
-or response-header-mutation capabilities. Nested layouts, asynchronous render
+admits exact declared capabilities but does not yet mediate their behavioral
+effects inside trusted native Rust middleware. Nested layouts, asynchronous render
 boundaries, HTTP/2, middleware fuzzing, fixed-load memory/latency, and
 OpenTelemetry evidence remain open. This evidence does not close G1 or change
 any capability from `not-released`.

@@ -11,6 +11,9 @@ Route-local middleware and root/route error boundaries are sealed by
 responses before commitment, and remains active for recovered downstream
 errors. Error boundaries receive only a bounded public class, status, code,
 and optional route ID; internal diagnostic messages remain receipt-only.
+Middleware capability sets are part of route graph v3 and must exactly match
+the native registry before startup. This admission contract does not yet
+sandbox behavioral effects performed by trusted Rust application code.
 
 The source tree also contains bounded `complete` and `ordered` server-rendering
 modes over `pliego-dom`. They emit a typed HTML document or fragment, validate
@@ -28,5 +31,5 @@ slow-peer, and fixed-load evidence remain open gate work.
 
 This foundation is intentionally incomplete. It does not yet expose
 asynchronous boundary streaming, pre-route/group/layout middleware,
-middleware capability declarations, OpenTelemetry, multipart/decompression
+typed middleware effect mediation, OpenTelemetry, multipart/decompression
 policies, or a production `pliego serve` command.

@@ -36,3 +36,4 @@ pub use scope::{
 pub use axum::body::Body;
 pub use http::{Request, Response, StatusCode};
 pub use pliego_dom::{RenderLimits, View};
+pub use pliego_router::{MiddlewareCapabilities, MiddlewareCapability};

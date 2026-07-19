@@ -12,7 +12,7 @@ use futures_util::FutureExt;
 use http::{Request, Response, StatusCode};
 use http_body::{Body as HttpBody, Frame, SizeHint};
 use http_body_util::{BodyExt, Limited};
-use pliego_router::{ResolveError, RouteGraph, RouteMatch, RouteMethod};
+use pliego_router::{MiddlewareCapabilities, ResolveError, RouteGraph, RouteMatch, RouteMethod};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
@@ -91,7 +91,7 @@ pub struct NativeRuntimeBuilder {
     deployment_id: String,
     limits: RequestLimits,
     handlers: BTreeMap<String, Arc<dyn RuntimeHandler>>,
-    middleware: BTreeMap<String, Arc<dyn RuntimeMiddleware>>,
+    middleware: BTreeMap<String, MiddlewareRegistration>,
     error_boundaries: BTreeMap<String, Arc<dyn RuntimeErrorBoundary>>,
     duplicate_middleware: BTreeSet<String>,
     duplicate_error_boundaries: BTreeSet<String>,
@@ -136,15 +136,44 @@ impl NativeRuntimeBuilder {
     where
         M: RuntimeMiddleware,
     {
-        let id = id.into();
+        self.register_middleware(id.into(), MiddlewareCapabilities::none(), middleware);
+        self
+    }
+
+    pub fn middleware_with_capabilities<M>(
+        mut self,
+        id: impl Into<String>,
+        capabilities: MiddlewareCapabilities,
+        middleware: M,
+    ) -> Self
+    where
+        M: RuntimeMiddleware,
+    {
+        self.register_middleware(id.into(), capabilities, middleware);
+        self
+    }
+
+    fn register_middleware<M>(
+        &mut self,
+        id: String,
+        capabilities: MiddlewareCapabilities,
+        middleware: M,
+    ) where
+        M: RuntimeMiddleware,
+    {
         if self
             .middleware
-            .insert(id.clone(), Arc::new(middleware))
+            .insert(
+                id.clone(),
+                MiddlewareRegistration {
+                    capabilities,
+                    handler: Arc::new(middleware),
+                },
+            )
             .is_some()
         {
             self.duplicate_middleware.insert(id);
         }
-        self
     }
 
     pub fn error_boundary<B>(mut self, id: impl Into<String>, boundary: B) -> Self
@@ -210,6 +239,20 @@ impl NativeRuntimeBuilder {
             RuntimeBuildError::MissingMiddleware,
             RuntimeBuildError::UnknownMiddleware,
         )?;
+        for (id, declared) in self.graph.middleware_declarations() {
+            let registered = &self
+                .middleware
+                .get(id)
+                .expect("middleware registry completeness was validated")
+                .capabilities;
+            if registered != declared {
+                return Err(RuntimeBuildError::MiddlewareCapabilityMismatch {
+                    id: id.clone(),
+                    declared: declared.clone(),
+                    registered: registered.clone(),
+                });
+            }
+        }
         let error_boundary_ids: BTreeSet<_> = self
             .graph
             .error_boundary_ids()
@@ -271,11 +314,17 @@ struct RuntimeState {
     deployment_id: String,
     limits: RequestLimits,
     handlers: BTreeMap<String, Arc<dyn RuntimeHandler>>,
-    middleware: BTreeMap<String, Arc<dyn RuntimeMiddleware>>,
+    middleware: BTreeMap<String, MiddlewareRegistration>,
     error_boundaries: BTreeMap<String, Arc<dyn RuntimeErrorBoundary>>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
     request_sequence: AtomicU64,
     registry: Arc<RequestRegistry>,
+}
+
+#[derive(Clone)]
+struct MiddlewareRegistration {
+    capabilities: MiddlewareCapabilities,
+    handler: Arc<dyn RuntimeMiddleware>,
 }
 
 struct RequestRegistry {
@@ -595,6 +644,7 @@ fn route_handler_future(
                     .middleware
                     .get(id)
                     .expect("middleware registry was sealed with the route graph")
+                    .handler
                     .clone(),
             )
         })
@@ -1092,6 +1142,11 @@ pub enum RuntimeBuildError {
     MissingMiddleware(String),
     UnknownMiddleware(String),
     DuplicateMiddlewareRegistration(String),
+    MiddlewareCapabilityMismatch {
+        id: String,
+        declared: MiddlewareCapabilities,
+        registered: MiddlewareCapabilities,
+    },
     MissingErrorBoundary(String),
     UnknownErrorBoundary(String),
     DuplicateErrorBoundaryRegistration(String),
@@ -1120,6 +1175,14 @@ impl Display for RuntimeBuildError {
                     "middleware ID {id} was registered more than once"
                 )
             }
+            Self::MiddlewareCapabilityMismatch {
+                id,
+                declared,
+                registered,
+            } => write!(
+                formatter,
+                "middleware {id} capability mismatch: graph declares {declared:?}, runtime registers {registered:?}"
+            ),
             Self::MissingErrorBoundary(id) => {
                 write!(
                     formatter,
