@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::RequestLimits;
+use crate::{RenderMode, RequestLimits};
 use pliego_router::RouteMatch;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -187,6 +187,7 @@ pub struct RuntimeReceipt {
     pub cancel_reason: Option<CancelReason>,
     pub response_status: Option<u16>,
     pub response_bytes: u64,
+    pub render_mode: Option<RenderMode>,
     pub diagnostics: Vec<RuntimeDiagnostic>,
 }
 
@@ -205,6 +206,7 @@ struct ScopeInner {
     internal_cleanups: Mutex<Vec<InternalCleanup>>,
     diagnostics: Mutex<Vec<RuntimeDiagnostic>>,
     response_status: Mutex<Option<u16>>,
+    render_mode: Mutex<Option<RenderMode>>,
     response_bytes: AtomicU64,
     receipt_recorded: AtomicBool,
     sink: Arc<dyn RuntimeReceiptSink>,
@@ -238,6 +240,7 @@ impl RequestScope {
                 internal_cleanups: Mutex::new(Vec::new()),
                 diagnostics: Mutex::new(Vec::new()),
                 response_status: Mutex::new(None),
+                render_mode: Mutex::new(None),
                 response_bytes: AtomicU64::new(0),
                 receipt_recorded: AtomicBool::new(false),
                 sink,
@@ -345,6 +348,10 @@ impl RequestScope {
         self.transition(RequestState::ResponseCommitted)?;
         *lock(&self.inner.response_status) = Some(status);
         Ok(())
+    }
+
+    pub(crate) fn set_render_mode(&self, mode: RenderMode) {
+        *lock(&self.inner.render_mode) = Some(mode);
     }
 
     pub(crate) fn add_response_bytes(&self, bytes: usize) -> Result<(), ScopeError> {
@@ -470,6 +477,7 @@ impl RequestScope {
             cancel_reason: self.cancel_reason(),
             response_status: *lock(&self.inner.response_status),
             response_bytes: self.inner.response_bytes.load(Ordering::Acquire),
+            render_mode: *lock(&self.inner.render_mode),
             diagnostics: self.diagnostics(),
         }
     }

@@ -448,6 +448,9 @@ fn wrap_handler_response(
     scope: RequestScope,
     response: Response<Body>,
 ) -> Result<Response<Body>, ScopeError> {
+    if let Some(mode) = response.extensions().get::<crate::RenderMode>().copied() {
+        scope.set_render_mode(mode);
+    }
     let (parts, body) = response.into_parts();
     commit_response_or_close(&scope, parts.status.as_u16())?;
     debug!(request_id = %scope.identity().request_id, status = parts.status.as_u16(), "PliegoRS response committed");

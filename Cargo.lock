@@ -1271,6 +1271,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "hyper",
+ "pliego-dom",
  "pliego-router",
  "serde",
  "serde_json",

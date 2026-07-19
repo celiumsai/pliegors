@@ -9,6 +9,7 @@
 
 mod host;
 mod limits;
+mod render;
 mod scope;
 
 pub use host::{
@@ -16,6 +17,10 @@ pub use host::{
     RuntimeHandler,
 };
 pub use limits::{LimitError, RequestLimits};
+pub use render::{
+    CompleteDocument, CompleteRenderOptions, RenderMode, RenderSeedMode, ServerRenderError,
+    render_complete_document, render_complete_fragment,
+};
 pub use scope::{
     CancelReason, InMemoryReceiptSink, RequestContext, RequestIdentity, RequestOutcome,
     RequestScope, RequestState, RuntimeDiagnostic, RuntimeReceipt, RuntimeReceiptSink, ScopeError,
@@ -23,3 +28,4 @@ pub use scope::{
 
 pub use axum::body::Body;
 pub use http::{Request, Response, StatusCode};
+pub use pliego_dom::{RenderLimits, View};
