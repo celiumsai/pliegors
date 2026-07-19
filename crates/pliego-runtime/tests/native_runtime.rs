@@ -378,3 +378,50 @@ async fn dropping_response_body_is_a_client_disconnect() {
         Some(pliego_runtime::CancelReason::ClientDisconnect)
     );
 }
+
+#[tokio::test]
+async fn complete_server_render_is_escaped_and_bound_to_the_receipt() {
+    use pliego_dom::{IntoView, el};
+    use pliego_runtime::{
+        CompleteDocument, CompleteRenderOptions, RenderMode, render_complete_document,
+    };
+
+    let graph = RouteGraphBuilder::new()
+        .route(route("document", RouteMethod::get(), "/document"))
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "render-test")
+        .unwrap()
+        .handler("document", |_context, _request| {
+            let document = CompleteDocument::new(
+                "Pliego & Rust",
+                el("main").child("<trusted by construction>").into_view(),
+            );
+            std::future::ready(render_complete_document(
+                &document,
+                CompleteRenderOptions::default(),
+            ))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .uri("/document")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), 4096).await.unwrap();
+    let body = std::str::from_utf8(&body).unwrap();
+    assert!(body.starts_with("<!doctype html><html lang=\"en\">"));
+    assert!(body.contains("Pliego &amp; Rust"));
+    assert!(body.contains("&lt;trusted by construction&gt;"));
+    assert_eq!(sink.receipts()[0].render_mode, Some(RenderMode::Complete));
+}

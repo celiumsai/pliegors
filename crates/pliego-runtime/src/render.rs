@@ -1,0 +1,481 @@
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{Body, HandlerError, Response, RuntimeDiagnostic, StatusCode};
+use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use pliego_dom::{RenderLimits, View, try_render_adoptable_html, try_render_html};
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+
+const DOCTYPE: &str = "<!doctype html>";
+const DOCUMENT_SUFFIX: &str = "</body></html>";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RenderMode {
+    Complete,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RenderSeedMode {
+    #[default]
+    Plain,
+    Adoptable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CompleteRenderOptions {
+    limits: RenderLimits,
+    seed_mode: RenderSeedMode,
+    status: StatusCode,
+}
+
+impl CompleteRenderOptions {
+    pub fn new(limits: RenderLimits) -> Self {
+        Self {
+            limits,
+            seed_mode: RenderSeedMode::Plain,
+            status: StatusCode::OK,
+        }
+    }
+
+    pub fn adoptable(mut self) -> Self {
+        self.seed_mode = RenderSeedMode::Adoptable;
+        self
+    }
+
+    pub fn limits(self) -> RenderLimits {
+        self.limits
+    }
+
+    pub fn seed_mode(self) -> RenderSeedMode {
+        self.seed_mode
+    }
+
+    pub fn status(mut self, status: StatusCode) -> Self {
+        self.status = status;
+        self
+    }
+
+    pub fn response_status(self) -> StatusCode {
+        self.status
+    }
+}
+
+impl Default for CompleteRenderOptions {
+    fn default() -> Self {
+        Self::new(RenderLimits::default())
+    }
+}
+
+#[derive(Clone)]
+pub struct CompleteDocument {
+    language: String,
+    title: String,
+    description: Option<String>,
+    canonical: Option<String>,
+    stylesheets: Vec<String>,
+    module_scripts: Vec<String>,
+    body: View,
+}
+
+impl CompleteDocument {
+    pub fn new(title: impl Into<String>, body: View) -> Self {
+        Self {
+            language: "en".to_owned(),
+            title: title.into(),
+            description: None,
+            canonical: None,
+            stylesheets: Vec::new(),
+            module_scripts: Vec::new(),
+            body,
+        }
+    }
+
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = language.into();
+        self
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn canonical(mut self, canonical: impl Into<String>) -> Self {
+        self.canonical = Some(canonical.into());
+        self
+    }
+
+    pub fn stylesheet(mut self, path: impl Into<String>) -> Self {
+        self.stylesheets.push(path.into());
+        self
+    }
+
+    pub fn module_script(mut self, path: impl Into<String>) -> Self {
+        self.module_scripts.push(path.into());
+        self
+    }
+}
+
+pub fn render_complete_fragment(
+    view: &View,
+    options: CompleteRenderOptions,
+) -> Result<Response<Body>, HandlerError> {
+    let html = render_view(view, options).map_err(ServerRenderError::into_handler_error)?;
+    html_response(html, options.response_status()).map_err(ServerRenderError::into_handler_error)
+}
+
+pub fn render_complete_document(
+    document: &CompleteDocument,
+    options: CompleteRenderOptions,
+) -> Result<Response<Body>, HandlerError> {
+    let prefix = document_prefix(document).map_err(ServerRenderError::into_handler_error)?;
+    let overhead = prefix
+        .len()
+        .checked_add(DOCUMENT_SUFFIX.len())
+        .ok_or(ServerRenderError::OutputLimitTooSmall)
+        .map_err(ServerRenderError::into_handler_error)?;
+    let available = options
+        .limits()
+        .max_output_bytes()
+        .checked_sub(overhead)
+        .ok_or(ServerRenderError::OutputLimitTooSmall)
+        .map_err(ServerRenderError::into_handler_error)?;
+    let limits = RenderLimits::new(
+        options.limits().max_depth(),
+        options.limits().max_nodes(),
+        available,
+    )
+    .map_err(ServerRenderError::InvalidLimits)
+    .map_err(ServerRenderError::into_handler_error)?;
+    let body = render_view(&document.body, CompleteRenderOptions { limits, ..options })
+        .map_err(ServerRenderError::into_handler_error)?;
+    let mut html = String::with_capacity(overhead + body.len());
+    html.push_str(&prefix);
+    html.push_str(&body);
+    html.push_str(DOCUMENT_SUFFIX);
+    html_response(html, options.response_status()).map_err(ServerRenderError::into_handler_error)
+}
+
+fn document_prefix(document: &CompleteDocument) -> Result<String, ServerRenderError> {
+    validate_language(&document.language)?;
+    validate_text("title", &document.title, 1_024)?;
+    if let Some(description) = &document.description {
+        validate_text("description", description, 4_096)?;
+    }
+    if let Some(canonical) = &document.canonical {
+        validate_canonical(canonical)?;
+    }
+    for path in document
+        .stylesheets
+        .iter()
+        .chain(document.module_scripts.iter())
+    {
+        validate_asset_path(path)?;
+    }
+
+    let mut output = String::from(DOCTYPE);
+    output.push_str("<html lang=\"");
+    push_escaped_attribute(&mut output, &document.language);
+    output.push_str("\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>");
+    push_escaped_text(&mut output, &document.title);
+    output.push_str("</title>");
+    if let Some(description) = &document.description {
+        output.push_str("<meta name=\"description\" content=\"");
+        push_escaped_attribute(&mut output, description);
+        output.push_str("\">");
+    }
+    if let Some(canonical) = &document.canonical {
+        output.push_str("<link rel=\"canonical\" href=\"");
+        push_escaped_attribute(&mut output, canonical);
+        output.push_str("\">");
+    }
+    for stylesheet in &document.stylesheets {
+        output.push_str("<link rel=\"stylesheet\" href=\"");
+        push_escaped_attribute(&mut output, stylesheet);
+        output.push_str("\">");
+    }
+    for script in &document.module_scripts {
+        output.push_str("<script type=\"module\" src=\"");
+        push_escaped_attribute(&mut output, script);
+        output.push_str("\"></script>");
+    }
+    output.push_str("</head><body>");
+    Ok(output)
+}
+
+fn render_view(view: &View, options: CompleteRenderOptions) -> Result<String, ServerRenderError> {
+    match options.seed_mode() {
+        RenderSeedMode::Plain => try_render_html(view, options.limits()),
+        RenderSeedMode::Adoptable => try_render_adoptable_html(view, options.limits()),
+    }
+    .map_err(ServerRenderError::Dom)
+}
+
+fn validate_language(language: &str) -> Result<(), ServerRenderError> {
+    if language.is_empty()
+        || language.len() > 64
+        || !language
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_alphabetic())
+        || !language
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        || language.ends_with('-')
+        || language.contains("--")
+    {
+        return Err(ServerRenderError::InvalidDocumentField("language"));
+    }
+    Ok(())
+}
+
+fn validate_text(
+    field: &'static str,
+    value: &str,
+    maximum: usize,
+) -> Result<(), ServerRenderError> {
+    if value.is_empty() || value.len() > maximum || value.chars().any(char::is_control) {
+        return Err(ServerRenderError::InvalidDocumentField(field));
+    }
+    Ok(())
+}
+
+fn validate_canonical(value: &str) -> Result<(), ServerRenderError> {
+    if value.is_empty()
+        || value.len() > 2_048
+        || value.chars().any(char::is_control)
+        || value.contains('\\')
+    {
+        return Err(ServerRenderError::InvalidCanonicalUrl);
+    }
+    let uri = value
+        .parse::<http::Uri>()
+        .map_err(|_| ServerRenderError::InvalidCanonicalUrl)?;
+    if value.starts_with('/') {
+        if value.starts_with("//") || uri.authority().is_some() {
+            return Err(ServerRenderError::InvalidCanonicalUrl);
+        }
+        return Ok(());
+    }
+    if !matches!(uri.scheme_str(), Some("http" | "https")) || uri.authority().is_none() {
+        return Err(ServerRenderError::InvalidCanonicalUrl);
+    }
+    Ok(())
+}
+
+fn validate_asset_path(value: &str) -> Result<(), ServerRenderError> {
+    if value.is_empty()
+        || value.len() > 2_048
+        || !value.starts_with('/')
+        || value.starts_with("//")
+        || value.contains('\\')
+        || value.chars().any(char::is_control)
+        || value.parse::<http::Uri>().is_err()
+    {
+        return Err(ServerRenderError::InvalidAssetPath);
+    }
+    Ok(())
+}
+
+fn push_escaped_text(output: &mut String, value: &str) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            _ => output.push(character),
+        }
+    }
+}
+
+fn push_escaped_attribute(output: &mut String, value: &str) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' => output.push_str("&quot;"),
+            '\'' => output.push_str("&#39;"),
+            _ => output.push(character),
+        }
+    }
+}
+
+fn html_response(html: String, status: StatusCode) -> Result<Response<Body>, ServerRenderError> {
+    if status.is_informational()
+        || matches!(
+            status,
+            StatusCode::NO_CONTENT | StatusCode::RESET_CONTENT | StatusCode::NOT_MODIFIED
+        )
+    {
+        return Err(ServerRenderError::InvalidResponseStatus(status));
+    }
+    let length = html.len();
+    let mut response = Response::new(Body::from(html));
+    *response.status_mut() = status;
+    response.headers_mut().insert(
+        CONTENT_TYPE,
+        http::HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    response.headers_mut().insert(
+        CONTENT_LENGTH,
+        http::HeaderValue::from_str(&length.to_string()).expect("usize is a valid header value"),
+    );
+    response.extensions_mut().insert(RenderMode::Complete);
+    Ok(response)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ServerRenderError {
+    InvalidDocumentField(&'static str),
+    InvalidCanonicalUrl,
+    InvalidAssetPath,
+    InvalidResponseStatus(StatusCode),
+    OutputLimitTooSmall,
+    InvalidLimits(pliego_dom::RenderLimitsError),
+    Dom(pliego_dom::RenderError),
+}
+
+impl ServerRenderError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidDocumentField(_) => "PLG-REN-001",
+            Self::OutputLimitTooSmall | Self::InvalidLimits(_) => "PLG-REN-002",
+            Self::InvalidCanonicalUrl | Self::InvalidAssetPath => "PLG-REN-003",
+            Self::InvalidResponseStatus(_) => "PLG-REN-004",
+            Self::Dom(_) => "PLG-REN-201",
+        }
+    }
+
+    fn into_handler_error(self) -> HandlerError {
+        let message = bounded(&self.to_string(), 320);
+        let diagnostic =
+            RuntimeDiagnostic::new(self.code(), message).expect("render diagnostics are bounded");
+        HandlerError::new(StatusCode::INTERNAL_SERVER_ERROR, diagnostic)
+    }
+}
+
+impl Display for ServerRenderError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidDocumentField(field) => {
+                write!(formatter, "invalid complete document field: {field}")
+            }
+            Self::InvalidCanonicalUrl => {
+                formatter.write_str("invalid complete document canonical URL")
+            }
+            Self::InvalidAssetPath => {
+                formatter.write_str("complete document assets require a local absolute path")
+            }
+            Self::InvalidResponseStatus(status) => {
+                write!(formatter, "HTTP status {status} cannot carry rendered HTML")
+            }
+            Self::OutputLimitTooSmall => {
+                formatter.write_str("render output limit cannot contain the HTML doctype")
+            }
+            Self::InvalidLimits(error) => Display::fmt(error, formatter),
+            Self::Dom(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl std::error::Error for ServerRenderError {}
+
+fn bounded(value: &str, maximum: usize) -> String {
+    if value.len() <= maximum {
+        value.to_owned()
+    } else {
+        let mut end = maximum;
+        while !value.is_char_boundary(end) {
+            end -= 1;
+        }
+        value[..end].to_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http_body::Body as _;
+    use pliego_dom::{IntoView, el, text};
+
+    #[tokio::test]
+    async fn complete_document_is_bounded_escaped_and_tagged() {
+        let document = CompleteDocument::new("A & B", el("main").child("<safe>").into_view())
+            .language("es-CO")
+            .description("A \"bounded\" document")
+            .canonical("https://pliegors.dev/docs?mode=complete")
+            .stylesheet("/assets/site.css")
+            .module_script("/assets/site.js");
+        let response =
+            render_complete_document(&document, CompleteRenderOptions::default()).unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.extensions().get::<RenderMode>(),
+            Some(&RenderMode::Complete)
+        );
+        let length = response.headers()[CONTENT_LENGTH]
+            .to_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        assert_eq!(
+            length,
+            response.body().size_hint().exact().unwrap() as usize
+        );
+        let html = axum::body::to_bytes(response.into_body(), 8 * 1024)
+            .await
+            .unwrap();
+        let html = std::str::from_utf8(&html).unwrap();
+        assert!(html.starts_with("<!doctype html><html lang=\"es-CO\">"));
+        assert!(html.contains("<title>A &amp; B</title>"));
+        assert!(html.contains("content=\"A &quot;bounded&quot; document\""));
+        assert!(html.contains("<main>&lt;safe&gt;</main>"));
+    }
+
+    #[test]
+    fn document_validates_metadata_assets_and_accounts_for_shell() {
+        let invalid = CompleteDocument::new("Title", el("main").into_view()).language("bad--lang");
+        let error =
+            render_complete_document(&invalid, CompleteRenderOptions::default()).unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-001");
+
+        let invalid =
+            CompleteDocument::new("Title", el("main").into_view()).canonical("javascript:alert(1)");
+        let error =
+            render_complete_document(&invalid, CompleteRenderOptions::default()).unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-003");
+
+        let limits = RenderLimits::new(8, 8, DOCTYPE.len()).unwrap();
+        let document = CompleteDocument::new("Title", el("main").into_view());
+        let error =
+            render_complete_document(&document, CompleteRenderOptions::new(limits)).unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-002");
+
+        let options = CompleteRenderOptions::default().status(StatusCode::NO_CONTENT);
+        let error = render_complete_document(&document, options).unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-004");
+
+        let response = render_complete_document(
+            &document,
+            CompleteRenderOptions::default().status(StatusCode::NOT_FOUND),
+        )
+        .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn adopts_only_when_explicit_and_maps_dom_failures() {
+        let view = el("main").child(text("hello")).into_view();
+        let plain = render_view(&view, CompleteRenderOptions::default()).unwrap();
+        assert!(!plain.contains("pliego:ssr:v1"));
+        let adoptable = render_view(&view, CompleteRenderOptions::default().adoptable()).unwrap();
+        assert!(adoptable.starts_with("<!--pliego:ssr:v1-->"));
+
+        let limits = RenderLimits::new(8, 8, 1).unwrap();
+        let error =
+            render_complete_fragment(&view, CompleteRenderOptions::new(limits)).unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-201");
+    }
+}
