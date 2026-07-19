@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    CancelReason, LimitError, RequestContext, RequestIdentity, RequestLimits, RequestScope,
-    RequestState, RuntimeDiagnostic, RuntimeReceipt, RuntimeReceiptSink, ScopeError,
+    CancelReason, ErrorBoundaryContext, LimitError, MiddlewareNext, PublicError, PublicErrorClass,
+    RequestContext, RequestIdentity, RequestLimits, RequestScope, RequestState, RuntimeDiagnostic,
+    RuntimeErrorBoundary, RuntimeMiddleware, RuntimeReceipt, RuntimeReceiptSink, ScopeError,
 };
 use axum::Router;
 use axum::body::{Body, Bytes};
@@ -11,7 +12,7 @@ use futures_util::FutureExt;
 use http::{Request, Response, StatusCode};
 use http_body::{Body as HttpBody, Frame, SizeHint};
 use http_body_util::{BodyExt, Limited};
-use pliego_router::{ResolveError, RouteGraph, RouteMethod};
+use pliego_router::{ResolveError, RouteGraph, RouteMatch, RouteMethod};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::future::{Future, IntoFuture};
@@ -90,6 +91,10 @@ pub struct NativeRuntimeBuilder {
     deployment_id: String,
     limits: RequestLimits,
     handlers: BTreeMap<String, Arc<dyn RuntimeHandler>>,
+    middleware: BTreeMap<String, Arc<dyn RuntimeMiddleware>>,
+    error_boundaries: BTreeMap<String, Arc<dyn RuntimeErrorBoundary>>,
+    duplicate_middleware: BTreeSet<String>,
+    duplicate_error_boundaries: BTreeSet<String>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
 }
 
@@ -105,6 +110,10 @@ impl NativeRuntimeBuilder {
             deployment_id,
             limits: RequestLimits::default(),
             handlers: BTreeMap::new(),
+            middleware: BTreeMap::new(),
+            error_boundaries: BTreeMap::new(),
+            duplicate_middleware: BTreeSet::new(),
+            duplicate_error_boundaries: BTreeSet::new(),
             receipt_sink: Arc::new(|_: RuntimeReceipt| {}),
         })
     }
@@ -123,6 +132,36 @@ impl NativeRuntimeBuilder {
         self
     }
 
+    pub fn middleware<M>(mut self, id: impl Into<String>, middleware: M) -> Self
+    where
+        M: RuntimeMiddleware,
+    {
+        let id = id.into();
+        if self
+            .middleware
+            .insert(id.clone(), Arc::new(middleware))
+            .is_some()
+        {
+            self.duplicate_middleware.insert(id);
+        }
+        self
+    }
+
+    pub fn error_boundary<B>(mut self, id: impl Into<String>, boundary: B) -> Self
+    where
+        B: RuntimeErrorBoundary,
+    {
+        let id = id.into();
+        if self
+            .error_boundaries
+            .insert(id.clone(), Arc::new(boundary))
+            .is_some()
+        {
+            self.duplicate_error_boundaries.insert(id);
+        }
+        self
+    }
+
     pub fn receipt_sink<S>(mut self, sink: S) -> Self
     where
         S: RuntimeReceiptSink,
@@ -133,6 +172,16 @@ impl NativeRuntimeBuilder {
 
     pub fn build(self) -> Result<NativeRuntime, RuntimeBuildError> {
         self.limits.validate()?;
+        if let Some(id) = self.duplicate_middleware.iter().next() {
+            return Err(RuntimeBuildError::DuplicateMiddlewareRegistration(
+                id.clone(),
+            ));
+        }
+        if let Some(id) = self.duplicate_error_boundaries.iter().next() {
+            return Err(RuntimeBuildError::DuplicateErrorBoundaryRegistration(
+                id.clone(),
+            ));
+        }
         let route_ids: BTreeSet<_> = self
             .graph
             .routes()
@@ -149,6 +198,36 @@ impl NativeRuntimeBuilder {
                 return Err(RuntimeBuildError::UnknownHandler(route_id.clone()));
             }
         }
+        let middleware_ids: BTreeSet<_> = self
+            .graph
+            .routes()
+            .iter()
+            .flat_map(|route| route.middleware_ids().iter().cloned())
+            .collect();
+        validate_behavior_registry(
+            &middleware_ids,
+            self.middleware.keys(),
+            RuntimeBuildError::MissingMiddleware,
+            RuntimeBuildError::UnknownMiddleware,
+        )?;
+        let error_boundary_ids: BTreeSet<_> = self
+            .graph
+            .error_boundary_ids()
+            .iter()
+            .chain(
+                self.graph
+                    .routes()
+                    .iter()
+                    .flat_map(|route| route.error_boundary_ids()),
+            )
+            .cloned()
+            .collect();
+        validate_behavior_registry(
+            &error_boundary_ids,
+            self.error_boundaries.keys(),
+            RuntimeBuildError::MissingErrorBoundary,
+            RuntimeBuildError::UnknownErrorBoundary,
+        )?;
         let registry = Arc::new(RequestRegistry::new(self.limits.max_concurrent_requests));
         Ok(NativeRuntime {
             state: Arc::new(RuntimeState {
@@ -156,6 +235,8 @@ impl NativeRuntimeBuilder {
                 deployment_id: self.deployment_id,
                 limits: self.limits,
                 handlers: self.handlers,
+                middleware: self.middleware,
+                error_boundaries: self.error_boundaries,
                 receipt_sink: self.receipt_sink,
                 request_sequence: AtomicU64::new(0),
                 registry,
@@ -164,11 +245,34 @@ impl NativeRuntimeBuilder {
     }
 }
 
+fn validate_behavior_registry<'a, I, Missing, Unknown>(
+    required: &BTreeSet<String>,
+    registered: I,
+    missing: Missing,
+    unknown: Unknown,
+) -> Result<(), RuntimeBuildError>
+where
+    I: IntoIterator<Item = &'a String>,
+    Missing: Fn(String) -> RuntimeBuildError,
+    Unknown: Fn(String) -> RuntimeBuildError,
+{
+    let registered: BTreeSet<_> = registered.into_iter().cloned().collect();
+    if let Some(id) = required.iter().find(|id| !registered.contains(*id)) {
+        return Err(missing(id.clone()));
+    }
+    if let Some(id) = registered.iter().find(|id| !required.contains(*id)) {
+        return Err(unknown(id.clone()));
+    }
+    Ok(())
+}
+
 struct RuntimeState {
     graph: Arc<RouteGraph>,
     deployment_id: String,
     limits: RequestLimits,
     handlers: BTreeMap<String, Arc<dyn RuntimeHandler>>,
+    middleware: BTreeMap<String, Arc<dyn RuntimeMiddleware>>,
+    error_boundaries: BTreeMap<String, Arc<dyn RuntimeErrorBoundary>>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
     request_sequence: AtomicU64,
     registry: Arc<RequestRegistry>,
@@ -328,9 +432,9 @@ async fn dispatch(
         let status = limit_status(&error);
         let diagnostic = RuntimeDiagnostic::new(error.code(), bounded(&error.to_string(), 320))
             .expect("limit diagnostics are bounded");
-        scope.reject(diagnostic.clone());
-        return scoped_response(scope, status, diagnostic.code)
-            .unwrap_or_else(|_| fallback_response());
+        let public = PublicError::new(PublicErrorClass::InvalidRequest, status, error.code());
+        let response = recover_error(&state, &scope, None, public, diagnostic).await;
+        return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
     }
     if scope.transition(RequestState::HeadAdmitted).is_err() {
         return lifecycle_failure_response(scope);
@@ -341,17 +445,25 @@ async fn dispatch(
         Err(error) => {
             let diagnostic = RuntimeDiagnostic::new(error.code(), bounded(&error.to_string(), 320))
                 .expect("route diagnostics are bounded");
-            scope.reject(diagnostic.clone());
-            return scoped_response(scope, StatusCode::BAD_REQUEST, diagnostic.code)
-                .unwrap_or_else(|_| fallback_response());
+            let public = PublicError::new(
+                PublicErrorClass::InvalidRequest,
+                StatusCode::BAD_REQUEST,
+                error.code(),
+            );
+            let response = recover_error(&state, &scope, None, public, diagnostic).await;
+            return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
         }
     };
     let path = match decode_path(parts.uri.path()) {
         Ok(path) => path,
         Err(diagnostic) => {
-            scope.reject(diagnostic.clone());
-            return scoped_response(scope, StatusCode::BAD_REQUEST, diagnostic.code)
-                .unwrap_or_else(|_| fallback_response());
+            let public = PublicError::new(
+                PublicErrorClass::InvalidRequest,
+                StatusCode::BAD_REQUEST,
+                "PLG-RUN-106",
+            );
+            let response = recover_error(&state, &scope, None, public, diagnostic).await;
+            return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
         }
     };
     let matched = match state.graph.resolve(&method, &path) {
@@ -360,15 +472,19 @@ async fn dispatch(
             let (status, allow) = resolve_status(&error);
             let diagnostic = RuntimeDiagnostic::new(error.code(), bounded(&error.to_string(), 320))
                 .expect("route diagnostics are bounded");
-            scope.reject(diagnostic.clone());
-            let mut response = scoped_response(scope, status, diagnostic.code)
-                .unwrap_or_else(|_| fallback_response());
+            let class = if matches!(error, ResolveError::NotFound) {
+                PublicErrorClass::NotFound
+            } else {
+                PublicErrorClass::InvalidRequest
+            };
+            let public = PublicError::new(class, status, error.code());
+            let mut response = recover_error(&state, &scope, None, public, diagnostic).await;
             if let Some(allow) = allow {
                 if let Ok(value) = http::HeaderValue::from_str(&allow) {
                     response.headers_mut().insert(http::header::ALLOW, value);
                 }
             }
-            return response;
+            return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
         }
     };
     if scope.transition(RequestState::RouteResolved).is_err()
@@ -384,17 +500,14 @@ async fn dispatch(
         error
     });
     let request = Request::from_parts(parts, Body::new(limited));
-    let handler = state
-        .handlers
-        .get(matched.route_id())
-        .expect("runtime graph and handler registry were sealed together")
-        .clone();
-    let context = RequestContext::new(scope.clone(), matched);
+    let context = RequestContext::new(scope.clone(), matched.clone());
     if scope.transition(RequestState::HandlerRunning).is_err() {
         return lifecycle_failure_response(scope);
     }
 
-    let handler_future = match catch_unwind(AssertUnwindSafe(|| handler.call(context, request))) {
+    let handler_future = match catch_unwind(AssertUnwindSafe(|| {
+        route_handler_future(state.clone(), matched.clone(), context, request)
+    })) {
         Ok(future) => future,
         Err(_) => {
             let diagnostic = RuntimeDiagnostic::new(
@@ -402,9 +515,13 @@ async fn dispatch(
                 "request handler panicked before returning its future",
             )
             .expect("static diagnostic is valid");
-            scope.fail(diagnostic.clone());
-            return scoped_response(scope, StatusCode::INTERNAL_SERVER_ERROR, diagnostic.code)
-                .unwrap_or_else(|_| fallback_response());
+            let public = PublicError::new(
+                PublicErrorClass::InternalFailure,
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "PLG-RUN-502",
+            );
+            let response = recover_error(&state, &scope, Some(&matched), public, diagnostic).await;
+            return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
         }
     };
     let cancellation = scope.cancellation_token();
@@ -424,9 +541,15 @@ async fn dispatch(
                     .unwrap_or_else(|_| fallback_response()),
                 Ok(Err(error)) => {
                     warn!(code = %error.diagnostic.code, "PliegoRS handler failed");
-                    scope.fail(error.diagnostic.clone());
-                    scoped_response(scope, error.status, error.diagnostic.code)
-                        .unwrap_or_else(|_| fallback_response())
+                    let public = public_handler_error(&error);
+                    let response = recover_error(
+                        &state,
+                        &scope,
+                        Some(&matched),
+                        public,
+                        error.diagnostic.clone(),
+                    ).await;
+                    wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response())
                 }
                 Err(_) => {
                     let diagnostic = RuntimeDiagnostic::new(
@@ -434,14 +557,256 @@ async fn dispatch(
                         "request handler panicked while being polled",
                     )
                     .expect("static diagnostic is valid");
-                    scope.fail(diagnostic.clone());
-                    scoped_response(scope, StatusCode::INTERNAL_SERVER_ERROR, diagnostic.code)
-                        .unwrap_or_else(|_| fallback_response())
+                    let public = PublicError::new(
+                        PublicErrorClass::InternalFailure,
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "PLG-RUN-502",
+                    );
+                    let response = recover_error(
+                        &state,
+                        &scope,
+                        Some(&matched),
+                        public,
+                        diagnostic,
+                    ).await;
+                    wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response())
                 }
             }
         }
     };
     response
+}
+
+type MiddlewareLayer = (String, Arc<dyn RuntimeMiddleware>);
+
+fn route_handler_future(
+    state: Arc<RuntimeState>,
+    matched: RouteMatch,
+    context: RequestContext,
+    request: Request<Body>,
+) -> HandlerFuture {
+    let layers: Vec<MiddlewareLayer> = matched
+        .middleware_ids()
+        .iter()
+        .map(|id| {
+            (
+                id.clone(),
+                state
+                    .middleware
+                    .get(id)
+                    .expect("middleware registry was sealed with the route graph")
+                    .clone(),
+            )
+        })
+        .collect();
+    let handler = state
+        .handlers
+        .get(matched.route_id())
+        .expect("runtime graph and handler registry were sealed together")
+        .clone();
+    run_middleware(
+        state,
+        Arc::new(matched),
+        Arc::new(layers),
+        handler,
+        0,
+        context,
+        request,
+    )
+}
+
+fn run_middleware(
+    state: Arc<RuntimeState>,
+    route: Arc<RouteMatch>,
+    layers: Arc<Vec<MiddlewareLayer>>,
+    handler: Arc<dyn RuntimeHandler>,
+    index: usize,
+    context: RequestContext,
+    request: Request<Body>,
+) -> HandlerFuture {
+    Box::pin(async move {
+        let scope = context.scope().clone();
+        let future = if let Some((id, middleware)) = layers.get(index).cloned() {
+            scope.record_middleware(&id);
+            let next_state = state.clone();
+            let next_route = route.clone();
+            let next_layers = layers.clone();
+            let next_handler = handler.clone();
+            let next_context = context.clone();
+            let next = MiddlewareNext::new(Box::new(move |request| {
+                run_middleware(
+                    next_state,
+                    next_route,
+                    next_layers,
+                    next_handler,
+                    index + 1,
+                    next_context,
+                    request,
+                )
+            }));
+            catch_unwind(AssertUnwindSafe(|| middleware.call(context, request, next)))
+        } else {
+            catch_unwind(AssertUnwindSafe(|| handler.call(context, request)))
+        };
+        let future = match future {
+            Ok(future) => future,
+            Err(_) => {
+                let diagnostic = RuntimeDiagnostic::new(
+                    "PLG-RUN-502",
+                    "route execution panicked before returning its future",
+                )
+                .expect("static diagnostic is valid");
+                let public = PublicError::new(
+                    PublicErrorClass::InternalFailure,
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "PLG-RUN-502",
+                );
+                return Ok(recover_error(&state, &scope, Some(&route), public, diagnostic).await);
+            }
+        };
+        match AssertUnwindSafe(future).catch_unwind().await {
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(error)) => {
+                warn!(code = %error.diagnostic.code, "PliegoRS route layer failed");
+                let public = public_handler_error(&error);
+                Ok(recover_error(&state, &scope, Some(&route), public, error.diagnostic).await)
+            }
+            Err(_) => {
+                let diagnostic = RuntimeDiagnostic::new(
+                    "PLG-RUN-502",
+                    "route execution panicked while being polled",
+                )
+                .expect("static diagnostic is valid");
+                let public = PublicError::new(
+                    PublicErrorClass::InternalFailure,
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "PLG-RUN-502",
+                );
+                Ok(recover_error(&state, &scope, Some(&route), public, diagnostic).await)
+            }
+        }
+    })
+}
+
+fn public_handler_error(error: &HandlerError) -> PublicError {
+    let class = match error.status {
+        StatusCode::NOT_FOUND => PublicErrorClass::NotFound,
+        StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+            PublicErrorClass::UnauthorizedOrForbidden
+        }
+        status if status.is_client_error() => PublicErrorClass::InvalidRequest,
+        _ => PublicErrorClass::InternalFailure,
+    };
+    let status = if error.status.is_client_error() || error.status.is_server_error() {
+        error.status
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    };
+    PublicError::new(class, status, error.diagnostic.code.clone())
+}
+
+async fn recover_error(
+    state: &RuntimeState,
+    scope: &RequestScope,
+    route: Option<&RouteMatch>,
+    public: PublicError,
+    diagnostic: RuntimeDiagnostic,
+) -> Response<Body> {
+    if public.class() == PublicErrorClass::InternalFailure {
+        scope.fail(diagnostic);
+    } else {
+        scope.reject(diagnostic);
+    }
+
+    let route_id = route.map(|route| route.route_id().to_owned());
+    let mut boundary_ids = Vec::new();
+    if let Some(route) = route {
+        boundary_ids.extend(route.error_boundary_ids().iter().rev().cloned());
+    }
+    boundary_ids.extend(state.graph.error_boundary_ids().iter().rev().cloned());
+
+    for id in boundary_ids {
+        let boundary = state
+            .error_boundaries
+            .get(&id)
+            .expect("error boundary registry was sealed with the route graph")
+            .clone();
+        let context = ErrorBoundaryContext::new(route_id.clone());
+        let boundary_future =
+            match catch_unwind(AssertUnwindSafe(|| boundary.call(context, public.clone()))) {
+                Ok(future) => future,
+                Err(_) => {
+                    scope.fail(
+                        RuntimeDiagnostic::new(
+                            "PLG-RUN-504",
+                            format!("error boundary {id} panicked before returning its future"),
+                        )
+                        .expect("sealed boundary IDs produce bounded diagnostics"),
+                    );
+                    continue;
+                }
+            };
+        let cancellation = scope.cancellation_token();
+        let result = tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => {
+                return plain_cancelled_response(scope);
+            }
+            result = AssertUnwindSafe(boundary_future).catch_unwind() => result,
+        };
+        let response = match result {
+            Ok(Ok(response)) => response,
+            Ok(Err(error)) => {
+                scope.fail(error.diagnostic);
+                continue;
+            }
+            Err(_) => {
+                scope.fail(
+                    RuntimeDiagnostic::new(
+                        "PLG-RUN-504",
+                        format!("error boundary {id} panicked while being polled"),
+                    )
+                    .expect("sealed boundary IDs produce bounded diagnostics"),
+                );
+                continue;
+            }
+        };
+        if response.status() != public.status() {
+            scope.fail(
+                RuntimeDiagnostic::new(
+                    "PLG-RUN-505",
+                    format!(
+                        "error boundary {id} returned {}; required {}",
+                        response.status(),
+                        public.status()
+                    ),
+                )
+                .expect("HTTP status diagnostics are bounded"),
+            );
+            continue;
+        }
+        scope.set_error_boundary(&id);
+        return response;
+    }
+
+    plain_error_response(public.status(), public.code())
+}
+
+fn plain_cancelled_response(scope: &RequestScope) -> Response<Body> {
+    let (status, code) = match scope.cancel_reason() {
+        Some(CancelReason::Deadline) => (StatusCode::GATEWAY_TIMEOUT, "PLG-RUN-408"),
+        Some(CancelReason::Shutdown) => (StatusCode::SERVICE_UNAVAILABLE, "PLG-RUN-503"),
+        _ => (StatusCode::REQUEST_TIMEOUT, "PLG-RUN-499"),
+    };
+    plain_error_response(status, code)
+}
+
+fn plain_error_response(status: StatusCode, code: impl AsRef<str>) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .header(http::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .body(Body::from(format!("{}\n", code.as_ref())))
+        .expect("runtime error response is valid")
 }
 
 fn wrap_handler_response(
@@ -724,6 +1089,12 @@ pub enum RuntimeBuildError {
     InvalidIdentity(ScopeError),
     MissingHandler(String),
     UnknownHandler(String),
+    MissingMiddleware(String),
+    UnknownMiddleware(String),
+    DuplicateMiddlewareRegistration(String),
+    MissingErrorBoundary(String),
+    UnknownErrorBoundary(String),
+    DuplicateErrorBoundaryRegistration(String),
 }
 
 impl Display for RuntimeBuildError {
@@ -736,6 +1107,36 @@ impl Display for RuntimeBuildError {
             }
             Self::UnknownHandler(route) => {
                 write!(formatter, "handler references unknown route {route}")
+            }
+            Self::MissingMiddleware(id) => {
+                write!(formatter, "route graph references missing middleware {id}")
+            }
+            Self::UnknownMiddleware(id) => {
+                write!(formatter, "middleware registry contains unknown ID {id}")
+            }
+            Self::DuplicateMiddlewareRegistration(id) => {
+                write!(
+                    formatter,
+                    "middleware ID {id} was registered more than once"
+                )
+            }
+            Self::MissingErrorBoundary(id) => {
+                write!(
+                    formatter,
+                    "route graph references missing error boundary {id}"
+                )
+            }
+            Self::UnknownErrorBoundary(id) => {
+                write!(
+                    formatter,
+                    "error boundary registry contains unknown ID {id}"
+                )
+            }
+            Self::DuplicateErrorBoundaryRegistration(id) => {
+                write!(
+                    formatter,
+                    "error boundary ID {id} was registered more than once"
+                )
             }
         }
     }

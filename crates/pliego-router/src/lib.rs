@@ -20,6 +20,8 @@ pub const MAX_PATTERN_BYTES: usize = 1_024;
 pub const MAX_ROUTE_SEGMENTS: usize = 32;
 pub const MAX_ROUTE_ID_BYTES: usize = 64;
 pub const MAX_PARAMETER_NAME_BYTES: usize = 63;
+pub const MAX_ROUTE_MIDDLEWARE: usize = 32;
+pub const MAX_ERROR_BOUNDARIES: usize = 16;
 pub const DEFAULT_MAX_ROUTES: usize = 4_096;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -411,6 +413,8 @@ pub struct RouteSpec {
     id: String,
     method: RouteMethod,
     pattern: RoutePattern,
+    middleware: Vec<String>,
+    error_boundaries: Vec<String>,
 }
 
 impl RouteSpec {
@@ -425,7 +429,35 @@ impl RouteSpec {
             id,
             method,
             pattern: RoutePattern::parse(pattern)?,
+            middleware: Vec::new(),
+            error_boundaries: Vec::new(),
         })
+    }
+
+    pub fn middleware(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_behavior_id(&id, BehaviorKind::Middleware)?;
+        if self.middleware.len() >= MAX_ROUTE_MIDDLEWARE {
+            return Err(RouteError::TooManyMiddleware(MAX_ROUTE_MIDDLEWARE));
+        }
+        if self.middleware.contains(&id) {
+            return Err(RouteError::DuplicateMiddleware(id));
+        }
+        self.middleware.push(id);
+        Ok(self)
+    }
+
+    pub fn error_boundary(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_behavior_id(&id, BehaviorKind::ErrorBoundary)?;
+        if self.error_boundaries.len() >= MAX_ERROR_BOUNDARIES {
+            return Err(RouteError::TooManyErrorBoundaries(MAX_ERROR_BOUNDARIES));
+        }
+        if self.error_boundaries.contains(&id) {
+            return Err(RouteError::DuplicateErrorBoundary(id));
+        }
+        self.error_boundaries.push(id);
+        Ok(self)
     }
 
     pub fn id(&self) -> &str {
@@ -438,6 +470,30 @@ impl RouteSpec {
 
     pub fn pattern(&self) -> &RoutePattern {
         &self.pattern
+    }
+
+    pub fn middleware_ids(&self) -> &[String] {
+        &self.middleware
+    }
+
+    pub fn error_boundary_ids(&self) -> &[String] {
+        &self.error_boundaries
+    }
+}
+
+#[derive(Clone, Copy)]
+enum BehaviorKind {
+    Middleware,
+    ErrorBoundary,
+}
+
+fn validate_behavior_id(id: &str, kind: BehaviorKind) -> Result<(), RouteError> {
+    if validate_route_id(id).is_ok() {
+        return Ok(());
+    }
+    match kind {
+        BehaviorKind::Middleware => Err(RouteError::InvalidMiddlewareId(id.to_owned())),
+        BehaviorKind::ErrorBoundary => Err(RouteError::InvalidErrorBoundaryId(id.to_owned())),
     }
 }
 
@@ -463,6 +519,7 @@ fn validate_route_id(id: &str) -> Result<(), RouteError> {
 pub struct RouteGraphBuilder {
     max_routes: usize,
     routes: Vec<RouteSpec>,
+    error_boundaries: Vec<String>,
 }
 
 impl Default for RouteGraphBuilder {
@@ -476,6 +533,7 @@ impl RouteGraphBuilder {
         Self {
             max_routes: DEFAULT_MAX_ROUTES,
             routes: Vec::new(),
+            error_boundaries: Vec::new(),
         }
     }
 
@@ -486,7 +544,21 @@ impl RouteGraphBuilder {
         Ok(Self {
             max_routes,
             routes: Vec::new(),
+            error_boundaries: Vec::new(),
         })
+    }
+
+    pub fn error_boundary(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_behavior_id(&id, BehaviorKind::ErrorBoundary)?;
+        if self.error_boundaries.len() >= MAX_ERROR_BOUNDARIES {
+            return Err(RouteError::TooManyErrorBoundaries(MAX_ERROR_BOUNDARIES));
+        }
+        if self.error_boundaries.contains(&id) {
+            return Err(RouteError::DuplicateErrorBoundary(id));
+        }
+        self.error_boundaries.push(id);
+        Ok(self)
     }
 
     pub fn route(mut self, route: RouteSpec) -> Self {
@@ -526,10 +598,11 @@ impl RouteGraphBuilder {
             }
         }
 
-        let digest = graph_digest(&self.routes);
+        let digest = graph_digest(&self.routes, &self.error_boundaries);
         self.routes.sort_by(match_order);
         Ok(RouteGraph {
             routes: self.routes,
+            error_boundaries: self.error_boundaries,
             digest,
         })
     }
@@ -551,9 +624,10 @@ fn match_order(left: &RouteSpec, right: &RouteSpec) -> Ordering {
         .then_with(|| left.id.cmp(&right.id))
 }
 
-fn graph_digest(routes: &[RouteSpec]) -> String {
+fn graph_digest(routes: &[RouteSpec], error_boundaries: &[String]) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"pliego-route-graph-v1\0");
+    digest.update(b"pliego-route-graph-v2\0");
+    digest_sequence(&mut digest, b"root-error-boundaries", error_boundaries);
     for route in routes {
         for value in [
             route.method.as_str(),
@@ -564,8 +638,24 @@ fn graph_digest(routes: &[RouteSpec]) -> String {
             digest.update((value.len() as u64).to_be_bytes());
             digest.update(value.as_bytes());
         }
+        digest_sequence(&mut digest, b"middleware", &route.middleware);
+        digest_sequence(
+            &mut digest,
+            b"route-error-boundaries",
+            &route.error_boundaries,
+        );
     }
     encode_hex(&digest.finalize())
+}
+
+fn digest_sequence(digest: &mut Sha256, label: &[u8], values: &[String]) {
+    digest.update((label.len() as u64).to_be_bytes());
+    digest.update(label);
+    digest.update((values.len() as u64).to_be_bytes());
+    for value in values {
+        digest.update((value.len() as u64).to_be_bytes());
+        digest.update(value.as_bytes());
+    }
 }
 
 fn encode_hex(bytes: &[u8]) -> String {
@@ -581,6 +671,7 @@ fn encode_hex(bytes: &[u8]) -> String {
 #[derive(Clone, Debug)]
 pub struct RouteGraph {
     routes: Vec<RouteSpec>,
+    error_boundaries: Vec<String>,
     digest: String,
 }
 
@@ -591,6 +682,10 @@ impl RouteGraph {
 
     pub fn routes(&self) -> &[RouteSpec] {
         &self.routes
+    }
+
+    pub fn error_boundary_ids(&self) -> &[String] {
+        &self.error_boundaries
     }
 
     pub fn resolve(&self, method: &RouteMethod, path: &str) -> Result<RouteMatch, ResolveError> {
@@ -604,6 +699,8 @@ impl RouteGraph {
                     method: route.method.clone(),
                     pattern: route.pattern.canonical.clone(),
                     parameters,
+                    middleware: route.middleware.clone(),
+                    error_boundaries: route.error_boundaries.clone(),
                 });
             }
         }
@@ -655,6 +752,8 @@ pub struct RouteMatch {
     method: RouteMethod,
     pattern: String,
     parameters: BTreeMap<String, String>,
+    middleware: Vec<String>,
+    error_boundaries: Vec<String>,
 }
 
 impl RouteMatch {
@@ -676,6 +775,14 @@ impl RouteMatch {
 
     pub fn parameter(&self, name: &str) -> Option<&str> {
         self.parameters.get(name).map(String::as_str)
+    }
+
+    pub fn middleware_ids(&self) -> &[String] {
+        &self.middleware
+    }
+
+    pub fn error_boundary_ids(&self) -> &[String] {
+        &self.error_boundaries
     }
 }
 
@@ -735,6 +842,12 @@ pub enum RouteError {
         maximum: usize,
     },
     DuplicateRouteId(String),
+    InvalidMiddlewareId(String),
+    DuplicateMiddleware(String),
+    TooManyMiddleware(usize),
+    InvalidErrorBoundaryId(String),
+    DuplicateErrorBoundary(String),
+    TooManyErrorBoundaries(usize),
     RouteCollision {
         method: RouteMethod,
         shape: String,
@@ -758,6 +871,12 @@ impl RouteError {
             Self::InvalidRouteLimit(_) | Self::TooManyRoutes { .. } => "PLG-RTE-008",
             Self::DuplicateRouteId(_) => "PLG-RTE-009",
             Self::RouteCollision { .. } => "PLG-RTE-010",
+            Self::InvalidMiddlewareId(_)
+            | Self::DuplicateMiddleware(_)
+            | Self::TooManyMiddleware(_) => "PLG-RTE-011",
+            Self::InvalidErrorBoundaryId(_)
+            | Self::DuplicateErrorBoundary(_)
+            | Self::TooManyErrorBoundaries(_) => "PLG-RTE-012",
         }
     }
 }
@@ -790,6 +909,27 @@ impl Display for RouteError {
                 "route graph has {actual} routes; maximum is {maximum}"
             ),
             Self::DuplicateRouteId(value) => write!(formatter, "duplicate route ID: {value}"),
+            Self::InvalidMiddlewareId(value) => {
+                write!(formatter, "invalid middleware ID {value:?}")
+            }
+            Self::DuplicateMiddleware(value) => {
+                write!(formatter, "duplicate middleware ID: {value}")
+            }
+            Self::TooManyMiddleware(maximum) => {
+                write!(formatter, "route exceeds {maximum} middleware entries")
+            }
+            Self::InvalidErrorBoundaryId(value) => {
+                write!(formatter, "invalid error boundary ID {value:?}")
+            }
+            Self::DuplicateErrorBoundary(value) => {
+                write!(formatter, "duplicate error boundary ID: {value}")
+            }
+            Self::TooManyErrorBoundaries(maximum) => {
+                write!(
+                    formatter,
+                    "graph or route exceeds {maximum} error boundaries"
+                )
+            }
             Self::RouteCollision {
                 method,
                 shape,
@@ -1041,6 +1181,68 @@ mod tests {
     }
 
     #[test]
+    fn middleware_and_error_boundaries_are_ordered_and_digest_bound() {
+        let guarded = route("account", RouteMethod::get(), "/account")
+            .middleware("request-id")
+            .unwrap()
+            .middleware("authorization")
+            .unwrap()
+            .error_boundary("account-error")
+            .unwrap();
+        let graph = RouteGraphBuilder::new()
+            .error_boundary("root-error")
+            .unwrap()
+            .route(guarded)
+            .seal()
+            .unwrap();
+        let matched = graph.resolve(&RouteMethod::get(), "/account").unwrap();
+        assert_eq!(
+            matched.middleware_ids(),
+            &["request-id".to_owned(), "authorization".to_owned()]
+        );
+        assert_eq!(matched.error_boundary_ids(), &["account-error".to_owned()]);
+        assert_eq!(graph.error_boundary_ids(), &["root-error".to_owned()]);
+
+        let changed = RouteGraphBuilder::new()
+            .error_boundary("root-error")
+            .unwrap()
+            .route(
+                route("account", RouteMethod::get(), "/account")
+                    .middleware("authorization")
+                    .unwrap()
+                    .middleware("request-id")
+                    .unwrap()
+                    .error_boundary("account-error")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap();
+        assert_ne!(graph.digest(), changed.digest());
+    }
+
+    #[test]
+    fn behavior_ids_and_duplicates_fail_before_graph_sealing() {
+        assert!(matches!(
+            route("home", RouteMethod::get(), "/").middleware("Bad ID"),
+            Err(RouteError::InvalidMiddlewareId(_))
+        ));
+        assert!(matches!(
+            route("home", RouteMethod::get(), "/")
+                .middleware("security")
+                .unwrap()
+                .middleware("security"),
+            Err(RouteError::DuplicateMiddleware(_))
+        ));
+        assert!(matches!(
+            RouteGraphBuilder::new()
+                .error_boundary("root-error")
+                .unwrap()
+                .error_boundary("root-error"),
+            Err(RouteError::DuplicateErrorBoundary(_))
+        ));
+    }
+
+    #[test]
     fn route_limit_fails_before_graph_creation() {
         let mut builder = RouteGraphBuilder::with_max_routes(1).unwrap();
         builder.push(route("home", RouteMethod::get(), "/"));
@@ -1064,5 +1266,7 @@ mod tests {
         let json = serde_json::to_value(matched).unwrap();
         assert_eq!(json["route_id"], "item");
         assert_eq!(json["parameters"]["id"], "42");
+        assert_eq!(json["middleware"], serde_json::json!([]));
+        assert_eq!(json["error_boundaries"], serde_json::json!([]));
     }
 }
