@@ -51,7 +51,7 @@ semver = "1"
 tar = "0.4"
 proc-macro2 = "1"
 quote = "1"
-syn = { version = "2", features = ["full"] }
+syn = { version = "3", features = ["full"] }
 tiny_http = "0.12"
 notify = "8.2.0"
 js-sys = "=0.3.103"
