@@ -1,8 +1,8 @@
 # PliegoRS execution backlog
 
 **Updated:** 2026-07-18
-**Objective:** preserve R0-R7 as regression gates and close P8 trust and adoption
-before adding broad OpenSDK or server-runtime surface.
+**Objective:** preserve R0-R7 and P8 as regression gates while the OpenSDK
+preview gathers implementation and governance evidence.
 
 The normative hardening sequence is defined in
 [`28-hardening-roadmap.md`](28-hardening-roadmap.md). A task is complete only
@@ -21,11 +21,13 @@ candidate.
 | 6 | R5 Golden developer experience | Complete | [Contract](32-golden-developer-experience.md) and [committed evidence](evidence/r5-golden-developer-experience.md) cover replayable scaffolding, receipt-bound causal graphs, native watching, typed HMR, why commands, structured diagnostics, and measured first-app p50/p95. |
 | 7 | R6 Candidate distribution | Complete | [Contract](33-candidate-distribution-contract.md) and [committed evidence](evidence/r6-candidate-distribution.md) cover five targets, two native replicas, exact binary hashes, a final Ed25519 manifest, installer lifecycles, and a distribution-only golden path. |
 | 8 | R7 External flagship | Complete | [Committed R7 evidence](evidence/r7-external-flagship.md) covers Cairn, an independent durable human-agent decision dossier built only from the accepted candidate, with replay, forks, effects, receipts, provenance, audit, selective sync, tamper rejection, and browser acceptance. |
-| 9 | P8 Trust and adoption | In progress | [P8 contract and audited baseline](35-p8-trust-and-adoption-contract.md) cover product stability, CLI diagnostics, release identity, adversarial suites, benchmarks, clean environments, and opt-in-only telemetry. |
+| 9 | P8 Trust and adoption | Complete | [P8 contract and audited baseline](35-p8-trust-and-adoption-contract.md), the signed [`v0.0.2`](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) release, and the release-only golden matrix cover product stability, CLI diagnostics, release identity, adversarial suites, benchmarks, clean environments, and opt-in-only telemetry. |
+| 10 | P9 OpenSDK preview | Implemented; governance pending | [OpenSDK foundation](42-opensdk-foundation.md), [multilang conformance](43-opensdk-multilang-conformance.md), [browser-framework conformance](44-browser-framework-conformance.md), [tooling protocol](45-opensdk-tooling-protocol.md), and [compatibility policy](46-opensdk-compatibility-and-deprecation.md) cover the preview implementation. RFC-006 and RFC-007 remain Draft, and ADR-006 remains Proposed, until formal governance review. |
 
 The [product constitution](34-product-constitution.md) governs admission of all
-work after R7. P9 OpenSDK follows P8; it does not displace unfinished trust,
-diagnostic, release, or measurement gates.
+work after R7. P9 entered preview only after the P8 release gates closed. Its
+implemented conformance surface does not imply RFC or ADR acceptance, stable
+API status, or release of the preview crate.
 
 ## Already implemented foundations
 
