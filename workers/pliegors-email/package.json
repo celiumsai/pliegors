@@ -15,10 +15,13 @@
     "mimetext": "3.0.28"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.18.4",
+    "@cloudflare/vitest-pool-workers": "0.18.7",
     "@types/node": "26.1.1",
     "typescript": "7.0.2",
     "vitest": "4.1.10",
-    "wrangler": "4.110.0"
+    "wrangler": "4.113.0"
+  },
+  "overrides": {
+    "sharp": "0.35.3"
   }
 }
