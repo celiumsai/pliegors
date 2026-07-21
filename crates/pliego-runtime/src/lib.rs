@@ -24,8 +24,9 @@ pub use host::{
 pub use limits::{LimitError, RequestLimits};
 pub use middleware::{MiddlewareNext, PreRouteNext, RuntimeMiddleware, RuntimePreRouteMiddleware};
 pub use render::{
-    CompleteDocument, CompleteRenderOptions, OrderedDocument, OrderedRenderOptions,
-    OrderedViewChunk, RenderMode, RenderSeedMode, ServerRenderError, render_complete_document,
+    AsyncBoundary, BoundaryDocument, BoundaryRenderOptions, CompleteDocument,
+    CompleteRenderOptions, OrderedDocument, OrderedRenderOptions, OrderedViewChunk, RenderMode,
+    RenderSeedMode, ServerRenderError, render_boundary_document, render_complete_document,
     render_complete_fragment, render_ordered_document,
 };
 pub use scope::{

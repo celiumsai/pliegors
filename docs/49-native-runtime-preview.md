@@ -15,7 +15,7 @@ not depend on Axum or a deployment provider.
 
 `pliego-runtime` owns request admission, scope lifecycle, deadlines,
 cancellation, cleanup, response commitment, response-body accounting,
-diagnostics, receipts, and complete/ordered server-rendering modes. Axum,
+diagnostics, receipts, and complete/ordered/boundary server-rendering modes. Axum,
 Hyper, Tower, and Tokio retain HTTP transport, service, and executor ownership.
 
 ## Complete rendering
@@ -99,6 +99,64 @@ It terminates the stream and produces a failed runtime receipt; it cannot
 replace the committed status. Ordered mode is intentionally plain SSR until a
 single adoption contract can span the streamed sibling sequence.
 
+## Asynchronous boundary rendering
+
+`BoundaryDocument` accepts a finite declaration of uniquely identified
+`AsyncBoundary` values. Each boundary owns a `Send` future that resolves to a
+factory for one non-`Send` `pliego-dom` view. The scheduler starts at most four
+futures concurrently by default, but emits the resolved HTML in declaration
+order. This gives independent I/O overlap without changing accessible document
+order.
+
+```rust
+use pliego_dom::{IntoView, el};
+use pliego_runtime::{
+    AsyncBoundary, BoundaryDocument, BoundaryRenderOptions,
+    render_boundary_document,
+};
+
+let document = BoundaryDocument::new("Account");
+let boundaries = [
+    AsyncBoundary::map("heading", async { "Account" }, |title| {
+        el("h1").child(title).into_view()
+    })?,
+    AsyncBoundary::try_map("activity", load_activity(), |items| {
+        el("p").child(format!("{} items", items.len())).into_view()
+    })?,
+];
+
+let response = render_boundary_document(
+    &document,
+    boundaries,
+    BoundaryRenderOptions::default(),
+)?;
+```
+
+Before each result, the stream emits an inert, stable anchor:
+
+```html
+<template data-pliego-boundary="activity"></template>
+```
+
+The resolved HTML follows its anchor. No inline bootstrap, DOM replacement, or
+client JavaScript is required, and useful HTML remains the baseline. This first
+contract deliberately does not deliver later boundaries out of order. It is
+not a claim of React Flight, Suspense patching, or partial prerendering.
+
+Boundary identities are ASCII, 1-64 bytes, unique per response, and validated
+before commitment. Defaults allow 32 declarations, four in flight, and five
+seconds per future; hard ceilings are 256, 32, and 60 seconds. Applications may
+tighten those values. Shell, all placeholder anchors, and every resolved view
+share one output budget. Depth and node limits apply independently to each
+resolved view.
+
+Timeout, future panic, factory panic, output exhaustion, or scheduler failure
+after the prefix is committed terminates the body. It cannot rewrite the status
+or emit a second error document. `try_map` converts an application failure into
+`PLG-REN-210` without retaining its potentially sensitive error text. Dropping
+the client response still cancels the request scope and drops every pending
+boundary through the host-owned body.
+
 ## Runtime limits
 
 `RequestLimits` currently bounds:
@@ -110,6 +168,7 @@ single adoption contract can span the streamed sibling sequence.
 - diagnostics and application cleanup callbacks;
 - concurrent admitted requests;
 - ordered render chunks and document metadata;
+- asynchronous boundary count, in-flight work, timeout, and identities;
 - request deadline; and
 - graceful-shutdown drain time.
 
@@ -143,9 +202,9 @@ The source implementation currently demonstrates:
 
 ## Dynamic reference application
 
-[`examples/native-pliego`](../examples/native-pliego/) seals five native
-routes in one graph: complete SSR, a typed parameter route, ordered SSR, a
-JSON health response, and a stylesheet asset. The executable binds to
+[`examples/native-pliego`](../examples/native-pliego/) seals six native
+routes in one graph: complete SSR, a typed parameter route, ordered SSR,
+async-boundary SSR, a JSON health response, and a stylesheet asset. The executable binds to
 `127.0.0.1:4310` by default, rejects non-loopback addresses unless
 `PLIEGO_EXPOSE=1` is explicit, and drains through the runtime on `Ctrl+C`.
 
@@ -163,13 +222,8 @@ both successful and authored 404 responses.
 
 ## Deliberately absent
 
-There is no asynchronous boundary streaming API yet. Ordered mode streams
-independent body siblings and buffers at most one bounded sibling view; it does
-not claim incremental output inside one DOM tree.
-
 The following remain gate work:
 
-- declared asynchronous boundaries;
 - layout-owned document composition, head metadata, loaders, and child slots;
 - OpenTelemetry with redaction and cardinality tests;
 - multipart and decompression policies;

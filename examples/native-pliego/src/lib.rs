@@ -7,8 +7,9 @@ use pliego_router::{
     RouteScopeSpec, RouteSpec,
 };
 use pliego_runtime::{
-    Body, CompleteDocument, CompleteRenderOptions, NativeRuntime, NativeRuntimeBuilder,
-    OrderedDocument, OrderedRenderOptions, OrderedViewChunk, Response, StatusCode,
+    AsyncBoundary, Body, BoundaryDocument, BoundaryRenderOptions, CompleteDocument,
+    CompleteRenderOptions, NativeRuntime, NativeRuntimeBuilder, OrderedDocument,
+    OrderedRenderOptions, OrderedViewChunk, Response, StatusCode, render_boundary_document,
     render_complete_document, render_ordered_document,
 };
 use std::error::Error;
@@ -79,6 +80,7 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
         .route(route("home", RouteMethod::get(), "/")?)
         .route(route("hello", RouteMethod::get(), "/hello/:name")?)
         .route(route("stream", RouteMethod::get(), "/stream")?)
+        .route(route("boundary", RouteMethod::get(), "/boundary")?)
         .route(route("health", RouteMethod::get(), "/health")?)
         .route(route("styles", RouteMethod::get(), "/assets/site.css")?)
         .seal()?;
@@ -156,6 +158,7 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
                     el("nav")
                         .attr("aria-label", "Runtime demonstrations")
                         .child(el("a").attr("href", "/stream").child("Inspect ordered SSR"))
+                        .child(el("a").attr("href", "/boundary").child("Resolve async boundaries"))
                         .child(el("a").attr("href", "/hello/Pliego").child("Resolve a typed route"))
                         .child(el("a").attr("href", "/health").child("Read health")),
                 )
@@ -214,6 +217,43 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
                 }),
             ]);
             render_ordered_document(&document, chunks, OrderedRenderOptions::default())
+        })
+        .handler("boundary", |_context, _request| async {
+            let document = BoundaryDocument::new("PliegoRS async boundaries")
+                .language("en")
+                .description("Bounded concurrent work with document-order HTML delivery.")
+                .stylesheet("/assets/site.css");
+            let boundaries = [
+                AsyncBoundary::map("intro", async { "ASYNC SSR / DECLARED" }, |label| {
+                    el("main")
+                        .class("stream")
+                        .child(el("p").class("eyebrow").child(label))
+                        .child(el("h1").child("Concurrency without changing the document."))
+                        .into_view()
+                })
+                .expect("static boundary identity is valid"),
+                AsyncBoundary::map(
+                    "account-summary",
+                    async {
+                        tokio::time::sleep(std::time::Duration::from_millis(8)).await;
+                        "RESOLVED / SERVER OWNED"
+                    },
+                    |label| {
+                        el("section")
+                            .class("panel")
+                            .child(el("p").class("signal").child(label))
+                            .child(el("p").child("The stable placeholder arrived before this bounded asynchronous result."))
+                            .child(el("nav").child(el("a").attr("href", "/").child("Return home")))
+                            .into_view()
+                    },
+                )
+                .expect("static boundary identity is valid"),
+            ];
+            render_boundary_document(
+                &document,
+                boundaries,
+                BoundaryRenderOptions::default(),
+            )
         })
         .handler("health", |_context, _request| async {
             Ok(Response::builder()
@@ -312,6 +352,19 @@ mod tests {
             stylesheet.headers()["content-type"],
             "text/css; charset=utf-8"
         );
+    }
+
+    #[tokio::test]
+    async fn boundary_route_resolves_without_a_javascript_runtime() {
+        let streamed = response("/boundary").await;
+        assert_eq!(streamed.status(), StatusCode::OK);
+        assert!(streamed.headers().get("content-length").is_none());
+        let body = streamed.into_body().collect().await.unwrap().to_bytes();
+        let body = std::str::from_utf8(&body).unwrap();
+        assert!(body.contains("data-pliego-boundary=\"intro\""));
+        assert!(body.contains("data-pliego-boundary=\"account-summary\""));
+        assert!(body.contains("RESOLVED / SERVER OWNED"));
+        assert!(!body.contains("<script"));
     }
 
     #[tokio::test]

@@ -21,10 +21,13 @@ Root pre-route middleware has a distinct context without route authority and
 runs before matching; it may rewrite or short-circuit while preserving the
 single post-unwind response commitment.
 
-The source tree also contains bounded `complete` and `ordered` server-rendering
-modes over `pliego-dom`. They emit a typed HTML document or fragment, validate
-metadata and response status, preserve backpressure between ordered sibling
-views, and bind the render mode into the runtime receipt before commitment.
+The source tree also contains bounded `complete`, `ordered`, and `boundary`
+server-rendering modes over `pliego-dom`. They emit typed HTML, validate
+metadata and response status, preserve backpressure, and bind the render mode
+into the runtime receipt before commitment. Boundary mode starts a bounded
+number of declared futures concurrently, emits stable inert placeholders, and
+delivers resolved HTML in declaration order without requiring client-side
+JavaScript.
 
 The crate is `0.1.0-preview.1` source work. It is not published on crates.io and
 does not promote the `native-http-runtime` or `dynamic-ssr` capabilities in
@@ -36,6 +39,5 @@ graceful-shutdown case with a pending streamed response. HTTP/2, TLS, proxy,
 slow-peer, and fixed-load evidence remain open gate work.
 
 This foundation is intentionally incomplete. It does not yet expose
-asynchronous boundary streaming, layout-owned document composition,
-OpenTelemetry, multipart/decompression
+layout-owned document composition, OpenTelemetry, multipart/decompression
 policies, or a production `pliego serve` command.

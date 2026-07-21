@@ -1540,3 +1540,123 @@ async fn ordered_server_render_streams_siblings_and_binds_the_receipt() {
     assert!(body.contains("</head><body><h1>First</h1><p>Second</p></body></html>"));
     assert_eq!(sink.receipts()[0].render_mode, Some(RenderMode::Ordered));
 }
+
+#[tokio::test]
+async fn boundary_server_render_resolves_in_order_and_binds_the_receipt() {
+    use pliego_dom::{IntoView, el};
+    use pliego_runtime::{
+        AsyncBoundary, BoundaryDocument, BoundaryRenderOptions, RenderMode,
+        render_boundary_document,
+    };
+
+    let graph = RouteGraphBuilder::new()
+        .route(route("boundary", RouteMethod::get(), "/boundary"))
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "boundary-render-test")
+        .unwrap()
+        .handler("boundary", |_context, _request| {
+            let document = BoundaryDocument::new("Boundary");
+            let boundaries = [
+                AsyncBoundary::map("heading", async { "First" }, |value| {
+                    el("h1").child(value).into_view()
+                })
+                .unwrap(),
+                AsyncBoundary::map("detail", async { "Second" }, |value| {
+                    el("p").child(value).into_view()
+                })
+                .unwrap(),
+            ];
+            std::future::ready(render_boundary_document(
+                &document,
+                boundaries,
+                BoundaryRenderOptions::default(),
+            ))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .uri("/boundary")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        response
+            .headers()
+            .get(http::header::CONTENT_LENGTH)
+            .is_none()
+    );
+    let body = to_bytes(response.into_body(), 4096).await.unwrap();
+    let body = std::str::from_utf8(&body).unwrap();
+    assert!(body.contains("<template data-pliego-boundary=\"heading\"></template><h1>First</h1>"));
+    assert!(body.contains("<template data-pliego-boundary=\"detail\"></template><p>Second</p>"));
+    assert_eq!(sink.receipts()[0].render_mode, Some(RenderMode::Boundary));
+}
+
+#[tokio::test]
+async fn boundary_timeout_after_commit_fails_the_receipt_without_rewriting_status() {
+    use pliego_dom::{IntoView, el};
+    use pliego_runtime::{
+        AsyncBoundary, BoundaryDocument, BoundaryRenderOptions, RenderMode, RequestOutcome,
+        render_boundary_document,
+    };
+    use std::time::Duration;
+
+    let graph = RouteGraphBuilder::new()
+        .route(route("timeout", RouteMethod::get(), "/timeout"))
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "boundary-timeout-test")
+        .unwrap()
+        .handler("timeout", |_context, _request| {
+            let boundary =
+                AsyncBoundary::map("slow", futures_util::future::pending::<()>(), |_| {
+                    el("p").into_view()
+                })
+                .unwrap();
+            let options = BoundaryRenderOptions::default()
+                .with_timeout(Duration::from_millis(1))
+                .unwrap();
+            std::future::ready(render_boundary_document(
+                &BoundaryDocument::new("Timeout"),
+                [boundary],
+                options,
+            ))
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .uri("/timeout")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(to_bytes(response.into_body(), 4096).await.is_err());
+    let receipts = sink.receipts();
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].outcome, RequestOutcome::Failed);
+    assert_eq!(receipts[0].response_status, Some(200));
+    assert_eq!(receipts[0].render_mode, Some(RenderMode::Boundary));
+    assert!(
+        receipts[0]
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PLG-RUN-501")
+    );
+}

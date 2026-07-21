@@ -1,8 +1,8 @@
 # Native PliegoRS reference application
 
 This unreleased G1 application exercises `pliego-router`, `pliego-runtime`,
-`pliego-dom`, complete SSR, ordered sibling streaming, assets, health, and
-graceful shutdown in one native process. Its sealed graph also declares a
+`pliego-dom`, complete SSR, ordered sibling streaming, bounded asynchronous
+boundary SSR, assets, health, and graceful shutdown in one native process. Its sealed graph also declares a
 response-policy middleware and a safe root error boundary.
 The graph and runtime registry both declare its
 `mutate-response-headers` capability; a mismatch prevents startup.
@@ -21,5 +21,5 @@ with `PLIEGO_ADDR`. Binding a non-loopback address is rejected unless
 
 This application is gate evidence, not a released starter. It does not yet
 prove layout-owned document composition,
-asynchronous boundaries, HTTP/2, TLS, OpenTelemetry,
+HTTP/2, TLS, OpenTelemetry,
 multipart/decompression policy, fixed-load behavior, or production deployment.

@@ -958,16 +958,16 @@ pub fn changelog(locale: Locale) -> View {
                 "MAIN",
                 None,
                 l(locale, "Experimental preview", "Preview experimental"),
-                l(locale, "OpenSDK becomes executable.", "OpenSDK se vuelve ejecutable."),
+                l(locale, "The native runtime becomes executable.", "El runtime nativo se vuelve ejecutable."),
                 l(
                     locale,
-                    "The public extension boundary now has typed contracts and real conformance evidence. It is implemented for evaluation, not declared stable.",
-                    "El límite público de extensiones ya tiene contratos tipados y evidencia real de conformidad. Está implementado para evaluación, no declarado estable.",
+                    "G1 now has a sealed router, bounded native lifecycle, and three SSR modes alongside the OpenSDK preview. All remain source work for evaluation, not released APIs.",
+                    "G1 ya tiene un router sellado, lifecycle nativo limitado y tres modos SSR junto al preview de OpenSDK. Todos siguen siendo trabajo fuente para evaluación, no APIs liberadas.",
                 ),
                 &[
-                    l(locale, "Typed Wasm Component host with fuel, deadline, memory, output, and capability limits.", "Host tipado de Wasm Components con límites de fuel, deadline, memoria, output y capacidades."),
-                    l(locale, "Rust, TypeScript, Python, React, Svelte, Lit, JSON-RPC, and MCP conformance fixtures.", "Fixtures de conformidad para Rust, TypeScript, Python, React, Svelte, Lit, JSON-RPC y MCP."),
-                    l(locale, "RFC-006 and RFC-007 remain Draft; ADR-006 remains Proposed.", "RFC-006 y RFC-007 siguen Draft; ADR-006 sigue Proposed."),
+                    l(locale, "Complete, ordered, and bounded async-boundary SSR with stable receipts and post-commit failure semantics.", "SSR complete, ordered y async-boundary limitado con recibos estables y semántica de fallo post-commit."),
+                    l(locale, "Pre-route plus inherited group, layout, and route middleware with exact capability admission and authored error recovery.", "Middleware pre-route y heredado de group, layout y route con admisión exacta de capabilities y recuperación de errores con autoría."),
+                    l(locale, "OpenSDK remains an unreleased preview; PliegoCSS 0.1.0-rc.2 is an optional external companion, never a framework requirement.", "OpenSDK sigue como preview aún no liberado; PliegoCSS 0.1.0-rc.2 es un companion externo opcional, nunca un requisito del framework."),
                 ],
                 Some((
                     "https://github.com/celiumsai/pliegors/blob/main/CHANGELOG.md",
