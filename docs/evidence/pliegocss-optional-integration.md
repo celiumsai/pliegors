@@ -25,7 +25,7 @@ contract to PliegoRS commit `b031222` and covered-source SHA-256
 The replay command was:
 
 ```powershell
-$env:PLIEGORS_ROOT='C:\Users\Mario\Documents\pliegors'
+$env:PLIEGORS_ROOT='<pliegors-checkout>'
 pnpm integration:pliegors
 ```
 

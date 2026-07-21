@@ -97,10 +97,10 @@
       "stability": "none",
       "gate": "G1",
       "summary": "Request-time synchronous, asynchronous, and streamed server rendering with explicit boundaries.",
-      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md"],
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md", "docs/evidence/g1-async-boundary-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md"],
       "limitations": [
         "No request-time SSR or streaming API is part of the current public release.",
-        "Unreleased source implements bounded complete and ordered-sibling rendering plus authored error pages; async boundaries, nested middleware, load evidence, and conformance remain incomplete."
+        "Unreleased source implements bounded complete, ordered-sibling, and declaration-ordered async-boundary rendering plus authored error pages; layout composition, load evidence, and conformance remain incomplete."
       ]
     },
     {
@@ -139,7 +139,7 @@
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-native-socket-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md"],
       "limitations": [
         "The unreleased source is a lifecycle foundation, not a production-conformant server release.",
-          "Asynchronous rendering boundaries, layout-owned document composition, OpenTelemetry, load evidence, and the threat-model corpus remain incomplete; tiny_http remains limited to development and static preview commands."
+        "Layout-owned document composition, OpenTelemetry, load evidence, and the threat-model corpus remain incomplete; tiny_http remains limited to development and static preview commands."
       ]
     },
     {

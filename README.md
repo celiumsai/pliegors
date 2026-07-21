@@ -114,16 +114,18 @@ telemetry. See the [execution backlog](docs/19-product-execution-backlog.md),
 [R7 evidence](docs/evidence/r7-external-flagship.md). Production Hyphae
 operation remains a separate system boundary.
 
-The next public boundary is OpenSDK: provider-neutral extension contracts,
-capability admission, portable build output, and conformance across languages
-and browser ecosystems. Its current implementation is evidence for governance,
-not permission to call the API stable.
+The current critical path is G1: the unreleased native router and runtime now
+cover bounded request lifecycles, inherited middleware, authored errors, and
+complete, ordered, and asynchronous-boundary SSR. OpenSDK continues as the
+provider-neutral extension boundary required by that runtime; neither source
+preview is permission to call its API stable.
 
 ## Packages
 
-The fifteen release packages below are published at `0.0.2`. `pliego-sdk` is an
-unreleased repository preview at `0.1.0-preview.1` and is listed separately so
-the registry boundary stays explicit.
+The fifteen release packages below are published at `0.0.2`. The G1 router and
+runtime plus `pliego-sdk` are unreleased repository previews at
+`0.1.0-preview.1`; they are listed separately so the registry boundary stays
+explicit.
 
 | Package | Responsibility |
 | --- | --- |
@@ -145,6 +147,8 @@ the registry boundary stays explicit.
 
 | Unreleased package | Responsibility | Status |
 | --- | --- | --- |
+| `pliego-router` | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | `0.1.0-preview.1` on `main`; not on crates.io |
+| `pliego-runtime` | Bounded native HTTP lifecycle and complete, ordered, and async-boundary SSR | `0.1.0-preview.1` on `main`; not on crates.io |
 | `pliego-sdk` | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | `0.1.0-preview.1` on `main`; not on crates.io |
 
 ## Install

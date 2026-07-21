@@ -22,6 +22,7 @@ const routes = [
   "/docs/content",
   "/docs/browser-runtime",
   "/docs/dom-lifecycle",
+  "/docs/native-runtime",
   "/docs/opensdk",
   "/docs/opensdk-components",
   "/docs/browser-framework-conformance",
@@ -48,7 +49,6 @@ const routes = [
 const expected = ["/404.html", ...routes, ...routes.map((route) => route === "/" ? "/es" : `/es${route}`)];
 const forbidden = [
   "pliego" + ".run",
-  "pliego" + "css",
   "/acquire",
   "/account",
   "one-of-one",
@@ -197,8 +197,8 @@ if (!homeHtml.includes("PLIEGORS / 0.0.2 / PUBLIC PREVIEW")) {
 }
 
 const changelogPages = [
-  ["/changelog", path.join(root, "changelog/index.html"), "OpenSDK becomes executable."],
-  ["/es/changelog", path.join(root, "es/changelog/index.html"), "OpenSDK se vuelve ejecutable."],
+  ["/changelog", path.join(root, "changelog/index.html"), "The native runtime becomes executable."],
+  ["/es/changelog", path.join(root, "es/changelog/index.html"), "El runtime nativo se vuelve ejecutable."],
 ];
 for (const [route, file, localizedTitle] of changelogPages) {
   const html = await readFile(file, "utf8").catch(() => "");
@@ -223,11 +223,13 @@ for (const [route, file, localizedTitle] of changelogPages) {
 const docsHtml = await readFile(path.join(root, "docs/index.html"), "utf8").catch(() => "");
 const docsDocument = parse(docsHtml);
 const docsItems = elements(docsDocument, "a").filter((node) => attribute(node, "data-docs-item") === "");
-if (docsItems.length !== 26) failures.push(`docs index: expected 26 topics, found ${docsItems.length}`);
+if (docsItems.length !== 27) failures.push(`docs index: expected 27 topics, found ${docsItems.length}`);
 for (const required of [
-  "RELEASE / 0.0.2 + OPENSDK / PREVIEW",
-  "pliego-sdk is not on crates.io",
+  "RELEASE / 0.0.2 + G1 / PREVIEW",
+  "pliego-runtime",
+  "not on crates.io",
   "/capabilities.json",
+  "/docs/native-runtime",
   "/docs/opensdk",
 ]) {
   if (!docsHtml.includes(required)) failures.push(`docs index: missing release boundary ${required}`);
@@ -274,6 +276,8 @@ for (const crate of [
   "pliego-hyphae",
   "pliego-starters",
   "pliego-cli",
+  "pliego-router",
+  "pliego-runtime",
   "pliego-sdk",
 ]) {
   if (!crateGuide.includes(crate)) failures.push(`crate reference: missing ${crate}`);
@@ -286,6 +290,22 @@ const opensdkPages = [
   ["/docs/opensdk-tooling", ["JSON-RPC 2.0", "MCP 2025-11-25", "pliego/handshake", "10,000", "1 MiB"]],
   ["/docs/opensdk-compatibility", ["pliego.sdk-compatibility-matrix.schema.json", "experimental", "preview", "stable", "provider-neutral"]],
 ];
+
+const nativeRuntime = await readFile(outputPath("/docs/native-runtime"), "utf8").catch(() => "");
+for (const required of [
+  "0.1.0-preview.1",
+  "pliego-router",
+  "pliego-runtime",
+  "Complete",
+  "Ordered",
+  "Boundary",
+  "data-pliego-boundary",
+  "PLG-REN-210",
+  "PliegoCSS 0.1.0-rc.2",
+  "not-released",
+]) {
+  if (!nativeRuntime.includes(required)) failures.push(`/docs/native-runtime: missing contract ${required}`);
+}
 for (const [route, requiredTerms] of opensdkPages) {
   const html = await readFile(outputPath(route), "utf8").catch(() => "");
   for (const required of requiredTerms) {

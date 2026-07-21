@@ -92,6 +92,12 @@ pageType = "web-page"
 robots = "index-follow"
 
 [[routes]]
+path = "/docs/native-runtime"
+page = "docs-native-runtime"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
 path = "/docs/opensdk"
 page = "docs-opensdk"
 pageType = "web-page"

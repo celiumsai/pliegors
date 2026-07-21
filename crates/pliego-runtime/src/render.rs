@@ -2,14 +2,18 @@
 
 use crate::{Body, HandlerError, Response, RuntimeDiagnostic, StatusCode};
 use axum::body::Bytes;
-use futures_util::Stream;
+use futures_util::stream::FuturesOrdered;
+use futures_util::{FutureExt, Stream, StreamExt};
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use pliego_dom::{RenderLimits, View, try_render_adoptable_html, try_render_html};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::future::Future;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
+use std::{collections::HashSet, collections::VecDeque};
 
 const DOCTYPE: &str = "<!doctype html>";
 const DOCUMENT_SUFFIX: &str = "</body></html>";
@@ -21,6 +25,7 @@ const MAX_DOCUMENT_METADATA_BYTES: usize = 64 * 1_024;
 pub enum RenderMode {
     Complete,
     Ordered,
+    Boundary,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -114,6 +119,77 @@ impl Default for OrderedRenderOptions {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BoundaryRenderOptions {
+    limits: RenderLimits,
+    max_boundaries: usize,
+    max_in_flight: usize,
+    timeout: Duration,
+    status: StatusCode,
+}
+
+impl BoundaryRenderOptions {
+    pub const DEFAULT_MAX_BOUNDARIES: usize = 32;
+    pub const HARD_MAX_BOUNDARIES: usize = 256;
+    pub const DEFAULT_MAX_IN_FLIGHT: usize = 4;
+    pub const HARD_MAX_IN_FLIGHT: usize = 32;
+    pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
+    pub const HARD_MAX_TIMEOUT: Duration = Duration::from_secs(60);
+
+    pub fn new(limits: RenderLimits) -> Self {
+        Self {
+            limits,
+            max_boundaries: Self::DEFAULT_MAX_BOUNDARIES,
+            max_in_flight: Self::DEFAULT_MAX_IN_FLIGHT,
+            timeout: Self::DEFAULT_TIMEOUT,
+            status: StatusCode::OK,
+        }
+    }
+
+    pub fn with_max_boundaries(mut self, maximum: usize) -> Result<Self, ServerRenderError> {
+        if maximum == 0 || maximum > Self::HARD_MAX_BOUNDARIES {
+            return Err(ServerRenderError::InvalidBoundaryLimit {
+                field: "max_boundaries",
+                value: maximum,
+            });
+        }
+        self.max_boundaries = maximum;
+        Ok(self)
+    }
+
+    pub fn with_max_in_flight(mut self, maximum: usize) -> Result<Self, ServerRenderError> {
+        if maximum == 0 || maximum > Self::HARD_MAX_IN_FLIGHT {
+            return Err(ServerRenderError::InvalidBoundaryLimit {
+                field: "max_in_flight",
+                value: maximum,
+            });
+        }
+        self.max_in_flight = maximum;
+        Ok(self)
+    }
+
+    pub fn with_timeout(mut self, timeout: Duration) -> Result<Self, ServerRenderError> {
+        if timeout < Duration::from_millis(1) || timeout > Self::HARD_MAX_TIMEOUT {
+            return Err(ServerRenderError::InvalidBoundaryTimeout(
+                timeout.as_millis(),
+            ));
+        }
+        self.timeout = timeout;
+        Ok(self)
+    }
+
+    pub fn status(mut self, status: StatusCode) -> Self {
+        self.status = status;
+        self
+    }
+}
+
+impl Default for BoundaryRenderOptions {
+    fn default() -> Self {
+        Self::new(RenderLimits::default())
+    }
+}
+
 type OrderedFactory = Box<dyn FnOnce() -> Result<View, ServerRenderError> + Send + 'static>;
 
 pub struct OrderedViewChunk {
@@ -141,6 +217,66 @@ impl OrderedViewChunk {
         self.factory
             .take()
             .expect("ordered view factory is consumed exactly once")()
+    }
+}
+
+type BoundaryFuture =
+    Pin<Box<dyn Future<Output = Result<OrderedViewChunk, ServerRenderError>> + Send + 'static>>;
+
+pub struct AsyncBoundary {
+    id: String,
+    future: BoundaryFuture,
+}
+
+impl AsyncBoundary {
+    pub fn new<F>(id: impl Into<String>, future: F) -> Result<Self, ServerRenderError>
+    where
+        F: Future<Output = Result<OrderedViewChunk, ServerRenderError>> + Send + 'static,
+    {
+        let id = id.into();
+        validate_boundary_id(&id)?;
+        Ok(Self {
+            id,
+            future: Box::pin(future),
+        })
+    }
+
+    pub fn map<F, T, M>(
+        id: impl Into<String>,
+        future: F,
+        render: M,
+    ) -> Result<Self, ServerRenderError>
+    where
+        F: Future<Output = T> + Send + 'static,
+        T: Send + 'static,
+        M: FnOnce(T) -> View + Send + 'static,
+    {
+        Self::new(id, async move {
+            let value = future.await;
+            Ok(OrderedViewChunk::new(move || render(value)))
+        })
+    }
+
+    pub fn try_map<F, T, E, M>(
+        id: impl Into<String>,
+        future: F,
+        render: M,
+    ) -> Result<Self, ServerRenderError>
+    where
+        F: Future<Output = Result<T, E>> + Send + 'static,
+        T: Send + 'static,
+        E: Send + 'static,
+        M: FnOnce(T) -> View + Send + 'static,
+    {
+        let id = id.into();
+        validate_boundary_id(&id)?;
+        let failure_id = id.clone();
+        Self::new(id, async move {
+            let value = future
+                .await
+                .map_err(|_| ServerRenderError::BoundaryFailed { id: failure_id })?;
+            Ok(OrderedViewChunk::new(move || render(value)))
+        })
     }
 }
 
@@ -213,6 +349,44 @@ pub struct OrderedDocument {
 }
 
 impl OrderedDocument {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            metadata: DocumentMetadata::new(title),
+        }
+    }
+
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.metadata.language = language.into();
+        self
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.metadata.description = Some(description.into());
+        self
+    }
+
+    pub fn canonical(mut self, canonical: impl Into<String>) -> Self {
+        self.metadata.canonical = Some(canonical.into());
+        self
+    }
+
+    pub fn stylesheet(mut self, path: impl Into<String>) -> Self {
+        self.metadata.stylesheets.push(path.into());
+        self
+    }
+
+    pub fn module_script(mut self, path: impl Into<String>) -> Self {
+        self.metadata.module_scripts.push(path.into());
+        self
+    }
+}
+
+#[derive(Clone)]
+pub struct BoundaryDocument {
+    metadata: DocumentMetadata,
+}
+
+impl BoundaryDocument {
     pub fn new(title: impl Into<String>) -> Self {
         Self {
             metadata: DocumentMetadata::new(title),
@@ -326,6 +500,75 @@ where
     Ok(response)
 }
 
+pub fn render_boundary_document<I>(
+    document: &BoundaryDocument,
+    boundaries: I,
+    options: BoundaryRenderOptions,
+) -> Result<Response<Body>, HandlerError>
+where
+    I: IntoIterator<Item = AsyncBoundary>,
+{
+    validate_body_status(options.status).map_err(ServerRenderError::into_handler_error)?;
+    let prefix =
+        document_prefix(&document.metadata).map_err(ServerRenderError::into_handler_error)?;
+    let mut pending = VecDeque::new();
+    let mut ids = HashSet::new();
+    let mut placeholder_bytes = 0usize;
+    let mut input = boundaries.into_iter();
+    for _ in 0..options.max_boundaries {
+        let Some(boundary) = input.next() else {
+            break;
+        };
+        if !ids.insert(boundary.id.clone()) {
+            return Err(ServerRenderError::DuplicateBoundaryId(boundary.id).into_handler_error());
+        }
+        placeholder_bytes = placeholder_bytes
+            .checked_add(boundary_placeholder(&boundary.id).len())
+            .ok_or(ServerRenderError::OutputLimitTooSmall)
+            .map_err(ServerRenderError::into_handler_error)?;
+        pending.push_back(boundary);
+    }
+    if input.next().is_some() {
+        return Err(ServerRenderError::TooManyBoundaries {
+            maximum: options.max_boundaries,
+        }
+        .into_handler_error());
+    }
+
+    let overhead = prefix
+        .len()
+        .checked_add(DOCUMENT_SUFFIX.len())
+        .and_then(|value| value.checked_add(placeholder_bytes))
+        .ok_or(ServerRenderError::OutputLimitTooSmall)
+        .map_err(ServerRenderError::into_handler_error)?;
+    let remaining = options
+        .limits
+        .max_output_bytes()
+        .checked_sub(overhead)
+        .ok_or(ServerRenderError::OutputLimitTooSmall)
+        .map_err(ServerRenderError::into_handler_error)?;
+
+    let mut stream = BoundaryBodyStream {
+        pending,
+        in_flight: FuturesOrdered::new(),
+        active_ids: VecDeque::new(),
+        phase: BoundaryPhase::Prefix,
+        prefix: Some(Bytes::from(prefix)),
+        remaining,
+        options,
+    };
+    stream.fill_in_flight();
+
+    let mut response = Response::new(Body::from_stream(stream));
+    *response.status_mut() = options.status;
+    response.headers_mut().insert(
+        CONTENT_TYPE,
+        http::HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    response.extensions_mut().insert(RenderMode::Boundary);
+    Ok(response)
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OrderedPhase {
     Prefix,
@@ -419,6 +662,179 @@ where
             }
         }
     }
+}
+
+type BoundaryTask = Pin<
+    Box<
+        dyn Future<Output = (String, Result<OrderedViewChunk, ServerRenderError>)> + Send + 'static,
+    >,
+>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BoundaryPhase {
+    Prefix,
+    Placeholder,
+    Resolution,
+    Suffix,
+    Done,
+}
+
+struct BoundaryBodyStream {
+    pending: VecDeque<AsyncBoundary>,
+    in_flight: FuturesOrdered<BoundaryTask>,
+    active_ids: VecDeque<String>,
+    phase: BoundaryPhase,
+    prefix: Option<Bytes>,
+    remaining: usize,
+    options: BoundaryRenderOptions,
+}
+
+impl BoundaryBodyStream {
+    fn fill_in_flight(&mut self) {
+        while self.active_ids.len() < self.options.max_in_flight {
+            let Some(boundary) = self.pending.pop_front() else {
+                break;
+            };
+            let id = boundary.id;
+            let timeout = self.options.timeout;
+            let future = boundary.future;
+            let task_id = id.clone();
+            let task = async move {
+                let guarded = AssertUnwindSafe(future).catch_unwind();
+                let result = match tokio::time::timeout(timeout, guarded).await {
+                    Ok(Ok(result)) => result,
+                    Ok(Err(_)) => Err(ServerRenderError::BoundaryFuturePanic {
+                        id: task_id.clone(),
+                    }),
+                    Err(_) => Err(ServerRenderError::BoundaryTimeout {
+                        id: task_id.clone(),
+                        timeout_ms: timeout.as_millis() as u64,
+                    }),
+                };
+                (task_id, result)
+            };
+            self.active_ids.push_back(id);
+            self.in_flight.push_back(Box::pin(task));
+        }
+    }
+}
+
+impl Stream for BoundaryBodyStream {
+    type Item = Result<Bytes, ServerRenderError>;
+
+    fn poll_next(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let state = self.get_mut();
+        loop {
+            match state.phase {
+                BoundaryPhase::Prefix => {
+                    state.phase = BoundaryPhase::Placeholder;
+                    return Poll::Ready(state.prefix.take().map(Ok));
+                }
+                BoundaryPhase::Placeholder => {
+                    let Some(id) = state.active_ids.front() else {
+                        state.phase = BoundaryPhase::Suffix;
+                        continue;
+                    };
+                    state.phase = BoundaryPhase::Resolution;
+                    return Poll::Ready(Some(Ok(Bytes::from(boundary_placeholder(id)))));
+                }
+                BoundaryPhase::Resolution => {
+                    let polled = catch_unwind(AssertUnwindSafe(|| {
+                        state.in_flight.poll_next_unpin(context)
+                    }));
+                    let (id, chunk) = match polled {
+                        Ok(Poll::Ready(Some(item))) => item,
+                        Ok(Poll::Ready(None)) => {
+                            state.phase = BoundaryPhase::Done;
+                            return Poll::Ready(Some(Err(
+                                ServerRenderError::BoundaryStreamEndedEarly,
+                            )));
+                        }
+                        Ok(Poll::Pending) => return Poll::Pending,
+                        Err(_) => {
+                            state.phase = BoundaryPhase::Done;
+                            return Poll::Ready(Some(Err(ServerRenderError::BoundaryStreamPanic)));
+                        }
+                    };
+                    let expected = state
+                        .active_ids
+                        .pop_front()
+                        .expect("a boundary task always has a declared identity");
+                    if id != expected {
+                        state.phase = BoundaryPhase::Done;
+                        return Poll::Ready(Some(Err(ServerRenderError::BoundaryOrderViolation)));
+                    }
+                    state.fill_in_flight();
+                    let chunk = match chunk {
+                        Ok(chunk) => chunk,
+                        Err(error) => {
+                            state.phase = BoundaryPhase::Done;
+                            return Poll::Ready(Some(Err(error)));
+                        }
+                    };
+                    let limits = match RenderLimits::new(
+                        state.options.limits.max_depth(),
+                        state.options.limits.max_nodes(),
+                        state.remaining,
+                    ) {
+                        Ok(limits) => limits,
+                        Err(error) => {
+                            state.phase = BoundaryPhase::Done;
+                            return Poll::Ready(Some(Err(ServerRenderError::InvalidLimits(error))));
+                        }
+                    };
+                    let rendered = catch_unwind(AssertUnwindSafe(|| {
+                        let view = chunk.render()?;
+                        render_view(&view, CompleteRenderOptions::new(limits))
+                    }));
+                    let rendered = match rendered {
+                        Ok(Ok(rendered)) => rendered,
+                        Ok(Err(error)) => {
+                            state.phase = BoundaryPhase::Done;
+                            return Poll::Ready(Some(Err(error)));
+                        }
+                        Err(_) => {
+                            state.phase = BoundaryPhase::Done;
+                            return Poll::Ready(Some(Err(ServerRenderError::BoundaryViewPanic {
+                                id,
+                            })));
+                        }
+                    };
+                    state.remaining -= rendered.len();
+                    state.phase = BoundaryPhase::Placeholder;
+                    if rendered.is_empty() {
+                        continue;
+                    }
+                    return Poll::Ready(Some(Ok(Bytes::from(rendered))));
+                }
+                BoundaryPhase::Suffix => {
+                    state.phase = BoundaryPhase::Done;
+                    return Poll::Ready(Some(Ok(Bytes::from_static(DOCUMENT_SUFFIX.as_bytes()))));
+                }
+                BoundaryPhase::Done => return Poll::Ready(None),
+            }
+        }
+    }
+}
+
+fn boundary_placeholder(id: &str) -> String {
+    format!("<template data-pliego-boundary=\"{id}\"></template>")
+}
+
+fn validate_boundary_id(id: &str) -> Result<(), ServerRenderError> {
+    if id.is_empty()
+        || id.len() > 64
+        || !id
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_alphabetic())
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err(ServerRenderError::InvalidBoundaryId(id.to_owned()));
+    }
+    Ok(())
 }
 
 fn document_prefix(document: &DocumentMetadata) -> Result<String, ServerRenderError> {
@@ -644,10 +1060,22 @@ pub enum ServerRenderError {
     InvalidAssetPath,
     InvalidResponseStatus(StatusCode),
     InvalidChunkLimit(usize),
+    InvalidBoundaryLimit { field: &'static str, value: usize },
+    InvalidBoundaryTimeout(u128),
+    InvalidBoundaryId(String),
+    DuplicateBoundaryId(String),
     DocumentMetadataLimit { maximum: usize },
     TooManyChunks { maximum: usize },
+    TooManyBoundaries { maximum: usize },
     OrderedChunkPanic,
     OrderedStreamPanic,
+    BoundaryTimeout { id: String, timeout_ms: u64 },
+    BoundaryFuturePanic { id: String },
+    BoundaryFailed { id: String },
+    BoundaryViewPanic { id: String },
+    BoundaryStreamPanic,
+    BoundaryStreamEndedEarly,
+    BoundaryOrderViolation,
     OutputLimitTooSmall,
     InvalidLimits(pliego_dom::RenderLimitsError),
     Dom(pliego_dom::RenderError),
@@ -661,10 +1089,22 @@ impl ServerRenderError {
             Self::InvalidCanonicalUrl | Self::InvalidAssetPath => "PLG-REN-003",
             Self::InvalidResponseStatus(_) => "PLG-REN-004",
             Self::InvalidChunkLimit(_) => "PLG-REN-005",
+            Self::InvalidBoundaryLimit { .. }
+            | Self::InvalidBoundaryTimeout(_)
+            | Self::InvalidBoundaryId(_)
+            | Self::DuplicateBoundaryId(_) => "PLG-REN-007",
             Self::DocumentMetadataLimit { .. } => "PLG-REN-006",
             Self::TooManyChunks { .. } => "PLG-REN-202",
+            Self::TooManyBoundaries { .. } => "PLG-REN-205",
             Self::OrderedChunkPanic => "PLG-REN-203",
             Self::OrderedStreamPanic => "PLG-REN-204",
+            Self::BoundaryTimeout { .. } => "PLG-REN-206",
+            Self::BoundaryFuturePanic { .. } => "PLG-REN-207",
+            Self::BoundaryFailed { .. } => "PLG-REN-210",
+            Self::BoundaryViewPanic { .. } => "PLG-REN-208",
+            Self::BoundaryStreamPanic
+            | Self::BoundaryStreamEndedEarly
+            | Self::BoundaryOrderViolation => "PLG-REN-209",
             Self::Dom(_) => "PLG-REN-201",
         }
     }
@@ -695,6 +1135,18 @@ impl Display for ServerRenderError {
             Self::InvalidChunkLimit(maximum) => {
                 write!(formatter, "invalid ordered render chunk limit: {maximum}")
             }
+            Self::InvalidBoundaryLimit { field, value } => {
+                write!(formatter, "invalid boundary render {field}: {value}")
+            }
+            Self::InvalidBoundaryTimeout(milliseconds) => {
+                write!(formatter, "invalid boundary timeout: {milliseconds}ms")
+            }
+            Self::InvalidBoundaryId(id) => {
+                write!(formatter, "invalid async boundary identity: {id:?}")
+            }
+            Self::DuplicateBoundaryId(id) => {
+                write!(formatter, "duplicate async boundary identity: {id}")
+            }
             Self::DocumentMetadataLimit { maximum } => {
                 write!(
                     formatter,
@@ -704,8 +1156,35 @@ impl Display for ServerRenderError {
             Self::TooManyChunks { maximum } => {
                 write!(formatter, "ordered render exceeded {maximum} chunks")
             }
+            Self::TooManyBoundaries { maximum } => {
+                write!(formatter, "boundary render exceeded {maximum} declarations")
+            }
             Self::OrderedChunkPanic => formatter.write_str("ordered render chunk panicked"),
             Self::OrderedStreamPanic => formatter.write_str("ordered render input stream panicked"),
+            Self::BoundaryTimeout { id, timeout_ms } => {
+                write!(formatter, "async boundary {id} exceeded {timeout_ms}ms")
+            }
+            Self::BoundaryFuturePanic { id } => {
+                write!(formatter, "async boundary {id} panicked while being polled")
+            }
+            Self::BoundaryFailed { id } => {
+                write!(
+                    formatter,
+                    "async boundary {id} returned an application failure"
+                )
+            }
+            Self::BoundaryViewPanic { id } => {
+                write!(formatter, "async boundary {id} panicked while rendering")
+            }
+            Self::BoundaryStreamPanic => {
+                formatter.write_str("boundary scheduler panicked while being polled")
+            }
+            Self::BoundaryStreamEndedEarly => {
+                formatter.write_str("boundary scheduler ended before its declarations")
+            }
+            Self::BoundaryOrderViolation => {
+                formatter.write_str("boundary scheduler violated declaration order")
+            }
             Self::OutputLimitTooSmall => {
                 formatter.write_str("render output limit cannot contain the HTML doctype")
             }
@@ -716,6 +1195,12 @@ impl Display for ServerRenderError {
 }
 
 impl std::error::Error for ServerRenderError {}
+
+impl From<ServerRenderError> for HandlerError {
+    fn from(error: ServerRenderError) -> Self {
+        error.into_handler_error()
+    }
+}
 
 fn bounded(value: &str, maximum: usize) -> String {
     if value.len() <= maximum {
@@ -737,6 +1222,7 @@ mod tests {
     use pliego_dom::{IntoView, el, text};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::sync::Notify;
 
     #[tokio::test]
     async fn complete_document_is_bounded_escaped_and_tagged() {
@@ -892,5 +1378,213 @@ mod tests {
                 .with_max_chunks(OrderedRenderOptions::HARD_MAX_CHUNKS + 1)
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn boundary_render_starts_bounded_work_and_preserves_document_order() {
+        let first_gate = Arc::new(Notify::new());
+        let second_started = Arc::new(Notify::new());
+        let boundaries = vec![
+            AsyncBoundary::map(
+                "profile",
+                {
+                    let first_gate = first_gate.clone();
+                    async move {
+                        first_gate.notified().await;
+                        "first"
+                    }
+                },
+                |value| el("p").child(value).into_view(),
+            )
+            .unwrap(),
+            AsyncBoundary::map(
+                "activity",
+                {
+                    let second_started = second_started.clone();
+                    async move {
+                        second_started.notify_one();
+                        "second"
+                    }
+                },
+                |value| el("p").child(value).into_view(),
+            )
+            .unwrap(),
+        ];
+        let document = BoundaryDocument::new("Async").language("en");
+        let response = render_boundary_document(
+            &document,
+            boundaries,
+            BoundaryRenderOptions::default()
+                .with_max_in_flight(2)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            response.extensions().get::<RenderMode>(),
+            Some(&RenderMode::Boundary)
+        );
+        assert!(response.headers().get(CONTENT_LENGTH).is_none());
+
+        let mut body = response.into_body();
+        let prefix = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert!(prefix.starts_with(DOCTYPE.as_bytes()));
+        let placeholder = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(
+            placeholder,
+            "<template data-pliego-boundary=\"profile\"></template>"
+        );
+
+        let first_resolution = tokio::spawn(async move {
+            let frame = body.frame().await.unwrap().unwrap().into_data().unwrap();
+            (body, frame)
+        });
+        tokio::time::timeout(Duration::from_secs(1), second_started.notified())
+            .await
+            .expect("the second declared future should start while the first is pending");
+        assert!(!first_resolution.is_finished());
+        first_gate.notify_one();
+        let (mut body, first) = first_resolution.await.unwrap();
+        assert_eq!(first, "<p>first</p>");
+        let placeholder = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(
+            placeholder,
+            "<template data-pliego-boundary=\"activity\"></template>"
+        );
+        let second = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(second, "<p>second</p>");
+        let suffix = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(suffix, DOCUMENT_SUFFIX);
+        assert!(body.frame().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn boundary_render_rejects_invalid_declarations_before_commitment() {
+        let invalid = AsyncBoundary::map("bad id", async {}, |_| el("p").into_view());
+        assert_eq!(invalid.err().unwrap().code(), "PLG-REN-007");
+
+        let boundaries = vec![
+            AsyncBoundary::map("same", async {}, |_| el("p").into_view()).unwrap(),
+            AsyncBoundary::map("same", async {}, |_| el("p").into_view()).unwrap(),
+        ];
+        let error = render_boundary_document(
+            &BoundaryDocument::new("Duplicate"),
+            boundaries,
+            BoundaryRenderOptions::default(),
+        )
+        .unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-007");
+
+        let boundaries = vec![
+            AsyncBoundary::map("one", async {}, |_| el("p").into_view()).unwrap(),
+            AsyncBoundary::map("two", async {}, |_| el("p").into_view()).unwrap(),
+        ];
+        let options = BoundaryRenderOptions::default()
+            .with_max_boundaries(1)
+            .unwrap();
+        let error =
+            render_boundary_document(&BoundaryDocument::new("Bounded"), boundaries, options)
+                .unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-205");
+    }
+
+    #[tokio::test]
+    async fn boundary_render_enforces_the_in_flight_ceiling() {
+        let first_gate = Arc::new(Notify::new());
+        let second_started = Arc::new(Notify::new());
+        let boundaries = [
+            AsyncBoundary::map(
+                "first",
+                {
+                    let first_gate = first_gate.clone();
+                    async move { first_gate.notified().await }
+                },
+                |_| el("p").child("first").into_view(),
+            )
+            .unwrap(),
+            AsyncBoundary::map(
+                "second",
+                {
+                    let second_started = second_started.clone();
+                    async move { second_started.notify_one() }
+                },
+                |_| el("p").child("second").into_view(),
+            )
+            .unwrap(),
+        ];
+        let response = render_boundary_document(
+            &BoundaryDocument::new("Serial"),
+            boundaries,
+            BoundaryRenderOptions::default()
+                .with_max_in_flight(1)
+                .unwrap(),
+        )
+        .unwrap();
+        let mut body = response.into_body();
+        let _prefix = body.frame().await.unwrap().unwrap();
+        let _first_placeholder = body.frame().await.unwrap().unwrap();
+        let first_resolution = tokio::spawn(async move {
+            let frame = body.frame().await.unwrap().unwrap().into_data().unwrap();
+            (body, frame)
+        });
+        assert!(
+            tokio::time::timeout(Duration::from_millis(10), second_started.notified())
+                .await
+                .is_err()
+        );
+        first_gate.notify_one();
+        let (mut body, first) = first_resolution.await.unwrap();
+        assert_eq!(first, "<p>first</p>");
+        let _second_placeholder = body.frame().await.unwrap().unwrap();
+        let second = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert_eq!(second, "<p>second</p>");
+        tokio::time::timeout(Duration::from_secs(1), second_started.notified())
+            .await
+            .expect("the second future starts only after the first leaves the active set");
+    }
+
+    #[tokio::test]
+    async fn boundary_render_terminates_after_timeout_or_panic() {
+        let options = BoundaryRenderOptions::default()
+            .with_timeout(Duration::from_millis(1))
+            .unwrap();
+        let boundary = AsyncBoundary::map("slow", futures_util::future::pending::<()>(), |_| {
+            el("p").into_view()
+        })
+        .unwrap();
+        let response =
+            render_boundary_document(&BoundaryDocument::new("Timeout"), [boundary], options)
+                .unwrap();
+        assert!(
+            axum::body::to_bytes(response.into_body(), 8 * 1024)
+                .await
+                .is_err()
+        );
+
+        let boundary =
+            AsyncBoundary::map("panic", async { panic!("boundary future panic") }, |_| {
+                el("p").into_view()
+            })
+            .unwrap();
+        let response = render_boundary_document(
+            &BoundaryDocument::new("Panic"),
+            [boundary],
+            BoundaryRenderOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            axum::body::to_bytes(response.into_body(), 8 * 1024)
+                .await
+                .is_err()
+        );
+
+        let boundary = AsyncBoundary::try_map(
+            "loader",
+            async { Err::<(), _>("secret upstream detail") },
+            |_| el("p").into_view(),
+        )
+        .unwrap();
+        let error = boundary.future.await.err().unwrap();
+        assert_eq!(error.code(), "PLG-REN-210");
+        assert!(!error.to_string().contains("secret upstream detail"));
     }
 }

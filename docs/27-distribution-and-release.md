@@ -49,6 +49,10 @@ crates publish first; `pliego-cli` publishes last. The guarded
 `scripts/publish-crates.mjs` command checks package contents, the 10 MB registry
 limit, exact internal requirements, repository state, registry convergence, and
 the server-provided backoff deadline when crates.io rate-limits new packages.
+The check covers unreleased preview packages as well, but the publish path
+requires every package in the graph to share the explicitly confirmed release
+version. Mixed `0.0.2` and `0.1.0-preview.1` families therefore fail before any
+registry mutation.
 Authentication comes from the ephemeral `CARGO_REGISTRY_TOKEN` environment
 variable or Cargo's local credential store after an explicit `cargo login`. The
 token is never passed on the command line or stored in the repository; a local

@@ -19,14 +19,16 @@ const crates = metadata.packages
 const expected = [
   'pliego-adapters', 'pliego-artifact', 'pliego-assets', 'pliego-cli', 'pliego-content', 'pliego-dom',
   'pliego-fold', 'pliego-hyphae', 'pliego-inspect', 'pliego-log', 'pliego-macros',
-  'pliego-reactive', 'pliego-resume', 'pliego-sdk', 'pliego-ssg', 'pliego-starters',
+  'pliego-reactive', 'pliego-resume', 'pliego-router', 'pliego-runtime', 'pliego-sdk', 'pliego-ssg',
+  'pliego-starters',
 ].sort();
 assert.deepEqual(crates.map((pkg) => pkg.name), expected);
 const packagesByName = new Map(crates.map((pkg) => [pkg.name, pkg]));
+const previewPackages = new Set(['pliego-router', 'pliego-runtime', 'pliego-sdk']);
 
 for (const pkg of crates) {
-  if (pkg.name === 'pliego-sdk') {
-    assert.match(pkg.version, /^0\.1\.0-preview\.\d+$/u, 'pliego-sdk preview version');
+  if (previewPackages.has(pkg.name)) {
+    assert.match(pkg.version, /^0\.1\.0-preview\.\d+$/u, `${pkg.name} preview version`);
   } else {
     assert.equal(pkg.version, workspaceVersion, `${pkg.name} version drift`);
   }

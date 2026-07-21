@@ -9,6 +9,10 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Added
 
+- Add bounded asynchronous SSR boundaries with stable inert placeholders,
+  declaration-order delivery, configurable concurrency and timeout ceilings,
+  post-commit failure semantics, runtime receipts, and a no-JavaScript reference
+  route.
 - Reactivate the separately installed PliegoCSS `0.1.0-rc.2` companion as an
   optional experimental integration, with a current revision-pinned SSG,
   route/island bundle, manifest, and Rust/WASM cross-repository gate.
@@ -17,7 +21,7 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   boundaries resolve route-first without duplicate registration.
 
 - Add the unreleased G1 native runtime foundation with a sealed dynamic route
-  graph, bounded complete and ordered SSR, raw HTTP/1.1 lifecycle evidence,
+  graph, bounded complete, ordered, and boundary SSR, raw HTTP/1.1 lifecycle evidence,
   pre-route and route middleware, exact capability admission and effect mediation, safe authored
   error boundaries, receipts, cancellation, and a launchable reference app.
 - Add the OpenSDK `0.1.0-preview.1` contracts, conformance CLI, typed Wasmtime

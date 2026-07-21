@@ -12,10 +12,11 @@ assert.ok(['--check', '--publish'].includes(mode), 'usage: publish-crates.mjs --
 const layers = [
   [
     'pliego-artifact', 'pliego-assets', 'pliego-content', 'pliego-inspect',
-    'pliego-log', 'pliego-macros', 'pliego-reactive', 'pliego-sdk', 'pliego-starters',
+    'pliego-log', 'pliego-macros', 'pliego-reactive', 'pliego-router', 'pliego-sdk',
+    'pliego-starters',
   ],
   ['pliego-dom', 'pliego-fold', 'pliego-hyphae'],
-  ['pliego-adapters', 'pliego-resume', 'pliego-ssg'],
+  ['pliego-adapters', 'pliego-resume', 'pliego-runtime', 'pliego-ssg'],
   ['pliego-cli'],
 ];
 const ordered = layers.flat();
