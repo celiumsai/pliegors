@@ -62,6 +62,7 @@ the official site.
 | P8 trust and adoption | Complete for `v0.0.2` | [P8 contract](docs/35-p8-trust-and-adoption-contract.md) and [signed release evidence](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) |
 | OpenSDK `0.1.0-preview.1` | Implemented on `main`; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
 | Hyphae integration | Optional verified protocol boundary | [Verified sync guide](docs/29-hyphae-verified-sync-guide.md); no production gateway claim |
+| PliegoCSS `0.1.0-rc.2` | Optional experimental build-time companion | [Integration evidence](docs/evidence/pliegocss-optional-integration.md); never a runtime or starter requirement |
 
 ## What exists
 
@@ -170,6 +171,20 @@ pliego telemetry status
 
 The commands above are part of the published `0.0.2` CLI. They run locally and
 do not upload project data.
+
+### Optional PliegoCSS companion
+
+PliegoRS works with ordinary CSS and does not require PliegoCSS. To opt into
+the separately released compiler for typed styles and static validation:
+
+```sh
+cargo install pliego-cssc --version =0.1.0-rc.2 --locked
+pliego css check --seed
+```
+
+`pliego css check` only delegates from the canonical project root. PliegoCSS
+compilation, watch mode, manifests, and route/island bundles remain explicit
+`pliego-cssc` workflows and produce static CSS rather than a styling runtime.
 
 ## Evaluate OpenSDK from `main`
 
@@ -280,6 +295,7 @@ using the native Windows CLI for normal project development.
 - [Compatibility and deprecation policy](docs/46-opensdk-compatibility-and-deprecation.md)
 - [Canonical product capability manifest](docs/47-product-capability-manifest.md)
 - [Full-stack runtime threat model](docs/48-fullstack-threat-model.md)
+- [Optional PliegoCSS companion evidence](docs/evidence/pliegocss-optional-integration.md)
 - [OpenSDK planes and capability RFC](docs/rfc/RFC-006-opensdk-planes-and-capabilities.md)
 - [Portable build output RFC](docs/rfc/RFC-007-pliego-build-output-contract.md)
 - [Native HTTP runtime RFC](docs/rfc/RFC-008-native-runtime.md)

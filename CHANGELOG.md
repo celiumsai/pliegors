@@ -9,6 +9,9 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Added
 
+- Reactivate the separately installed PliegoCSS `0.1.0-rc.2` companion as an
+  optional experimental integration, with a current revision-pinned SSG,
+  route/island bundle, manifest, and Rust/WASM cross-repository gate.
 - Route scopes now provide bounded group and layout inheritance: middleware
   enters from outermost scope to route and unwinds in reverse, while error
   boundaries resolve route-first without duplicate registration.
