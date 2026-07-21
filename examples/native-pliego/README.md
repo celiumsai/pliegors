@@ -8,6 +8,9 @@ The graph and runtime registry both declare its
 `mutate-response-headers` capability; a mismatch prevents startup.
 The `canonical-entry` pre-route layer rewrites `/start` to the sealed `/`
 route before matching and declares only `rewrite-path`.
+The `/` and `/hello/:name` pages also prove layout-owned complete-document
+composition: the sealed graph names `document-layout`, the runtime admits one
+matching structural child slot, and the receipt records that layout identity.
 
 Run it from the workspace root:
 
@@ -20,6 +23,5 @@ with `PLIEGO_ADDR`. Binding a non-loopback address is rejected unless
 `PLIEGO_EXPOSE=1` is also present.
 
 This application is gate evidence, not a released starter. It does not yet
-prove layout-owned document composition,
-HTTP/2, TLS, OpenTelemetry,
+prove HTTP/2, TLS, OpenTelemetry,
 multipart/decompression policy, fixed-load behavior, or production deployment.

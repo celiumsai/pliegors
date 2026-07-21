@@ -2,11 +2,16 @@
 
 use axum::body::to_bytes;
 use http::{Request, Response, StatusCode};
+use pliego_dom::{IntoView, el};
 use pliego_router::{
     MiddlewareCapabilities, MiddlewareCapability, RouteGraphBuilder, RouteMethod, RouteScopeKind,
     RouteScopeSpec, RouteSpec,
 };
 use pliego_runtime::{Body, InMemoryReceiptSink, NativeRuntimeBuilder, RequestLimits};
+use pliego_runtime::{
+    CompleteRenderOptions, DocumentHead, LayoutDocument, LayoutLayer, RenderMode,
+    render_layout_document,
+};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::Notify;
@@ -306,6 +311,74 @@ async fn group_and_layout_middleware_and_errors_inherit_in_sealed_order() {
         vec!["app-group".to_owned(), "account-layout".to_owned()]
     );
     assert_eq!(receipt.error_boundary.as_deref(), Some("layout-error"));
+}
+
+#[tokio::test]
+async fn matched_layout_owns_document_composition_and_receipt_identity() {
+    let group = RouteScopeSpec::new("site-group", RouteScopeKind::Group).unwrap();
+    let layout = RouteScopeSpec::new("site-layout", RouteScopeKind::Layout)
+        .unwrap()
+        .parent("site-group")
+        .unwrap();
+    let graph = RouteGraphBuilder::new()
+        .scope(group)
+        .scope(layout)
+        .route(
+            route("layout-page", RouteMethod::get(), "/layout")
+                .scope("site-layout")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "layout-composition")
+        .unwrap()
+        .handler(
+            "layout-page",
+            |context: pliego_runtime::RequestContext, _request| async move {
+                let layer = LayoutLayer::new("site-layout")?
+                    .before(el("header").child("PLIEGO"))
+                    .wrap(el("div").class("site"))
+                    .head(
+                        DocumentHead::new()
+                            .language("en")
+                            .stylesheet("/assets/site.css"),
+                    );
+                let document = LayoutDocument::new(
+                    context.route(),
+                    el("main").child("Native layout").into_view(),
+                )
+                .layout(layer)?
+                .title("Layout proof");
+                render_layout_document(&document, CompleteRenderOptions::default())
+            },
+        )
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .uri("/layout")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        to_bytes(response.into_body(), 8 * 1024).await.unwrap(),
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Layout proof</title><link rel=\"stylesheet\" href=\"/assets/site.css\"></head><body><div class=\"site\"><header>PLIEGO</header><main>Native layout</main></div></body></html>"
+    );
+    let receipt = &sink.receipts()[0];
+    assert_eq!(
+        receipt.route_scopes,
+        vec!["site-group".to_owned(), "site-layout".to_owned()]
+    );
+    assert_eq!(receipt.route_layouts, vec!["site-layout".to_owned()]);
+    assert_eq!(receipt.render_mode, Some(RenderMode::Layout));
 }
 
 #[tokio::test]

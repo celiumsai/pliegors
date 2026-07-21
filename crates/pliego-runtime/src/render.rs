@@ -5,7 +5,9 @@ use axum::body::Bytes;
 use futures_util::stream::FuturesOrdered;
 use futures_util::{FutureExt, Stream, StreamExt};
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
-use pliego_dom::{RenderLimits, View, try_render_adoptable_html, try_render_html};
+use pliego_dom::{
+    Element, IntoView, RenderLimits, View, try_render_adoptable_html, try_render_html,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::future::Future;
@@ -13,7 +15,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use std::{collections::HashSet, collections::VecDeque};
+use std::{collections::BTreeMap, collections::HashSet, collections::VecDeque};
 
 const DOCTYPE: &str = "<!doctype html>";
 const DOCUMENT_SUFFIX: &str = "</body></html>";
@@ -26,6 +28,7 @@ pub enum RenderMode {
     Complete,
     Ordered,
     Boundary,
+    Layout,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -290,6 +293,272 @@ struct DocumentMetadata {
     module_scripts: Vec<String>,
 }
 
+/// A bounded head contribution owned by a layout or the leaf page.
+///
+/// Scalar fields use inner-wins semantics. Assets retain root-to-leaf order
+/// and exact duplicates are emitted once.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DocumentHead {
+    language: Option<String>,
+    title: Option<String>,
+    description: Option<String>,
+    canonical: Option<String>,
+    stylesheets: Vec<String>,
+    module_scripts: Vec<String>,
+}
+
+impl DocumentHead {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
+        self
+    }
+
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn canonical(mut self, canonical: impl Into<String>) -> Self {
+        self.canonical = Some(canonical.into());
+        self
+    }
+
+    pub fn stylesheet(mut self, path: impl Into<String>) -> Self {
+        self.stylesheets.push(path.into());
+        self
+    }
+
+    pub fn module_script(mut self, path: impl Into<String>) -> Self {
+        self.module_scripts.push(path.into());
+        self
+    }
+}
+
+/// One layout declaration bound to its sealed route-graph identity.
+#[derive(Clone)]
+pub struct LayoutLayer {
+    id: String,
+    operations: Vec<LayoutOperation>,
+    head: DocumentHead,
+}
+
+#[derive(Clone)]
+enum LayoutOperation {
+    Before(View),
+    After(View),
+    Wrap(Element),
+}
+
+impl LayoutLayer {
+    pub fn new(id: impl Into<String>) -> Result<Self, ServerRenderError> {
+        let id = id.into();
+        validate_layout_id(&id)?;
+        Ok(Self {
+            id,
+            operations: Vec::new(),
+            head: DocumentHead::default(),
+        })
+    }
+
+    /// Insert one sibling before the owned child frame.
+    pub fn before(mut self, view: impl IntoView) -> Self {
+        self.operations
+            .push(LayoutOperation::Before(view.into_view()));
+        self
+    }
+
+    /// Insert one sibling after the owned child frame.
+    pub fn after(mut self, view: impl IntoView) -> Self {
+        self.operations
+            .push(LayoutOperation::After(view.into_view()));
+        self
+    }
+
+    /// Wrap the complete owned child frame in one authored element.
+    pub fn wrap(mut self, element: Element) -> Self {
+        self.operations.push(LayoutOperation::Wrap(element));
+        self
+    }
+
+    pub fn head(mut self, head: DocumentHead) -> Self {
+        self.head = head;
+        self
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn compose(&self, child: View) -> View {
+        self.operations
+            .iter()
+            .fold(child, |frame, operation| match operation {
+                LayoutOperation::Before(view) => View::Fragment(vec![view.clone(), frame]),
+                LayoutOperation::After(view) => View::Fragment(vec![frame, view.clone()]),
+                LayoutOperation::Wrap(element) => element.clone().child(frame).into_view(),
+            })
+    }
+}
+
+fn validate_layout_id(id: &str) -> Result<(), ServerRenderError> {
+    if id.is_empty()
+        || id.len() > pliego_router::MAX_ROUTE_ID_BYTES
+        || !id
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_lowercase())
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        || id.ends_with('-')
+        || id.contains("--")
+    {
+        return Err(ServerRenderError::InvalidLayoutId(id.to_owned()));
+    }
+    Ok(())
+}
+
+/// A complete document whose layout ownership comes from a sealed route match.
+#[derive(Clone)]
+pub struct LayoutDocument {
+    expected_layouts: Vec<String>,
+    layers: BTreeMap<String, LayoutLayer>,
+    page_head: DocumentHead,
+    body: View,
+}
+
+impl LayoutDocument {
+    pub fn new(route: &pliego_router::RouteMatch, body: View) -> Self {
+        Self {
+            expected_layouts: route.layout_ids().to_vec(),
+            layers: BTreeMap::new(),
+            page_head: DocumentHead::default(),
+            body,
+        }
+    }
+
+    pub fn layout(mut self, layer: LayoutLayer) -> Result<Self, ServerRenderError> {
+        if !self.expected_layouts.contains(&layer.id) {
+            return Err(ServerRenderError::LayoutNotDeclared(layer.id));
+        }
+        let id = layer.id.clone();
+        if self.layers.insert(id.clone(), layer).is_some() {
+            return Err(ServerRenderError::DuplicateLayout(id));
+        }
+        Ok(self)
+    }
+
+    pub fn head(mut self, head: DocumentHead) -> Self {
+        self.page_head = head;
+        self
+    }
+
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.page_head.language = Some(language.into());
+        self
+    }
+
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.page_head.title = Some(title.into());
+        self
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.page_head.description = Some(description.into());
+        self
+    }
+
+    pub fn canonical(mut self, canonical: impl Into<String>) -> Self {
+        self.page_head.canonical = Some(canonical.into());
+        self
+    }
+
+    pub fn stylesheet(mut self, path: impl Into<String>) -> Self {
+        self.page_head.stylesheets.push(path.into());
+        self
+    }
+
+    pub fn module_script(mut self, path: impl Into<String>) -> Self {
+        self.page_head.module_scripts.push(path.into());
+        self
+    }
+
+    fn compose(&self) -> Result<CompleteDocument, ServerRenderError> {
+        for id in &self.expected_layouts {
+            if !self.layers.contains_key(id) {
+                return Err(ServerRenderError::MissingLayout(id.clone()));
+            }
+        }
+
+        let mut metadata = DocumentMetadata {
+            language: "en".to_owned(),
+            title: String::new(),
+            description: None,
+            canonical: None,
+            stylesheets: Vec::new(),
+            module_scripts: Vec::new(),
+        };
+        for id in &self.expected_layouts {
+            merge_document_head(
+                &mut metadata,
+                &self
+                    .layers
+                    .get(id)
+                    .expect("every expected layout was admitted")
+                    .head,
+            );
+        }
+        merge_document_head(&mut metadata, &self.page_head);
+        if metadata.title.is_empty() {
+            return Err(ServerRenderError::MissingDocumentTitle);
+        }
+
+        let mut body = self.body.clone();
+        for id in self.expected_layouts.iter().rev() {
+            let layer = self
+                .layers
+                .get(id)
+                .expect("every expected layout was admitted");
+            body = layer.compose(body);
+        }
+        Ok(CompleteDocument { metadata, body })
+    }
+}
+
+fn merge_document_head(metadata: &mut DocumentMetadata, head: &DocumentHead) {
+    if let Some(language) = &head.language {
+        metadata.language.clone_from(language);
+    }
+    if let Some(title) = &head.title {
+        metadata.title.clone_from(title);
+    }
+    if let Some(description) = &head.description {
+        metadata.description = Some(description.clone());
+    }
+    if let Some(canonical) = &head.canonical {
+        metadata.canonical = Some(canonical.clone());
+    }
+    for stylesheet in &head.stylesheets {
+        if !metadata.stylesheets.contains(stylesheet) {
+            metadata.stylesheets.push(stylesheet.clone());
+        }
+    }
+    for script in &head.module_scripts {
+        if !metadata.module_scripts.contains(script) {
+            metadata.module_scripts.push(script.clone());
+        }
+    }
+}
+
 impl DocumentMetadata {
     fn new(title: impl Into<String>) -> Self {
         Self {
@@ -458,6 +727,18 @@ pub fn render_complete_document(
     html.push_str(&body);
     html.push_str(DOCUMENT_SUFFIX);
     html_response(html, options.response_status()).map_err(ServerRenderError::into_handler_error)
+}
+
+pub fn render_layout_document(
+    document: &LayoutDocument,
+    options: CompleteRenderOptions,
+) -> Result<Response<Body>, HandlerError> {
+    let complete = document
+        .compose()
+        .map_err(ServerRenderError::into_handler_error)?;
+    let mut response = render_complete_document(&complete, options)?;
+    response.extensions_mut().insert(RenderMode::Layout);
+    Ok(response)
 }
 
 pub fn render_ordered_document<S>(
@@ -1064,6 +1345,11 @@ pub enum ServerRenderError {
     InvalidBoundaryTimeout(u128),
     InvalidBoundaryId(String),
     DuplicateBoundaryId(String),
+    InvalidLayoutId(String),
+    LayoutNotDeclared(String),
+    DuplicateLayout(String),
+    MissingLayout(String),
+    MissingDocumentTitle,
     DocumentMetadataLimit { maximum: usize },
     TooManyChunks { maximum: usize },
     TooManyBoundaries { maximum: usize },
@@ -1093,6 +1379,11 @@ impl ServerRenderError {
             | Self::InvalidBoundaryTimeout(_)
             | Self::InvalidBoundaryId(_)
             | Self::DuplicateBoundaryId(_) => "PLG-REN-007",
+            Self::InvalidLayoutId(_)
+            | Self::LayoutNotDeclared(_)
+            | Self::DuplicateLayout(_)
+            | Self::MissingLayout(_)
+            | Self::MissingDocumentTitle => "PLG-REN-008",
             Self::DocumentMetadataLimit { .. } => "PLG-REN-006",
             Self::TooManyChunks { .. } => "PLG-REN-202",
             Self::TooManyBoundaries { .. } => "PLG-REN-205",
@@ -1146,6 +1437,21 @@ impl Display for ServerRenderError {
             }
             Self::DuplicateBoundaryId(id) => {
                 write!(formatter, "duplicate async boundary identity: {id}")
+            }
+            Self::InvalidLayoutId(id) => {
+                write!(formatter, "invalid layout identity: {id:?}")
+            }
+            Self::LayoutNotDeclared(id) => {
+                write!(formatter, "layout {id} is not owned by the matched route")
+            }
+            Self::DuplicateLayout(id) => {
+                write!(formatter, "layout {id} was supplied more than once")
+            }
+            Self::MissingLayout(id) => {
+                write!(formatter, "matched route requires missing layout {id}")
+            }
+            Self::MissingDocumentTitle => {
+                formatter.write_str("layout document requires a page or layout title")
             }
             Self::DocumentMetadataLimit { maximum } => {
                 write!(
@@ -1256,6 +1562,138 @@ mod tests {
         assert!(html.contains("<title>A &amp; B</title>"));
         assert!(html.contains("content=\"A &quot;bounded&quot; document\""));
         assert!(html.contains("<main>&lt;safe&gt;</main>"));
+    }
+
+    #[tokio::test]
+    async fn layout_document_follows_sealed_ownership_and_merges_head_inner_first() {
+        use pliego_router::{
+            RouteGraphBuilder, RouteMethod, RouteScopeKind, RouteScopeSpec, RouteSpec,
+        };
+
+        let graph = RouteGraphBuilder::new()
+            .scope(RouteScopeSpec::new("site-group", RouteScopeKind::Group).unwrap())
+            .scope(
+                RouteScopeSpec::new("root-layout", RouteScopeKind::Layout)
+                    .unwrap()
+                    .parent("site-group")
+                    .unwrap(),
+            )
+            .scope(
+                RouteScopeSpec::new("docs-layout", RouteScopeKind::Layout)
+                    .unwrap()
+                    .parent("root-layout")
+                    .unwrap(),
+            )
+            .route(
+                RouteSpec::new("guide", RouteMethod::get(), "/guide")
+                    .unwrap()
+                    .scope("docs-layout")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap();
+        let matched = graph.resolve(&RouteMethod::get(), "/guide").unwrap();
+        assert_eq!(
+            matched.layout_ids(),
+            &["root-layout".to_owned(), "docs-layout".to_owned()]
+        );
+
+        let root = LayoutLayer::new("root-layout")
+            .unwrap()
+            .before(el("nav").child("PLIEGO"))
+            .wrap(el("div").class("root"))
+            .head(
+                DocumentHead::new()
+                    .language("es-CO")
+                    .title("Root fallback")
+                    .stylesheet("/assets/root.css"),
+            );
+        let docs = LayoutLayer::new("docs-layout")
+            .unwrap()
+            .wrap(el("section").class("docs"))
+            .head(
+                DocumentHead::new()
+                    .title("Docs fallback")
+                    .description("Layout description")
+                    .module_script("/assets/docs.js"),
+            );
+        let document = LayoutDocument::new(&matched, el("article").child("Owned page").into_view())
+            .layout(root)
+            .unwrap()
+            .layout(docs)
+            .unwrap()
+            .title("Guide")
+            .stylesheet("/assets/root.css")
+            .stylesheet("/assets/page.css");
+
+        let response = render_layout_document(&document, CompleteRenderOptions::default()).unwrap();
+        assert_eq!(
+            response.extensions().get::<RenderMode>(),
+            Some(&RenderMode::Layout)
+        );
+        let html = axum::body::to_bytes(response.into_body(), 16 * 1024)
+            .await
+            .unwrap();
+        let html = std::str::from_utf8(&html).unwrap();
+        assert!(html.starts_with("<!doctype html><html lang=\"es-CO\">"));
+        assert!(html.contains("<title>Guide</title>"));
+        assert_eq!(html.matches("/assets/root.css").count(), 1);
+        assert!(html.contains("/assets/page.css"));
+        assert!(html.contains("/assets/docs.js"));
+        assert_eq!(html.matches("Owned page").count(), 1);
+        assert!(html.contains(
+            "<div class=\"root\"><nav>PLIEGO</nav><section class=\"docs\"><article>Owned page</article></section></div>"
+        ));
+    }
+
+    #[test]
+    fn layout_document_rejects_missing_foreign_duplicate_and_invalid_layers_precommit() {
+        use pliego_router::{
+            RouteGraphBuilder, RouteMethod, RouteScopeKind, RouteScopeSpec, RouteSpec,
+        };
+
+        let graph = RouteGraphBuilder::new()
+            .scope(RouteScopeSpec::new("app-layout", RouteScopeKind::Layout).unwrap())
+            .route(
+                RouteSpec::new("home", RouteMethod::get(), "/")
+                    .unwrap()
+                    .scope("app-layout")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap();
+        let matched = graph.resolve(&RouteMethod::get(), "/").unwrap();
+
+        let missing = LayoutDocument::new(&matched, text("page")).title("Home");
+        let error = render_layout_document(&missing, CompleteRenderOptions::default()).unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-008");
+
+        let foreign = LayoutLayer::new("other-layout").unwrap();
+        assert!(matches!(
+            LayoutDocument::new(&matched, text("page")).layout(foreign),
+            Err(ServerRenderError::LayoutNotDeclared(ref id)) if id == "other-layout"
+        ));
+
+        let layer = LayoutLayer::new("app-layout").unwrap();
+        let document = LayoutDocument::new(&matched, text("page"))
+            .layout(layer.clone())
+            .unwrap();
+        assert!(matches!(
+            document.layout(layer),
+            Err(ServerRenderError::DuplicateLayout(ref id)) if id == "app-layout"
+        ));
+
+        assert!(matches!(
+            LayoutLayer::new("Bad_Layout"),
+            Err(ServerRenderError::InvalidLayoutId(ref id)) if id == "Bad_Layout"
+        ));
+
+        let untitled = LayoutDocument::new(&matched, text("page"))
+            .layout(LayoutLayer::new("app-layout").unwrap())
+            .unwrap();
+        let error =
+            render_layout_document(&untitled, CompleteRenderOptions::default()).unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-008");
     }
 
     #[test]

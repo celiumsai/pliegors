@@ -930,6 +930,7 @@ impl RouteGraphBuilder {
 #[derive(Clone, Debug, Default)]
 struct ResolvedScopeChain {
     ids: Vec<String>,
+    layouts: Vec<String>,
     middleware: Vec<String>,
     error_boundaries: Vec<String>,
 }
@@ -969,6 +970,9 @@ fn resolve_scope_chain(
     let mut boundaries = BTreeSet::new();
     for scope in chain {
         resolved.ids.push(scope.id.clone());
+        if scope.kind == RouteScopeKind::Layout {
+            resolved.layouts.push(scope.id.clone());
+        }
         for id in &scope.middleware {
             if !middleware.insert(id.clone()) {
                 return Err(RouteError::DuplicateInheritedMiddleware(id.clone()));
@@ -1156,6 +1160,7 @@ impl RouteGraph {
                     pattern: route.pattern.canonical.clone(),
                     parameters,
                     scopes: inherited.ids.clone(),
+                    layouts: inherited.layouts.clone(),
                     middleware,
                     error_boundaries,
                 });
@@ -1210,6 +1215,7 @@ pub struct RouteMatch {
     pattern: String,
     parameters: BTreeMap<String, String>,
     scopes: Vec<String>,
+    layouts: Vec<String>,
     middleware: Vec<String>,
     error_boundaries: Vec<String>,
 }
@@ -1237,6 +1243,10 @@ impl RouteMatch {
 
     pub fn scope_ids(&self) -> &[String] {
         &self.scopes
+    }
+
+    pub fn layout_ids(&self) -> &[String] {
+        &self.layouts
     }
 
     pub fn middleware_ids(&self) -> &[String] {
@@ -1896,6 +1906,7 @@ mod tests {
             matched.scope_ids(),
             &["app-group".to_owned(), "account-layout".to_owned()]
         );
+        assert_eq!(matched.layout_ids(), &["account-layout".to_owned()]);
         assert_eq!(
             matched.middleware_ids(),
             &[
@@ -2086,6 +2097,7 @@ mod tests {
         assert_eq!(json["route_id"], "item");
         assert_eq!(json["parameters"]["id"], "42");
         assert_eq!(json["scopes"], serde_json::json!([]));
+        assert_eq!(json["layouts"], serde_json::json!([]));
         assert_eq!(json["middleware"], serde_json::json!([]));
         assert_eq!(json["error_boundaries"], serde_json::json!([]));
     }

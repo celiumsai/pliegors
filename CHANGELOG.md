@@ -9,6 +9,9 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Added
 
+- Add route-owned complete-document layout composition with typed single-child
+  frames, deterministic head merging, exact asset deduplication,
+  pre-commit ownership failures, and layout identities in runtime receipts.
 - Add bounded asynchronous SSR boundaries with stable inert placeholders,
   declaration-order delivery, configurable concurrency and timeout ceilings,
   post-commit failure semantics, runtime receipts, and a no-JavaScript reference

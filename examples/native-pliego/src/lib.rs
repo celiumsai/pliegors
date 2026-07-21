@@ -8,9 +8,10 @@ use pliego_router::{
 };
 use pliego_runtime::{
     AsyncBoundary, Body, BoundaryDocument, BoundaryRenderOptions, CompleteDocument,
-    CompleteRenderOptions, NativeRuntime, NativeRuntimeBuilder, OrderedDocument,
-    OrderedRenderOptions, OrderedViewChunk, Response, StatusCode, render_boundary_document,
-    render_complete_document, render_ordered_document,
+    CompleteRenderOptions, DocumentHead, LayoutDocument, LayoutLayer, NativeRuntime,
+    NativeRuntimeBuilder, OrderedDocument, OrderedRenderOptions, OrderedViewChunk, RequestContext,
+    Response, StatusCode, render_boundary_document, render_complete_document,
+    render_layout_document, render_ordered_document,
 };
 use std::error::Error;
 use std::io;
@@ -25,6 +26,8 @@ h1{max-width:12ch;margin:0;font-size:clamp(3rem,9vw,7.5rem);font-weight:620;line
 .lede{max-width:42rem;margin:2rem 0;color:#b9bcb2;font-size:clamp(1.05rem,2vw,1.35rem);line-height:1.6}
 nav{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:2.5rem}nav a{padding:.8rem 1rem;border:1px solid #3b3d36;text-decoration:none}
 nav a:first-child{color:#11120f;background:#f3f2eb;border-color:#f3f2eb}
+.masthead,.colophon{display:flex;justify-content:space-between;gap:1rem;width:min(72rem,calc(100% - 2rem));margin:0 auto;padding:1rem 0;color:#b9bcb2;font:700 .72rem/1.4 ui-monospace,monospace;text-transform:uppercase}
+.masthead{border-bottom:1px solid #3b3d36}.colophon{border-top:1px solid #3b3d36}
 .stream{display:grid;gap:1rem}.panel{padding:1.25rem;border:1px solid #3b3d36;background:#181a16}
 .signal{color:#a8d087;font-family:ui-monospace,monospace}code{font-family:ui-monospace,monospace}
 .error-code{display:inline-block;margin-top:1rem;padding:.35rem .5rem;color:#a8d087;border:1px solid #3b3d36;font-family:ui-monospace,monospace}
@@ -55,7 +58,39 @@ fn route(
     method: RouteMethod,
     pattern: &str,
 ) -> Result<RouteSpec, pliego_router::RouteError> {
-    RouteSpec::new(id, method, pattern)?.scope("document-layout")
+    RouteSpec::new(id, method, pattern)
+}
+
+fn render_owned_page(
+    context: &RequestContext,
+    title: &str,
+    description: &str,
+    body: pliego_dom::View,
+) -> Result<Response<Body>, pliego_runtime::HandlerError> {
+    let layout = LayoutLayer::new("document-layout")?
+        .before(
+            el("header")
+                .class("masthead")
+                .child(el("span").child("PLIEGORS"))
+                .child(el("span").child("NATIVE / G1")),
+        )
+        .after(
+            el("footer")
+                .class("colophon")
+                .child(el("span").child("Explicit ownership"))
+                .child(el("span").child("No JS shell")),
+        )
+        .wrap(el("div").class("document-frame"))
+        .head(
+            DocumentHead::new()
+                .language("en")
+                .stylesheet("/assets/site.css"),
+        );
+    let document = LayoutDocument::new(context.route(), body)
+        .layout(layout)?
+        .title(title)
+        .description(description);
+    render_layout_document(&document, CompleteRenderOptions::default())
 }
 
 pub fn build_runtime() -> AppResult<NativeRuntime> {
@@ -77,12 +112,12 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
         .scope(
             RouteScopeSpec::new("document-layout", RouteScopeKind::Layout)?.parent("site-group")?,
         )
-        .route(route("home", RouteMethod::get(), "/")?)
-        .route(route("hello", RouteMethod::get(), "/hello/:name")?)
-        .route(route("stream", RouteMethod::get(), "/stream")?)
-        .route(route("boundary", RouteMethod::get(), "/boundary")?)
-        .route(route("health", RouteMethod::get(), "/health")?)
-        .route(route("styles", RouteMethod::get(), "/assets/site.css")?)
+        .route(route("home", RouteMethod::get(), "/")?.scope("document-layout")?)
+        .route(route("hello", RouteMethod::get(), "/hello/:name")?.scope("document-layout")?)
+        .route(route("stream", RouteMethod::get(), "/stream")?.scope("site-group")?)
+        .route(route("boundary", RouteMethod::get(), "/boundary")?.scope("site-group")?)
+        .route(route("health", RouteMethod::get(), "/health")?.scope("site-group")?)
+        .route(route("styles", RouteMethod::get(), "/assets/site.css")?.scope("site-group")?)
         .seal()?;
 
     let runtime = NativeRuntimeBuilder::new(graph, "native-pliego-preview")?
@@ -145,7 +180,7 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
                 Ok(response)
             },
         )
-        .handler("home", |_context, _request| async {
+        .handler("home", |context: RequestContext, _request| async move {
             let body = el("main")
                 .child(el("p").class("eyebrow").child("PLIEGORS / NATIVE PREVIEW"))
                 .child(el("h1").child("One runtime. Explicit ownership."))
@@ -163,11 +198,12 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
                         .child(el("a").attr("href", "/health").child("Read health")),
                 )
                 .into_view();
-            let document = CompleteDocument::new("Native PliegoRS preview", body)
-                .language("en")
-                .description("A dynamic reference application for the unreleased PliegoRS native runtime.")
-                .stylesheet("/assets/site.css");
-            render_complete_document(&document, CompleteRenderOptions::default())
+            render_owned_page(
+                &context,
+                "Native PliegoRS preview",
+                "A dynamic reference application for the unreleased PliegoRS native runtime.",
+                body,
+            )
         })
         .handler("hello", |context: pliego_runtime::RequestContext, _request| async move {
             let name = context.parameter("name").unwrap_or("developer").to_owned();
@@ -181,10 +217,12 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
                 )
                 .child(el("nav").child(el("a").attr("href", "/").child("Return home")))
                 .into_view();
-            let document = CompleteDocument::new("PliegoRS route", body)
-                .language("en")
-                .stylesheet("/assets/site.css");
-            render_complete_document(&document, CompleteRenderOptions::default())
+            render_owned_page(
+                &context,
+                "PliegoRS route",
+                "A typed route rendered inside its sealed layout owner.",
+                body,
+            )
         })
         .handler("stream", |_context, _request| async {
             let document = OrderedDocument::new("PliegoRS ordered SSR")
@@ -296,7 +334,7 @@ pub fn validate_bind_address(address: SocketAddr, expose: bool) -> io::Result<So
 mod tests {
     use super::*;
     use http_body_util::BodyExt;
-    use pliego_runtime::Request;
+    use pliego_runtime::{RenderMode, Request};
     use tower::ServiceExt;
 
     async fn response(target: &str) -> pliego_runtime::Response<pliego_runtime::Body> {
@@ -313,6 +351,10 @@ mod tests {
         let response = response("/").await;
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
+            response.extensions().get::<RenderMode>(),
+            Some(&RenderMode::Layout)
+        );
+        assert_eq!(
             response.headers()["content-type"],
             "text/html; charset=utf-8"
         );
@@ -320,7 +362,10 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let body = std::str::from_utf8(&body).unwrap();
         assert!(body.starts_with("<!doctype html>"));
+        assert!(body.contains("class=\"document-frame\""));
+        assert!(body.contains("class=\"masthead\""));
         assert!(body.contains("One runtime. Explicit ownership."));
+        assert!(body.contains("No JS shell"));
         assert!(body.ends_with("</body></html>"));
     }
 

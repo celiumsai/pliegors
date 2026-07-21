@@ -197,6 +197,7 @@ pub struct RuntimeReceipt {
     pub deployment_id: String,
     pub route_id: Option<String>,
     pub route_scopes: Vec<String>,
+    pub route_layouts: Vec<String>,
     pub limit_policy_sha256: String,
     pub outcome: RequestOutcome,
     pub final_state: RequestState,
@@ -218,6 +219,7 @@ struct ScopeInner {
     outcome: Mutex<RequestOutcome>,
     route_id: Mutex<Option<String>>,
     route_scopes: Mutex<Vec<String>>,
+    route_layouts: Mutex<Vec<String>>,
     cancel_reason: Mutex<Option<CancelReason>>,
     cancellation: CancellationToken,
     completion: CancellationToken,
@@ -255,6 +257,7 @@ impl RequestScope {
                 outcome: Mutex::new(RequestOutcome::Pending),
                 route_id: Mutex::new(None),
                 route_scopes: Mutex::new(Vec::new()),
+                route_layouts: Mutex::new(Vec::new()),
                 cancel_reason: Mutex::new(None),
                 cancellation: CancellationToken::new(),
                 completion: CancellationToken::new(),
@@ -367,6 +370,7 @@ impl RequestScope {
     pub(crate) fn set_route(&self, route: &RouteMatch) {
         *lock(&self.inner.route_id) = Some(route.route_id().to_owned());
         *lock(&self.inner.route_scopes) = route.scope_ids().to_vec();
+        *lock(&self.inner.route_layouts) = route.layout_ids().to_vec();
     }
 
     pub(crate) fn commit_response(&self, status: u16) -> Result<(), ScopeError> {
@@ -505,6 +509,7 @@ impl RequestScope {
             deployment_id: self.inner.identity.deployment_id.clone(),
             route_id: lock(&self.inner.route_id).clone(),
             route_scopes: lock(&self.inner.route_scopes).clone(),
+            route_layouts: lock(&self.inner.route_layouts).clone(),
             limit_policy_sha256: self.inner.limit_policy_sha256.clone(),
             outcome: self.outcome(),
             final_state: self.state(),
