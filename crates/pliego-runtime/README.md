@@ -29,6 +29,15 @@ number of declared futures concurrently, emits stable inert placeholders, and
 delivers resolved HTML in declaration order without requiring client-side
 JavaScript.
 
+Complete responses may use `LayoutDocument` to bind composition to the exact
+root-to-leaf layout identities in the sealed route match. Each `LayoutLayer`
+transforms one private child frame through typed `before`, `after`, and `wrap`
+operations, so it cannot drop or duplicate the child. Missing, duplicate, or
+foreign layers fail before response commitment. Head contributions merge in
+route ownership order, leaf/page scalars win, asset order stays stable, and
+exact duplicate assets are emitted once. Groups never masquerade as layouts,
+and receipts record both the complete scope chain and layout-only identity.
+
 The crate is `0.1.0-preview.1` source work. It is not published on crates.io and
 does not promote the `native-http-runtime` or `dynamic-ssr` capabilities in
 `product.capabilities.json`. See
@@ -39,5 +48,6 @@ graceful-shutdown case with a pending streamed response. HTTP/2, TLS, proxy,
 slow-peer, and fixed-load evidence remain open gate work.
 
 This foundation is intentionally incomplete. It does not yet expose
-layout-owned document composition, OpenTelemetry, multipart/decompression
-policies, or a production `pliego serve` command.
+layout composition for streamed modes, layout loaders or cleanup,
+OpenTelemetry, multipart/decompression policies, or a production `pliego
+serve` command.

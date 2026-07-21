@@ -1,5 +1,5 @@
 key = "docs-native-runtime"
 title = { en = "Native Runtime Preview | PliegoRS G1", es = "Preview del Runtime Nativo | PliegoRS G1" }
-description = { en = "Evaluate the unreleased PliegoRS native router, bounded HTTP lifecycle, middleware, authored errors, receipts, and three SSR modes from main.", es = "Evalúa desde main el router nativo de PliegoRS, lifecycle HTTP limitado, middleware, errores con autoría, recibos y tres modos SSR aún no liberados." }
+description = { en = "Evaluate the unreleased PliegoRS native router, route-owned layouts, bounded HTTP lifecycle, authored errors, receipts, and three SSR modes from main.", es = "Evalúa desde main el router nativo de PliegoRS, layouts controlados por rutas, lifecycle HTTP limitado, errores con autoría, recibos y tres modos SSR aún no liberados." }
 image = "/media/pliegors/ledger-wide.webp"
 imageAlt = { en = "A precision ledger representing the bounded PliegoRS native runtime", es = "Un ledger de precisión que representa el runtime nativo limitado de PliegoRS" }

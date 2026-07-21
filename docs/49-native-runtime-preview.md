@@ -15,8 +15,9 @@ not depend on Axum or a deployment provider.
 
 `pliego-runtime` owns request admission, scope lifecycle, deadlines,
 cancellation, cleanup, response commitment, response-body accounting,
-diagnostics, receipts, and complete/ordered/boundary server-rendering modes. Axum,
-Hyper, Tower, and Tokio retain HTTP transport, service, and executor ownership.
+diagnostics, receipts, layout-owned complete documents, and
+complete/ordered/boundary server-rendering modes. Axum, Hyper, Tower, and Tokio
+retain HTTP transport, service, and executor ownership.
 
 ## Complete rendering
 
@@ -59,6 +60,52 @@ let options = CompleteRenderOptions::default()
 `adoptable()` is explicit. Plain rendering does not insert browser-adoption
 markers. In either mode, text and attributes are escaped by their owning typed
 renderer, and the receipt records `renderMode: "complete"`.
+
+## Layout-owned complete documents
+
+`RouteMatch::layout_ids()` exposes only layout scopes from the sealed graph;
+pathless groups remain available through `scope_ids()` but never claim document
+composition. `LayoutDocument` requires one `LayoutLayer` for each matched
+layout, ordered root to leaf. Every layer owns exactly one structural
+child frame by construction:
+
+```rust
+use pliego_dom::{IntoView, el};
+use pliego_runtime::{
+    DocumentHead, LayoutDocument, LayoutLayer, render_layout_document,
+};
+
+let shell = LayoutLayer::new("account-layout")?
+    .before(el("nav").child("Account"))
+    .wrap(el("div").class("account-shell"))
+    .head(DocumentHead::new().stylesheet("/assets/account.css"));
+
+let document = LayoutDocument::new(
+    context.route(),
+    el("main").child("Profile").into_view(),
+)
+    .layout(shell)?
+    .title("Profile");
+
+let response = render_layout_document(
+    &document,
+    CompleteRenderOptions::default(),
+)?;
+```
+
+Composition walks layouts leaf to root so the final tree follows sealed
+root-to-leaf ownership. `before`, `after`, and `wrap` transform a private child
+frame that application code cannot clone, extract, or omit; the implementation
+does not parse or replace HTML strings. Missing, duplicate, foreign, or invalid
+layout identities return `PLG-REN-008` before commitment. Scalar head fields
+use inner/page precedence; stylesheet and module script declarations retain
+root-to-leaf order and exact duplicates are emitted once. The complete response
+is bounded by the same metadata, depth, node, and byte limits and records
+`renderMode: "layout"` plus `routeLayouts` in its receipt.
+
+This first contract composes complete documents. Ordered and asynchronous
+boundary modes do not yet accept layout frames, and layouts do not yet own
+loaders or request cleanup.
 
 ## Ordered rendering
 
@@ -197,6 +244,8 @@ The source implementation currently demonstrates:
 - root and route error boundaries that receive no internal diagnostic message;
 - bounded group/layout scope inheritance with deterministic middleware,
   outward error recovery, and scope identity in receipts;
+- route-bound complete-document composition with exactly one structural child
+  slot per layout, deterministic head merging, and layout identity in receipts;
 - exactly-once bounded receipts; and
 - pre-commit complete-render failures with stable `PLG-REN-*` diagnostics.
 
@@ -212,7 +261,7 @@ The application is reproducible G1 evidence, not a released starter or a
 production-readiness claim.
 
 The reference graph declares a `canonical-entry` pre-route rewrite and every
-route declares `response-policy` middleware and its
+route inherits `response-policy` middleware and its
 `mutate-response-headers` capability in the sealed graph. The runtime admits
 the implementation only when its registered capability set matches. It adds
 CSP, referrer, and content-type protections before commitment.
@@ -224,7 +273,7 @@ both successful and authored 404 responses.
 
 The following remain gate work:
 
-- layout-owned document composition, head metadata, loaders, and child slots;
+- layout composition for streamed modes plus layout-owned loaders and cleanup;
 - OpenTelemetry with redaction and cardinality tests;
 - multipart and decompression policies;
 - real socket HTTP/2 conformance; and

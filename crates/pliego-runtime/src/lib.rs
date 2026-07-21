@@ -25,9 +25,10 @@ pub use limits::{LimitError, RequestLimits};
 pub use middleware::{MiddlewareNext, PreRouteNext, RuntimeMiddleware, RuntimePreRouteMiddleware};
 pub use render::{
     AsyncBoundary, BoundaryDocument, BoundaryRenderOptions, CompleteDocument,
-    CompleteRenderOptions, OrderedDocument, OrderedRenderOptions, OrderedViewChunk, RenderMode,
-    RenderSeedMode, ServerRenderError, render_boundary_document, render_complete_document,
-    render_complete_fragment, render_ordered_document,
+    CompleteRenderOptions, DocumentHead, LayoutDocument, LayoutLayer, OrderedDocument,
+    OrderedRenderOptions, OrderedViewChunk, RenderMode, RenderSeedMode, ServerRenderError,
+    render_boundary_document, render_complete_document, render_complete_fragment,
+    render_layout_document, render_ordered_document,
 };
 pub use scope::{
     CancelReason, InMemoryReceiptSink, PreRouteContext, RequestContext, RequestIdentity,

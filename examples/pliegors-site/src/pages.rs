@@ -961,11 +961,12 @@ pub fn changelog(locale: Locale) -> View {
                 l(locale, "The native runtime becomes executable.", "El runtime nativo se vuelve ejecutable."),
                 l(
                     locale,
-                    "G1 now has a sealed router, bounded native lifecycle, and three SSR modes alongside the OpenSDK preview. All remain source work for evaluation, not released APIs.",
-                    "G1 ya tiene un router sellado, lifecycle nativo limitado y tres modos SSR junto al preview de OpenSDK. Todos siguen siendo trabajo fuente para evaluación, no APIs liberadas.",
+                    "G1 now has a sealed router, route-owned complete-document layouts, a bounded native lifecycle, and three SSR modes alongside the OpenSDK preview. All remain source work for evaluation, not released APIs.",
+                    "G1 ya tiene un router sellado, layouts de documento complete controlados por rutas, lifecycle nativo limitado y tres modos SSR junto al preview de OpenSDK. Todos siguen siendo trabajo fuente para evaluación, no APIs liberadas.",
                 ),
                 &[
                     l(locale, "Complete, ordered, and bounded async-boundary SSR with stable receipts and post-commit failure semantics.", "SSR complete, ordered y async-boundary limitado con recibos estables y semántica de fallo post-commit."),
+                    l(locale, "Complete documents compose sealed root-to-leaf layouts through one typed child frame, with deterministic head merging and receipt identity.", "Los documentos complete componen layouts sellados de raíz a hoja mediante un frame hijo tipado, con merge determinista del head e identidad en recibos."),
                     l(locale, "Pre-route plus inherited group, layout, and route middleware with exact capability admission and authored error recovery.", "Middleware pre-route y heredado de group, layout y route con admisión exacta de capabilities y recuperación de errores con autoría."),
                     l(locale, "OpenSDK remains an unreleased preview; PliegoCSS 0.1.0-rc.2 is an optional external companion, never a framework requirement.", "OpenSDK sigue como preview aún no liberado; PliegoCSS 0.1.0-rc.2 es un companion externo opcional, nunca un requisito del framework."),
                 ],
