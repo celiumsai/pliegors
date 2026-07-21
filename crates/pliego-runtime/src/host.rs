@@ -265,12 +265,7 @@ impl NativeRuntimeBuilder {
                 return Err(RuntimeBuildError::UnknownHandler(route_id.clone()));
             }
         }
-        let middleware_ids: BTreeSet<_> = self
-            .graph
-            .routes()
-            .iter()
-            .flat_map(|route| route.middleware_ids().iter().cloned())
-            .collect();
+        let middleware_ids = self.graph.route_middleware_ids().clone();
         validate_behavior_registry(
             &middleware_ids,
             self.middleware.keys(),
@@ -308,18 +303,7 @@ impl NativeRuntimeBuilder {
                 });
             }
         }
-        let error_boundary_ids: BTreeSet<_> = self
-            .graph
-            .error_boundary_ids()
-            .iter()
-            .chain(
-                self.graph
-                    .routes()
-                    .iter()
-                    .flat_map(|route| route.error_boundary_ids()),
-            )
-            .cloned()
-            .collect();
+        let error_boundary_ids = self.graph.all_error_boundary_ids().clone();
         validate_behavior_registry(
             &error_boundary_ids,
             self.error_boundaries.keys(),
@@ -637,7 +621,7 @@ async fn routed_response(
     {
         return lifecycle_failure_uncommitted(&scope);
     }
-    scope.set_route(matched.route_id());
+    scope.set_route(&matched);
 
     let request = Request::from_parts(parts, body);
     let context = RequestContext::new(scope.clone(), matched.clone());

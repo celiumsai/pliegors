@@ -22,6 +22,8 @@ pub const MAX_ROUTE_ID_BYTES: usize = 64;
 pub const MAX_PARAMETER_NAME_BYTES: usize = 63;
 pub const MAX_ROUTE_MIDDLEWARE: usize = 32;
 pub const MAX_ERROR_BOUNDARIES: usize = 16;
+pub const MAX_SCOPE_DEPTH: usize = 16;
+pub const DEFAULT_MAX_SCOPES: usize = 1_024;
 pub const DEFAULT_MAX_ROUTES: usize = 4_096;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -453,11 +455,104 @@ fn render_segment(segment: &Segment) -> String {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RouteScopeKind {
+    Group,
+    Layout,
+}
+
+impl RouteScopeKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Group => "group",
+            Self::Layout => "layout",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RouteScopeSpec {
+    id: String,
+    kind: RouteScopeKind,
+    parent: Option<String>,
+    middleware: Vec<String>,
+    error_boundaries: Vec<String>,
+}
+
+impl RouteScopeSpec {
+    pub fn new(id: impl Into<String>, kind: RouteScopeKind) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_route_id(&id).map_err(|_| RouteError::InvalidScopeId(id.clone()))?;
+        Ok(Self {
+            id,
+            kind,
+            parent: None,
+            middleware: Vec::new(),
+            error_boundaries: Vec::new(),
+        })
+    }
+
+    pub fn parent(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_route_id(&id).map_err(|_| RouteError::InvalidScopeId(id.clone()))?;
+        self.parent = Some(id);
+        Ok(self)
+    }
+
+    pub fn middleware(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_behavior_id(&id, BehaviorKind::Middleware)?;
+        if self.middleware.len() >= MAX_ROUTE_MIDDLEWARE {
+            return Err(RouteError::TooManyMiddleware(MAX_ROUTE_MIDDLEWARE));
+        }
+        if self.middleware.contains(&id) {
+            return Err(RouteError::DuplicateMiddleware(id));
+        }
+        self.middleware.push(id);
+        Ok(self)
+    }
+
+    pub fn error_boundary(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_behavior_id(&id, BehaviorKind::ErrorBoundary)?;
+        if self.error_boundaries.len() >= MAX_ERROR_BOUNDARIES {
+            return Err(RouteError::TooManyErrorBoundaries(MAX_ERROR_BOUNDARIES));
+        }
+        if self.error_boundaries.contains(&id) {
+            return Err(RouteError::DuplicateErrorBoundary(id));
+        }
+        self.error_boundaries.push(id);
+        Ok(self)
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn kind(&self) -> RouteScopeKind {
+        self.kind
+    }
+
+    pub fn parent_id(&self) -> Option<&str> {
+        self.parent.as_deref()
+    }
+
+    pub fn middleware_ids(&self) -> &[String] {
+        &self.middleware
+    }
+
+    pub fn error_boundary_ids(&self) -> &[String] {
+        &self.error_boundaries
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteSpec {
     id: String,
     method: RouteMethod,
     pattern: RoutePattern,
+    scope: Option<String>,
     middleware: Vec<String>,
     error_boundaries: Vec<String>,
 }
@@ -474,9 +569,17 @@ impl RouteSpec {
             id,
             method,
             pattern: RoutePattern::parse(pattern)?,
+            scope: None,
             middleware: Vec::new(),
             error_boundaries: Vec::new(),
         })
+    }
+
+    pub fn scope(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_route_id(&id).map_err(|_| RouteError::InvalidScopeId(id.clone()))?;
+        self.scope = Some(id);
+        Ok(self)
     }
 
     pub fn middleware(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
@@ -515,6 +618,10 @@ impl RouteSpec {
 
     pub fn pattern(&self) -> &RoutePattern {
         &self.pattern
+    }
+
+    pub fn scope_id(&self) -> Option<&str> {
+        self.scope.as_deref()
     }
 
     pub fn middleware_ids(&self) -> &[String] {
@@ -564,6 +671,7 @@ fn validate_route_id(id: &str) -> Result<(), RouteError> {
 pub struct RouteGraphBuilder {
     max_routes: usize,
     routes: Vec<RouteSpec>,
+    scopes: Vec<RouteScopeSpec>,
     pre_route_middleware: Vec<String>,
     middleware_capabilities: BTreeMap<String, MiddlewareCapabilities>,
     error_boundaries: Vec<String>,
@@ -580,6 +688,7 @@ impl RouteGraphBuilder {
         Self {
             max_routes: DEFAULT_MAX_ROUTES,
             routes: Vec::new(),
+            scopes: Vec::new(),
             pre_route_middleware: Vec::new(),
             middleware_capabilities: BTreeMap::new(),
             error_boundaries: Vec::new(),
@@ -593,6 +702,7 @@ impl RouteGraphBuilder {
         Ok(Self {
             max_routes,
             routes: Vec::new(),
+            scopes: Vec::new(),
             pre_route_middleware: Vec::new(),
             middleware_capabilities: BTreeMap::new(),
             error_boundaries: Vec::new(),
@@ -642,6 +752,11 @@ impl RouteGraphBuilder {
         Ok(self)
     }
 
+    pub fn scope(mut self, scope: RouteScopeSpec) -> Self {
+        self.scopes.push(scope);
+        self
+    }
+
     pub fn route(mut self, route: RouteSpec) -> Self {
         self.routes.push(route);
         self
@@ -660,6 +775,65 @@ impl RouteGraphBuilder {
         }
 
         self.routes.sort_by(canonical_route_order);
+        self.scopes.sort_by(|left, right| left.id.cmp(&right.id));
+        if self.scopes.len() > DEFAULT_MAX_SCOPES {
+            return Err(RouteError::TooManyScopes {
+                actual: self.scopes.len(),
+                maximum: DEFAULT_MAX_SCOPES,
+            });
+        }
+        let mut scope_map = BTreeMap::new();
+        for scope in &self.scopes {
+            if scope_map.insert(scope.id.clone(), scope).is_some() {
+                return Err(RouteError::DuplicateScopeId(scope.id.clone()));
+            }
+        }
+        for scope in &self.scopes {
+            resolve_scope_chain(Some(&scope.id), &scope_map)?;
+        }
+        let mut resolved_scopes = BTreeMap::new();
+        let mut reached_scopes = BTreeSet::new();
+        for route in &self.routes {
+            let resolved = resolve_scope_chain(route.scope.as_deref(), &scope_map)?;
+            reached_scopes.extend(resolved.ids.iter().cloned());
+            if resolved.middleware.len() + route.middleware.len() > MAX_ROUTE_MIDDLEWARE {
+                return Err(RouteError::TooManyMiddleware(MAX_ROUTE_MIDDLEWARE));
+            }
+            if let Some(id) = route
+                .middleware
+                .iter()
+                .find(|id| resolved.middleware.contains(*id))
+            {
+                return Err(RouteError::DuplicateInheritedMiddleware(id.clone()));
+            }
+            if self.error_boundaries.len()
+                + resolved.error_boundaries.len()
+                + route.error_boundaries.len()
+                > MAX_ERROR_BOUNDARIES
+            {
+                return Err(RouteError::TooManyErrorBoundaries(MAX_ERROR_BOUNDARIES));
+            }
+            let mut error_boundaries = BTreeSet::new();
+            for id in self
+                .error_boundaries
+                .iter()
+                .chain(resolved.error_boundaries.iter())
+                .chain(route.error_boundaries.iter())
+            {
+                if !error_boundaries.insert(id.clone()) {
+                    return Err(RouteError::DuplicateInheritedErrorBoundary(id.clone()));
+                }
+            }
+            resolved_scopes.insert(route.id.clone(), resolved);
+        }
+        if let Some(id) = self
+            .scopes
+            .iter()
+            .map(|scope| &scope.id)
+            .find(|id| !reached_scopes.contains(*id))
+        {
+            return Err(RouteError::UnreferencedScope(id.clone()));
+        }
         let mut ids = BTreeSet::new();
         let mut shapes = BTreeMap::new();
         for route in &self.routes {
@@ -683,6 +857,11 @@ impl RouteGraphBuilder {
             .routes
             .iter()
             .flat_map(|route| route.middleware.iter().cloned())
+            .chain(
+                self.scopes
+                    .iter()
+                    .flat_map(|scope| scope.middleware.iter().cloned()),
+            )
             .collect();
         if let Some(id) = self
             .pre_route_middleware
@@ -710,8 +889,25 @@ impl RouteGraphBuilder {
             return Err(RouteError::UnreferencedMiddlewareDeclaration(id.clone()));
         }
 
+        let all_error_boundaries: BTreeSet<_> = self
+            .error_boundaries
+            .iter()
+            .chain(
+                self.scopes
+                    .iter()
+                    .flat_map(|scope| scope.error_boundaries.iter()),
+            )
+            .chain(
+                self.routes
+                    .iter()
+                    .flat_map(|route| route.error_boundaries.iter()),
+            )
+            .cloned()
+            .collect();
+
         let digest = graph_digest(
             &self.routes,
+            &self.scopes,
             &self.pre_route_middleware,
             &self.middleware_capabilities,
             &self.error_boundaries,
@@ -719,12 +915,74 @@ impl RouteGraphBuilder {
         self.routes.sort_by(match_order);
         Ok(RouteGraph {
             routes: self.routes,
+            scopes: self.scopes,
+            resolved_scopes,
+            route_middleware,
+            all_error_boundaries,
             pre_route_middleware: self.pre_route_middleware,
             middleware_capabilities: self.middleware_capabilities,
             error_boundaries: self.error_boundaries,
             digest,
         })
     }
+}
+
+#[derive(Clone, Debug, Default)]
+struct ResolvedScopeChain {
+    ids: Vec<String>,
+    middleware: Vec<String>,
+    error_boundaries: Vec<String>,
+}
+
+fn resolve_scope_chain(
+    leaf: Option<&str>,
+    scopes: &BTreeMap<String, &RouteScopeSpec>,
+) -> Result<ResolvedScopeChain, RouteError> {
+    let Some(mut current) = leaf else {
+        return Ok(ResolvedScopeChain::default());
+    };
+    let mut seen = BTreeSet::new();
+    let mut chain = Vec::new();
+    loop {
+        if !seen.insert(current.to_owned()) {
+            return Err(RouteError::ScopeCycle(current.to_owned()));
+        }
+        let scope = scopes
+            .get(current)
+            .copied()
+            .ok_or_else(|| RouteError::UnknownScope(current.to_owned()))?;
+        chain.push(scope);
+        match scope.parent.as_deref() {
+            Some(parent) => current = parent,
+            None => break,
+        }
+    }
+    chain.reverse();
+    if chain.len() > MAX_SCOPE_DEPTH {
+        return Err(RouteError::TooManyScopes {
+            actual: chain.len(),
+            maximum: MAX_SCOPE_DEPTH,
+        });
+    }
+    let mut resolved = ResolvedScopeChain::default();
+    let mut middleware = BTreeSet::new();
+    let mut boundaries = BTreeSet::new();
+    for scope in chain {
+        resolved.ids.push(scope.id.clone());
+        for id in &scope.middleware {
+            if !middleware.insert(id.clone()) {
+                return Err(RouteError::DuplicateInheritedMiddleware(id.clone()));
+            }
+            resolved.middleware.push(id.clone());
+        }
+        for id in &scope.error_boundaries {
+            if !boundaries.insert(id.clone()) {
+                return Err(RouteError::DuplicateInheritedErrorBoundary(id.clone()));
+            }
+            resolved.error_boundaries.push(id.clone());
+        }
+    }
+    Ok(resolved)
 }
 
 fn canonical_route_order(left: &RouteSpec, right: &RouteSpec) -> Ordering {
@@ -745,12 +1003,13 @@ fn match_order(left: &RouteSpec, right: &RouteSpec) -> Ordering {
 
 fn graph_digest(
     routes: &[RouteSpec],
+    scopes: &[RouteScopeSpec],
     pre_route_middleware: &[String],
     middleware_capabilities: &BTreeMap<String, MiddlewareCapabilities>,
     error_boundaries: &[String],
 ) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"pliego-route-graph-v4\0");
+    digest.update(b"pliego-route-graph-v5\0");
     digest_sequence(&mut digest, b"pre-route-middleware", pre_route_middleware);
     digest_sequence(&mut digest, b"root-error-boundaries", error_boundaries);
     for (id, capabilities) in middleware_capabilities {
@@ -762,12 +1021,29 @@ fn graph_digest(
             .collect();
         digest_sequence(&mut digest, b"middleware-capabilities", &values);
     }
+    for scope in scopes {
+        for value in [
+            scope.id.as_str(),
+            scope.kind.as_str(),
+            scope.parent.as_deref().unwrap_or(""),
+        ] {
+            digest.update((value.len() as u64).to_be_bytes());
+            digest.update(value.as_bytes());
+        }
+        digest_sequence(&mut digest, b"scope-middleware", &scope.middleware);
+        digest_sequence(
+            &mut digest,
+            b"scope-error-boundaries",
+            &scope.error_boundaries,
+        );
+    }
     for route in routes {
         for value in [
             route.method.as_str(),
             route.id.as_str(),
             route.pattern.authored(),
             route.pattern.canonical(),
+            route.scope.as_deref().unwrap_or(""),
         ] {
             digest.update((value.len() as u64).to_be_bytes());
             digest.update(value.as_bytes());
@@ -805,6 +1081,10 @@ fn encode_hex(bytes: &[u8]) -> String {
 #[derive(Clone, Debug)]
 pub struct RouteGraph {
     routes: Vec<RouteSpec>,
+    scopes: Vec<RouteScopeSpec>,
+    resolved_scopes: BTreeMap<String, ResolvedScopeChain>,
+    route_middleware: BTreeSet<String>,
+    all_error_boundaries: BTreeSet<String>,
     pre_route_middleware: Vec<String>,
     middleware_capabilities: BTreeMap<String, MiddlewareCapabilities>,
     error_boundaries: Vec<String>,
@@ -818,6 +1098,18 @@ impl RouteGraph {
 
     pub fn routes(&self) -> &[RouteSpec] {
         &self.routes
+    }
+
+    pub fn scopes(&self) -> &[RouteScopeSpec] {
+        &self.scopes
+    }
+
+    pub fn route_middleware_ids(&self) -> &BTreeSet<String> {
+        &self.route_middleware
+    }
+
+    pub fn all_error_boundary_ids(&self) -> &BTreeSet<String> {
+        &self.all_error_boundaries
     }
 
     pub fn pre_route_middleware_ids(&self) -> &[String] {
@@ -842,13 +1134,30 @@ impl RouteGraph {
         validate_request_path(&normalized)?;
         for route in self.routes.iter().filter(|route| &route.method == method) {
             if let Some(parameters) = route.pattern.match_admitted(&normalized) {
+                let inherited = self
+                    .resolved_scopes
+                    .get(&route.id)
+                    .expect("sealed routes have resolved scope chains");
+                let middleware = inherited
+                    .middleware
+                    .iter()
+                    .chain(route.middleware.iter())
+                    .cloned()
+                    .collect();
+                let error_boundaries = inherited
+                    .error_boundaries
+                    .iter()
+                    .chain(route.error_boundaries.iter())
+                    .cloned()
+                    .collect();
                 return Ok(RouteMatch {
                     route_id: route.id.clone(),
                     method: route.method.clone(),
                     pattern: route.pattern.canonical.clone(),
                     parameters,
-                    middleware: route.middleware.clone(),
-                    error_boundaries: route.error_boundaries.clone(),
+                    scopes: inherited.ids.clone(),
+                    middleware,
+                    error_boundaries,
                 });
             }
         }
@@ -900,6 +1209,7 @@ pub struct RouteMatch {
     method: RouteMethod,
     pattern: String,
     parameters: BTreeMap<String, String>,
+    scopes: Vec<String>,
     middleware: Vec<String>,
     error_boundaries: Vec<String>,
 }
@@ -923,6 +1233,10 @@ impl RouteMatch {
 
     pub fn parameter(&self, name: &str) -> Option<&str> {
         self.parameters.get(name).map(String::as_str)
+    }
+
+    pub fn scope_ids(&self) -> &[String] {
+        &self.scopes
     }
 
     pub fn middleware_ids(&self) -> &[String] {
@@ -997,6 +1311,17 @@ pub enum RouteError {
     MissingMiddlewareDeclaration(String),
     UnreferencedMiddlewareDeclaration(String),
     MiddlewarePhaseConflict(String),
+    InvalidScopeId(String),
+    DuplicateScopeId(String),
+    UnknownScope(String),
+    UnreferencedScope(String),
+    ScopeCycle(String),
+    TooManyScopes {
+        actual: usize,
+        maximum: usize,
+    },
+    DuplicateInheritedMiddleware(String),
+    DuplicateInheritedErrorBoundary(String),
     InvalidErrorBoundaryId(String),
     DuplicateErrorBoundary(String),
     TooManyErrorBoundaries(usize),
@@ -1030,6 +1355,14 @@ impl RouteError {
             | Self::MissingMiddlewareDeclaration(_)
             | Self::UnreferencedMiddlewareDeclaration(_)
             | Self::MiddlewarePhaseConflict(_) => "PLG-RTE-013",
+            Self::InvalidScopeId(_)
+            | Self::DuplicateScopeId(_)
+            | Self::UnknownScope(_)
+            | Self::UnreferencedScope(_)
+            | Self::ScopeCycle(_)
+            | Self::TooManyScopes { .. }
+            | Self::DuplicateInheritedMiddleware(_)
+            | Self::DuplicateInheritedErrorBoundary(_) => "PLG-RTE-014",
             Self::InvalidErrorBoundaryId(_)
             | Self::DuplicateErrorBoundary(_)
             | Self::TooManyErrorBoundaries(_) => "PLG-RTE-012",
@@ -1092,6 +1425,25 @@ impl Display for RouteError {
             Self::MiddlewarePhaseConflict(value) => write!(
                 formatter,
                 "middleware {value} cannot use both pre-route and route phases"
+            ),
+            Self::InvalidScopeId(value) => write!(formatter, "invalid route scope ID {value:?}"),
+            Self::DuplicateScopeId(value) => write!(formatter, "duplicate route scope ID: {value}"),
+            Self::UnknownScope(value) => write!(formatter, "unknown route scope: {value}"),
+            Self::UnreferencedScope(value) => {
+                write!(formatter, "unreferenced route scope: {value}")
+            }
+            Self::ScopeCycle(value) => write!(formatter, "route scope cycle reaches {value}"),
+            Self::TooManyScopes { actual, maximum } => write!(
+                formatter,
+                "route graph or chain has {actual} scopes; maximum is {maximum}"
+            ),
+            Self::DuplicateInheritedMiddleware(value) => write!(
+                formatter,
+                "middleware {value} appears more than once in one inherited route chain"
+            ),
+            Self::DuplicateInheritedErrorBoundary(value) => write!(
+                formatter,
+                "error boundary {value} appears more than once in one inherited route chain"
             ),
             Self::InvalidErrorBoundaryId(value) => {
                 write!(formatter, "invalid error boundary ID {value:?}")
@@ -1507,6 +1859,187 @@ mod tests {
     }
 
     #[test]
+    fn group_and_layout_scopes_inherit_root_to_leaf_and_bind_the_digest() {
+        let group = RouteScopeSpec::new("app-group", RouteScopeKind::Group)
+            .unwrap()
+            .middleware("group-policy")
+            .unwrap();
+        let layout = RouteScopeSpec::new("account-layout", RouteScopeKind::Layout)
+            .unwrap()
+            .parent("app-group")
+            .unwrap()
+            .middleware("layout-policy")
+            .unwrap()
+            .error_boundary("layout-error")
+            .unwrap();
+        let scoped_route = route("account", RouteMethod::get(), "/account")
+            .scope("account-layout")
+            .unwrap()
+            .middleware("route-policy")
+            .unwrap()
+            .error_boundary("route-error")
+            .unwrap();
+        let graph = RouteGraphBuilder::new()
+            .declare_middleware("group-policy", MiddlewareCapabilities::none())
+            .unwrap()
+            .declare_middleware("layout-policy", MiddlewareCapabilities::none())
+            .unwrap()
+            .declare_middleware("route-policy", MiddlewareCapabilities::none())
+            .unwrap()
+            .scope(group)
+            .scope(layout)
+            .route(scoped_route)
+            .seal()
+            .unwrap();
+        let matched = graph.resolve(&RouteMethod::get(), "/account").unwrap();
+        assert_eq!(
+            matched.scope_ids(),
+            &["app-group".to_owned(), "account-layout".to_owned()]
+        );
+        assert_eq!(
+            matched.middleware_ids(),
+            &[
+                "group-policy".to_owned(),
+                "layout-policy".to_owned(),
+                "route-policy".to_owned()
+            ]
+        );
+        assert_eq!(
+            matched.error_boundary_ids(),
+            &["layout-error".to_owned(), "route-error".to_owned()]
+        );
+        assert_eq!(graph.scopes().len(), 2);
+
+        let flat = RouteGraphBuilder::new()
+            .declare_middleware("route-policy", MiddlewareCapabilities::none())
+            .unwrap()
+            .route(
+                route("account", RouteMethod::get(), "/account")
+                    .middleware("route-policy")
+                    .unwrap()
+                    .error_boundary("route-error")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap();
+        assert_ne!(graph.digest(), flat.digest());
+    }
+
+    #[test]
+    fn scope_graph_rejects_unknown_cycles_unreachable_and_duplicate_inheritance() {
+        let unknown = RouteGraphBuilder::new()
+            .route(
+                route("home", RouteMethod::get(), "/")
+                    .scope("missing")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap_err();
+        assert_eq!(unknown, RouteError::UnknownScope("missing".to_owned()));
+
+        let cycle = RouteGraphBuilder::new()
+            .scope(
+                RouteScopeSpec::new("first", RouteScopeKind::Group)
+                    .unwrap()
+                    .parent("second")
+                    .unwrap(),
+            )
+            .scope(
+                RouteScopeSpec::new("second", RouteScopeKind::Layout)
+                    .unwrap()
+                    .parent("first")
+                    .unwrap(),
+            )
+            .route(
+                route("home", RouteMethod::get(), "/")
+                    .scope("second")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap_err();
+        assert!(matches!(cycle, RouteError::ScopeCycle(_)));
+
+        let unreachable = RouteGraphBuilder::new()
+            .scope(RouteScopeSpec::new("unused", RouteScopeKind::Group).unwrap())
+            .route(route("home", RouteMethod::get(), "/"))
+            .seal()
+            .unwrap_err();
+        assert_eq!(
+            unreachable,
+            RouteError::UnreferencedScope("unused".to_owned())
+        );
+
+        let duplicate = RouteGraphBuilder::new()
+            .declare_middleware("policy", MiddlewareCapabilities::none())
+            .unwrap()
+            .scope(
+                RouteScopeSpec::new("group", RouteScopeKind::Group)
+                    .unwrap()
+                    .middleware("policy")
+                    .unwrap(),
+            )
+            .route(
+                route("home", RouteMethod::get(), "/")
+                    .scope("group")
+                    .unwrap()
+                    .middleware("policy")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap_err();
+        assert_eq!(
+            duplicate,
+            RouteError::DuplicateInheritedMiddleware("policy".to_owned())
+        );
+
+        let duplicate_boundary = RouteGraphBuilder::new()
+            .error_boundary("shared-error")
+            .unwrap()
+            .scope(
+                RouteScopeSpec::new("group", RouteScopeKind::Group)
+                    .unwrap()
+                    .error_boundary("shared-error")
+                    .unwrap(),
+            )
+            .route(
+                route("home", RouteMethod::get(), "/")
+                    .scope("group")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap_err();
+        assert_eq!(
+            duplicate_boundary,
+            RouteError::DuplicateInheritedErrorBoundary("shared-error".to_owned())
+        );
+
+        let mut too_many_boundaries = RouteGraphBuilder::new();
+        for index in 0..MAX_ERROR_BOUNDARIES {
+            too_many_boundaries = too_many_boundaries
+                .error_boundary(format!("root-error-{index}"))
+                .unwrap();
+        }
+        let too_many_boundaries = too_many_boundaries
+            .scope(
+                RouteScopeSpec::new("group", RouteScopeKind::Group)
+                    .unwrap()
+                    .error_boundary("scope-error")
+                    .unwrap(),
+            )
+            .route(
+                route("home", RouteMethod::get(), "/")
+                    .scope("group")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap_err();
+        assert_eq!(
+            too_many_boundaries,
+            RouteError::TooManyErrorBoundaries(MAX_ERROR_BOUNDARIES)
+        );
+    }
+
+    #[test]
     fn behavior_ids_and_duplicates_fail_before_graph_sealing() {
         assert!(matches!(
             route("home", RouteMethod::get(), "/").middleware("Bad ID"),
@@ -1552,6 +2085,7 @@ mod tests {
         let json = serde_json::to_value(matched).unwrap();
         assert_eq!(json["route_id"], "item");
         assert_eq!(json["parameters"]["id"], "42");
+        assert_eq!(json["scopes"], serde_json::json!([]));
         assert_eq!(json["middleware"], serde_json::json!([]));
         assert_eq!(json["error_boundaries"], serde_json::json!([]));
     }

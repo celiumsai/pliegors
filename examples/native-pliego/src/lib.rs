@@ -3,7 +3,8 @@
 use futures_util::stream;
 use pliego_dom::{IntoView, el};
 use pliego_router::{
-    MiddlewareCapabilities, MiddlewareCapability, RouteGraphBuilder, RouteMethod, RouteSpec,
+    MiddlewareCapabilities, MiddlewareCapability, RouteGraphBuilder, RouteMethod, RouteScopeKind,
+    RouteScopeSpec, RouteSpec,
 };
 use pliego_runtime::{
     Body, CompleteDocument, CompleteRenderOptions, NativeRuntime, NativeRuntimeBuilder,
@@ -53,7 +54,7 @@ fn route(
     method: RouteMethod,
     pattern: &str,
 ) -> Result<RouteSpec, pliego_router::RouteError> {
-    RouteSpec::new(id, method, pattern)?.middleware("response-policy")
+    RouteSpec::new(id, method, pattern)?.scope("document-layout")
 }
 
 pub fn build_runtime() -> AppResult<NativeRuntime> {
@@ -68,6 +69,13 @@ pub fn build_runtime() -> AppResult<NativeRuntime> {
         )?
         .pre_route_middleware("canonical-entry")?
         .error_boundary("root-error")?
+        .scope(
+            RouteScopeSpec::new("site-group", RouteScopeKind::Group)?
+                .middleware("response-policy")?,
+        )
+        .scope(
+            RouteScopeSpec::new("document-layout", RouteScopeKind::Layout)?.parent("site-group")?,
+        )
         .route(route("home", RouteMethod::get(), "/")?)
         .route(route("hello", RouteMethod::get(), "/hello/:name")?)
         .route(route("stream", RouteMethod::get(), "/stream")?)

@@ -136,6 +136,8 @@ The source implementation currently demonstrates:
 - fail-closed mediation of path rewrites, redirects, rejection, body reads,
   and downstream response-header changes with `PLG-RUN-507`;
 - root and route error boundaries that receive no internal diagnostic message;
+- bounded group/layout scope inheritance with deterministic middleware,
+  outward error recovery, and scope identity in receipts;
 - exactly-once bounded receipts; and
 - pre-commit complete-render failures with stable `PLG-REN-*` diagnostics.
 
@@ -168,7 +170,7 @@ not claim incremental output inside one DOM tree.
 The following remain gate work:
 
 - declared asynchronous boundaries;
-- group and layout middleware inheritance;
+- layout-owned document composition, head metadata, loaders, and child slots;
 - OpenTelemetry with redaction and cardinality tests;
 - multipart and decompression policies;
 - real socket HTTP/2 conformance; and
