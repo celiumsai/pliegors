@@ -48,6 +48,9 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Security
 
+- Resolve the `fast-uri` host-confusion advisory and override Cloudflare's
+  vulnerable transitive `sharp` pin with `0.35.3`; all three npm audit surfaces
+  now pass at high severity.
 - Prevent the OpenSDK browser conformance server from exposing internal
   exception details in HTTP 500 responses.
 
