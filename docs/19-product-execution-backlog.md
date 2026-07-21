@@ -73,4 +73,6 @@ These foundations are not substitutes for the R0-R7 evidence gates.
 - No broad server-framework expansion before reactive safety and artifact trust.
 - No Pliego.run control-plane, billing, dashboard, or infrastructure code in this
   open-source repository.
-- No PliegoCSS release or required integration while that project is paused.
+- No required PliegoCSS dependency. Its separately installed compiler may be
+  used as an experimental build-time companion without entering the G1-G3
+  critical path.

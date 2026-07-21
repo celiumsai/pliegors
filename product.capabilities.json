@@ -187,6 +187,20 @@
       "limitations": ["RFC-007 is Draft and no native plus Cloudflare conformance corpus has closed the stability gate."]
     },
     {
+      "id": "pliegocss-companion",
+      "label": "Optional PliegoCSS companion",
+      "domain": "tooling",
+      "availability": "released",
+      "stability": "experimental",
+      "gate": "preserved",
+      "summary": "Explicit local delegation to a separately installed PliegoCSS compiler while standard CSS remains the default contract.",
+      "evidence": ["docs/14-project-manifest-and-cli.md", "docs/evidence/pliegocss-optional-integration.md"],
+      "limitations": [
+        "PliegoCSS is not installed, linked, or required by PliegoRS; the validated companion is exactly pliego-cssc 0.1.0-rc.2.",
+        "The current cross-repository replay is exact-revision local evidence, not a hosted multi-platform compatibility promise."
+      ]
+    },
+    {
       "id": "production-observability",
       "label": "Production server observability",
       "domain": "operations",

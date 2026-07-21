@@ -28,7 +28,7 @@ behavior, diagnostics, and acceptance evidence.
 | --- | --- | --- |
 | PliegoRS | Apache-2.0 open source in `celiumsai/pliegors` | Framework, CLI, OpenSDK specifications, conformance suites, portable artifacts, and provider-neutral deployment contracts |
 | Pliego.run | Closed source in a separate private repository | Hosted control plane, build orchestration, UI, infrastructure, billing, and operations |
-| PliegoCSS | Paused research; no committed release | Optional future OpenSDK consumer; never a required PliegoRS dependency |
+| PliegoCSS | Separate Apache-2.0 public-preview product | Optional build-time companion; never a required PliegoRS dependency |
 
 The PliegoRS repository must not contain the Pliego.run dashboard, control
 plane, billing logic, infrastructure implementation, or private provider
@@ -36,9 +36,10 @@ adapter. A public build-output contract does not open the hosted product; it
 prevents the hosted product from becoming the only implementation.
 
 PliegoRS accepts standard CSS and external CSS pipelines. The delegated
-`pliego css check` command is experimental interoperability with a separately
-installed executable. PliegoCSS is not part of the supported quickstart while
-its work is paused.
+`pliego css check` command is active experimental interoperability with a
+separately installed, exact PliegoCSS release candidate. PliegoCSS is never
+installed implicitly, linked into the server runtime, or required by the
+default starter.
 
 ## Stability vocabulary
 
@@ -57,7 +58,7 @@ Current classification:
 | R0-R7 contracts and their accepted evidence | `preview` |
 | Published `pliego-*` Rust APIs and CLI commands in `0.0.x` | `preview` |
 | Hyphae protocol client boundary | `preview`; production gateway operation is outside this repository |
-| Delegated PliegoCSS command | `experimental` and paused |
+| Delegated PliegoCSS command | `experimental`; active optional companion |
 | Product topology registry | `experimental` until OpenSDK conformance fixes its external schema |
 | OpenSDK, server runtime, PBOC, and Pliego.run provider adapter | Not released |
 | Any `stable` public API | None before its explicit promotion record |

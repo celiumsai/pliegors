@@ -40,6 +40,7 @@ use pliego_starters as templates;
 use pliego_cli::project_manifest::{Client, Project, validate_manifest};
 
 const PROJECT_FILE: &str = "pliego.toml";
+const PLIEGO_CSSC_VERSION: &str = "0.1.0-rc.2";
 const SERVER_WORKERS: usize = 8;
 const SERVER_QUEUE: usize = 64;
 const RELOAD_WORKERS: usize = 16;
@@ -644,8 +645,9 @@ fn css_check(context: &Context, arguments: Vec<String>) -> Result<(), String> {
         .status()
         .map_err(|error| {
             format!(
-                "required tool `{}` is unavailable: {error}; install PliegoCSS with `cargo install --locked --path crates/pliego-cssc`",
-                Path::new(&program).display()
+                "optional tool `{}` requested by `pliego css check` is unavailable: {error}; install the validated PliegoCSS companion with `{}`",
+                Path::new(&program).display(),
+                pliegocss_install_command()
             )
         })?;
     if !status.success() {
@@ -653,6 +655,10 @@ fn css_check(context: &Context, arguments: Vec<String>) -> Result<(), String> {
     }
     println!("PLIEGO css check: delegated to pliego-cssc");
     Ok(())
+}
+
+fn pliegocss_install_command() -> String {
+    format!("cargo install pliego-cssc --version ={PLIEGO_CSSC_VERSION} --locked")
 }
 
 fn css_check_arguments(mut arguments: Vec<String>) -> Vec<String> {
@@ -3543,6 +3549,10 @@ mod tests {
                 "--seed".to_owned(),
             ]),
             ["--source", "styles", "--seed"]
+        );
+        assert_eq!(
+            pliegocss_install_command(),
+            "cargo install pliego-cssc --version =0.1.0-rc.2 --locked"
         );
     }
 
