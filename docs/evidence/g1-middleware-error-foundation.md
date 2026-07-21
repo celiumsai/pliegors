@@ -2,16 +2,17 @@
 
 **Gate:** G1 Native runtime and dynamic rendering
 
-**State:** Route middleware, capability admission, and root/route error slice; gate remains open
+**State:** Scoped middleware, capability admission, and error-boundary slice; gate remains open
 
 **Toolchain:** Rust 1.86.0 under Debian WSL2
 
 ## Sealed contract
 
-`pliego-router` now binds ordered pre-route and route middleware, their exact
-capability sets, and root/route error boundary IDs into route graph digest v4. IDs are portable and bounded,
-duplicates fail before sealing, and `NativeRuntimeBuilder` rejects missing or
-extra registrations before a socket can be served.
+`pliego-router` now binds ordered pre-route, group, layout, and route
+middleware, their exact capability sets, and scoped error-boundary IDs into
+route graph digest v5. IDs are portable and bounded, duplicates fail before
+sealing, and `NativeRuntimeBuilder` rejects missing or extra registrations
+before a socket can be served.
 
 Every referenced middleware must have one reachable declaration. The sealed
 set distinguishes `rewrite-path`, `redirect`, `reject`, `read-body`, and
@@ -34,6 +35,14 @@ application code.
 root-to-leaf and successful or recovered responses unwind leaf-to-root before
 the runtime commits headers. A short-circuit cannot accidentally call the next
 layer or handler twice.
+
+Groups and layouts are explicit bounded scopes in an acyclic ownership tree.
+The graph rejects unknown parents, cycles, duplicate IDs, unreferenced scopes,
+chains deeper than 16 scopes, and repeated middleware or error-boundary IDs
+across inherited layers. A matched route receives scope middleware from
+outermost group through innermost layout before its own middleware. Errors walk
+the opposite direction, then continue through root boundaries. Runtime
+receipts record the exact scope chain used by the match.
 
 Pre-route middleware uses a separate `PreRouteContext` with no invented route
 authority. It can rewrite the admitted request before matching or return a
@@ -70,8 +79,8 @@ cargo audit --deny warnings --ignore RUSTSEC-2026-0173
 
 Observed focused result:
 
-- `pliego-router`: 21 tests passed;
-- `pliego-runtime`: 13 unit, 23 in-process integration, and two real-socket
+- `pliego-router`: 23 tests passed;
+- `pliego-runtime`: 13 unit, 24 in-process integration, and two real-socket
   tests passed;
 - `native-pliego`: five tests passed;
 - Clippy with warnings denied passed; and
@@ -91,7 +100,7 @@ server. Observed response bodies were 790 bytes for `/`, 815 bytes for
 
 ## Evidence boundary
 
-This slice does not implement group or layout middleware. Nested layouts, asynchronous render
-boundaries, HTTP/2, middleware fuzzing, fixed-load memory/latency, and
-OpenTelemetry evidence remain open. This evidence does not close G1 or change
-any capability from `not-released`.
+This slice does not implement layout-owned document composition, head metadata,
+loaders, or child slots. Asynchronous render boundaries, HTTP/2, middleware
+fuzzing, fixed-load memory/latency, and OpenTelemetry evidence remain open.
+This evidence does not close G1 or change any capability from `not-released`.

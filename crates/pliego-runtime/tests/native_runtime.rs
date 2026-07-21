@@ -3,7 +3,8 @@
 use axum::body::to_bytes;
 use http::{Request, Response, StatusCode};
 use pliego_router::{
-    MiddlewareCapabilities, MiddlewareCapability, RouteGraphBuilder, RouteMethod, RouteSpec,
+    MiddlewareCapabilities, MiddlewareCapability, RouteGraphBuilder, RouteMethod, RouteScopeKind,
+    RouteScopeSpec, RouteSpec,
 };
 use pliego_runtime::{Body, InMemoryReceiptSink, NativeRuntimeBuilder, RequestLimits};
 use std::sync::{Arc, Mutex};
@@ -171,6 +172,140 @@ async fn middleware_unwinds_before_commit_and_records_entered_layers() {
         sink.receipts()[0].middleware,
         vec!["outer".to_owned(), "inner".to_owned()]
     );
+}
+
+#[tokio::test]
+async fn group_and_layout_middleware_and_errors_inherit_in_sealed_order() {
+    let group = RouteScopeSpec::new("app-group", RouteScopeKind::Group)
+        .unwrap()
+        .middleware("group-policy")
+        .unwrap();
+    let layout = RouteScopeSpec::new("account-layout", RouteScopeKind::Layout)
+        .unwrap()
+        .parent("app-group")
+        .unwrap()
+        .middleware("layout-policy")
+        .unwrap()
+        .error_boundary("layout-error")
+        .unwrap();
+    let graph = RouteGraphBuilder::new()
+        .declare_middleware("group-policy", MiddlewareCapabilities::none())
+        .unwrap()
+        .declare_middleware("layout-policy", MiddlewareCapabilities::none())
+        .unwrap()
+        .declare_middleware("route-policy", MiddlewareCapabilities::none())
+        .unwrap()
+        .scope(group)
+        .scope(layout)
+        .route(
+            route("account", RouteMethod::get(), "/account")
+                .scope("account-layout")
+                .unwrap()
+                .middleware("route-policy")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let order = Arc::new(Mutex::new(Vec::new()));
+    let sink = InMemoryReceiptSink::default();
+    let runtime = NativeRuntimeBuilder::new(graph, "scope-inheritance")
+        .unwrap()
+        .middleware("group-policy", {
+            let order = order.clone();
+            move |_context, request, next: pliego_runtime::MiddlewareNext| {
+                let order = order.clone();
+                async move {
+                    order.lock().unwrap().push("group-before");
+                    let response = next.run(request).await?;
+                    order.lock().unwrap().push("group-after");
+                    Ok(response)
+                }
+            }
+        })
+        .middleware("layout-policy", {
+            let order = order.clone();
+            move |_context, request, next: pliego_runtime::MiddlewareNext| {
+                let order = order.clone();
+                async move {
+                    order.lock().unwrap().push("layout-before");
+                    let response = next.run(request).await?;
+                    order.lock().unwrap().push("layout-after");
+                    Ok(response)
+                }
+            }
+        })
+        .middleware("route-policy", {
+            let order = order.clone();
+            move |_context, request, next: pliego_runtime::MiddlewareNext| {
+                let order = order.clone();
+                async move {
+                    order.lock().unwrap().push("route-before");
+                    let response = next.run(request).await?;
+                    order.lock().unwrap().push("route-after");
+                    Ok(response)
+                }
+            }
+        })
+        .error_boundary(
+            "layout-error",
+            |_context, error: pliego_runtime::PublicError| async move {
+                Ok(Response::builder()
+                    .status(error.status())
+                    .body(Body::from("layout failure"))
+                    .unwrap())
+            },
+        )
+        .handler("account", {
+            let order = order.clone();
+            move |context: pliego_runtime::RequestContext, _request| {
+                let order = order.clone();
+                assert_eq!(
+                    context.route().scope_ids(),
+                    &["app-group".to_owned(), "account-layout".to_owned()]
+                );
+                async move {
+                    order.lock().unwrap().push("handler");
+                    Err(pliego_runtime::HandlerError::internal("private failure"))
+                }
+            }
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            http::Request::builder()
+                .uri("/account")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        to_bytes(response.into_body(), 32).await.unwrap(),
+        "layout failure"
+    );
+    assert_eq!(
+        *order.lock().unwrap(),
+        vec![
+            "group-before",
+            "layout-before",
+            "route-before",
+            "handler",
+            "route-after",
+            "layout-after",
+            "group-after"
+        ]
+    );
+    let receipt = &sink.receipts()[0];
+    assert_eq!(
+        receipt.route_scopes,
+        vec!["app-group".to_owned(), "account-layout".to_owned()]
+    );
+    assert_eq!(receipt.error_boundary.as_deref(), Some("layout-error"));
 }
 
 #[tokio::test]

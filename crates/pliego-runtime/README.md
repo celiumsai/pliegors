@@ -36,6 +36,6 @@ graceful-shutdown case with a pending streamed response. HTTP/2, TLS, proxy,
 slow-peer, and fixed-load evidence remain open gate work.
 
 This foundation is intentionally incomplete. It does not yet expose
-asynchronous boundary streaming, group/layout middleware inheritance,
+asynchronous boundary streaming, layout-owned document composition,
 OpenTelemetry, multipart/decompression
 policies, or a production `pliego serve` command.

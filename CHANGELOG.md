@@ -9,6 +9,10 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Added
 
+- Route scopes now provide bounded group and layout inheritance: middleware
+  enters from outermost scope to route and unwinds in reverse, while error
+  boundaries resolve route-first without duplicate registration.
+
 - Add the unreleased G1 native runtime foundation with a sealed dynamic route
   graph, bounded complete and ordered SSR, raw HTTP/1.1 lifecycle evidence,
   pre-route and route middleware, exact capability admission and effect mediation, safe authored
