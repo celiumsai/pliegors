@@ -961,8 +961,8 @@ pub fn changelog(locale: Locale) -> View {
                 l(locale, "The native runtime becomes installable.", "El runtime nativo se vuelve instalable."),
                 l(
                     locale,
-                    "pliego-router, pliego-runtime, and pliego-sdk are public at 0.1.0-preview.1. G1 is complete, while the complete CLI remains 0.0.2 and G2/G3 stay open.",
-                    "pliego-router, pliego-runtime y pliego-sdk son públicos en 0.1.0-preview.1. G1 está completo, mientras el CLI completo sigue en 0.0.2 y G2/G3 permanecen abiertos.",
+                    "pliego-router, pliego-runtime, and pliego-sdk are public at 0.1.0-preview.1. G1 is complete, while the complete CLI remains 0.0.2 and that tagged release contains neither G2 nor G3.",
+                    "pliego-router, pliego-runtime y pliego-sdk son públicos en 0.1.0-preview.1. G1 está completo, mientras el CLI completo sigue en 0.0.2 y ese release etiquetado no contiene G2 ni G3.",
                 ),
                 &[
                     l(locale, "Bounded HTTP/1.1 and HTTP/2 transport with connection admission, slow-peer deadlines, graceful drain, and overload behavior.", "Transporte HTTP/1.1 y HTTP/2 limitado con admisión de conexiones, deadlines para peers lentos, drain ordenado y comportamiento de sobrecarga."),

@@ -16,6 +16,10 @@ pub struct RequestLimits {
     pub max_response_bytes: usize,
     pub max_diagnostics: usize,
     pub max_cleanups: usize,
+    pub max_data_receipts: usize,
+    pub max_data_cleanups: usize,
+    pub allow_gzip_request_bodies: bool,
+    pub allow_multipart_request_bodies: bool,
     pub max_concurrent_requests: usize,
     pub deadline_ms: u64,
     pub graceful_shutdown_ms: u64,
@@ -31,6 +35,10 @@ impl Default for RequestLimits {
             max_response_bytes: 16 * 1_024 * 1_024,
             max_diagnostics: 64,
             max_cleanups: 64,
+            max_data_receipts: 128,
+            max_data_cleanups: 64,
+            allow_gzip_request_bodies: false,
+            allow_multipart_request_bodies: false,
             max_concurrent_requests: 1_024,
             deadline_ms: 30_000,
             graceful_shutdown_ms: 30_000,
@@ -56,6 +64,8 @@ impl RequestLimits {
             ),
             ("max_diagnostics", self.max_diagnostics, 1_024),
             ("max_cleanups", self.max_cleanups, 4_096),
+            ("max_data_receipts", self.max_data_receipts, 4_096),
+            ("max_data_cleanups", self.max_data_cleanups, 1_024),
             (
                 "max_concurrent_requests",
                 self.max_concurrent_requests,
@@ -150,19 +160,23 @@ impl RequestLimits {
 
     pub(crate) fn admit_body_format(&self, parts: &Parts) -> Result<(), LimitError> {
         if parts.headers.contains_key(http::header::CONTENT_ENCODING) {
-            let mut saw_encoding = false;
+            let mut encodings = Vec::new();
             for value in parts.headers.get_all(http::header::CONTENT_ENCODING) {
                 let value = value
                     .to_str()
                     .map_err(|_| LimitError::UnsupportedContentEncoding)?;
                 for encoding in value.split(',').map(str::trim) {
-                    saw_encoding = true;
-                    if encoding.is_empty() || !encoding.eq_ignore_ascii_case("identity") {
+                    if encoding.is_empty() {
                         return Err(LimitError::UnsupportedContentEncoding);
                     }
+                    encodings.push(encoding);
                 }
             }
-            if !saw_encoding {
+            if encodings.len() != 1
+                || !(encodings[0].eq_ignore_ascii_case("identity")
+                    || (self.allow_gzip_request_bodies
+                        && encodings[0].eq_ignore_ascii_case("gzip")))
+            {
                 return Err(LimitError::UnsupportedContentEncoding);
             }
         }
@@ -172,6 +186,7 @@ impl RequestLimits {
                 if media_type
                     .get(..10)
                     .is_some_and(|prefix| prefix.eq_ignore_ascii_case("multipart/"))
+                    && !self.allow_multipart_request_bodies
                 {
                     return Err(LimitError::UnsupportedMultipart);
                 }

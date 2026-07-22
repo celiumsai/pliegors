@@ -19,6 +19,7 @@ members = [
     "crates/pliego-adapters",
     "crates/pliego-sdk",
     "crates/pliego-router",
+    "crates/pliego-data",
     "crates/pliego-runtime",
     "crates/pliego-starters",
     "crates/pliego-cli",
@@ -28,6 +29,7 @@ members = [
     "examples/pliegors-site",
     "examples/pliegors-site-client",
     "examples/native-pliego",
+    "examples/fullstack-pliego",
 ]
 
 [workspace.package]
@@ -49,6 +51,15 @@ publish = ["crates-io"]
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
+serde_urlencoded = "=0.7.1"
+base64 = "=0.22.1"
+getrandom = "=0.3.4"
+hmac = "=0.12.1"
+zeroize = "=1.8.2"
+url = "=2.5.4"
+flate2 = "=1.1.2"
+multer = "=3.1.0"
+tempfile = "=3.27.0"
 toml = "0.8"
 semver = "1"
 tar = "0.4"
@@ -79,7 +90,7 @@ http-body = "=1.1.0"
 http-body-util = "=0.1.4"
 hyper = { version = "=1.10.1", default-features = false, features = ["http1", "http2", "server"] }
 hyper-util = { version = "=0.1.20", default-features = false, features = ["http1", "http2", "server-auto", "service", "tokio"] }
-tokio = { version = "=1.53.0", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "=1.53.0", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-util = { version = "=0.7.18", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["limit", "load-shed", "timeout", "util"] }
 tracing = "=0.1.44"
@@ -95,6 +106,7 @@ pliego-reactive = { version = "=0.0.2", path = "crates/pliego-reactive" }
 pliego-artifact = { version = "=0.0.2", path = "crates/pliego-artifact" }
 pliego-sdk = { version = "=0.1.0-preview.1", path = "crates/pliego-sdk" }
 pliego-router = { version = "=0.1.0-preview.1", path = "crates/pliego-router" }
+pliego-data = { version = "=0.1.0-preview.1", path = "crates/pliego-data" }
 pliego-runtime = { version = "=0.1.0-preview.1", path = "crates/pliego-runtime" }
 pliego-starters = { version = "=0.0.2", path = "crates/pliego-starters" }
 

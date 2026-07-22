@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-data"
+version = "0.1.0-preview.1"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["web", "data", "cache", "server", "rust"]
+categories = ["web-programming", "development-tools"]
+description = "Provider-neutral request data, resource, action, session, and cache contracts for PliegoRS."
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+base64 = { workspace = true }
+getrandom = { workspace = true }
+hmac = { workspace = true }
+zeroize = { workspace = true }
+url = { workspace = true }
+futures-util = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }

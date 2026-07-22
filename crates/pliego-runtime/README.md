@@ -44,9 +44,10 @@ for shell plus streamed chunks under one output budget.
 `NativeRuntime::serve` uses one configurable Hyper HTTP/1.1 and HTTP/2 parser
 path behind a bounded accept loop. `TransportLimits` caps connections, the
 absolute HTTP/1 head deadline, read/write inactivity, HTTP/2 streams,
-flow-control windows, and send buffers. The runtime rejects conflicting body
-framing, implicit request decompression, and multipart parsing until their
-independent G2 policies exist. Every completed request also emits one bounded
+flow-control windows, and send buffers. The generic request path rejects
+conflicting body framing and implicit parsing. G2 action routes opt into
+independent encoded/decoded, field, part, file, and temporary-storage budgets
+before form, JSON, gzip, or multipart decoding. Every completed request emits one bounded
 `pliegors::request` structured event; operator receipt sinks are panic-isolated.
 
 `NativeRuntimeBuilder::open_telemetry` binds the runtime to global
@@ -75,8 +76,13 @@ slow-head and slow-reader peers, parser/body-policy cases, and an explicit
 2,000-request Linux RSS/latency harness. TLS and proxy identity remain host
 adapter work rather than implicit trust in forwarding headers.
 
-This source preview still does not expose G2 loaders, actions, caches,
-sessions, uploads, multipart/decompression parsers, G3 host adapters, or a
-production `pliego serve` command. See the
-[G1 transport evidence](../../docs/evidence/g1-transport-load-security.md) and
-[ASVS ownership map](../../security/asvs-v5.0.0-g1.json) for the exact boundary.
+Current `main` also contains the unreleased G2 source beta: sealed loader,
+action, session, idempotency, cache, upload, decompression, invalidation, and
+application-contract registries backed by `pliego-data`. These additions are
+not in the published `0.1.0-preview.1` runtime crate. G3 host adapters and a
+production `pliego serve` command remain unavailable.
+
+See the [G1 transport evidence](../../docs/evidence/g1-transport-load-security.md),
+[G2 full-stack evidence](../../docs/evidence/g2-fullstack-beta.md), and the
+[G1](../../security/asvs-v5.0.0-g1.json) and
+[G2](../../security/asvs-v5.0.0-g2.json) ASVS ownership maps.

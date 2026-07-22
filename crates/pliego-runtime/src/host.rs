@@ -20,9 +20,15 @@ use hyper::body::Incoming;
 use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
 use hyper_util::server::conn::auto::Builder as ConnectionBuilder;
 use hyper_util::service::TowerToHyperService;
+use pliego_data::{
+    ActionPolicy, CachePolicy, DataCancelReason, DataContext, DataContextOptions, DataIdentity,
+    DataPolicyGrants, DataRequestValues, LoaderPolicy, ResourceGrant, ResourceRegistry,
+};
 use pliego_router::{
     MiddlewareCapabilities, MiddlewareCapability, ResolveError, RouteGraph, RouteMatch, RouteMethod,
 };
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::future::Future;
@@ -98,6 +104,126 @@ impl Display for HandlerError {
 
 impl std::error::Error for HandlerError {}
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeContractManifest {
+    pub contract: String,
+    pub application_contract_sha256: String,
+    pub actions: Vec<ActionContractManifest>,
+    pub loaders: Vec<LoaderContractManifest>,
+    pub caches: Vec<CacheContractManifest>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ActionContractManifest {
+    pub id: String,
+    pub semantic_revision: u32,
+    pub contract_sha256: String,
+    pub accepted_media_types: Vec<String>,
+    pub accepted_content_encodings: Vec<String>,
+    pub max_encoded_bytes: usize,
+    pub max_decoded_bytes: usize,
+    pub max_form_fields: usize,
+    pub max_output_bytes: usize,
+    pub origin_policy: String,
+    pub csrf_policy: String,
+    pub requires_authentication: bool,
+    pub requires_authorization: bool,
+    pub post_commit_grace_ms: u64,
+    pub idempotency_policy_id: Option<String>,
+    pub resources: Vec<ContractResourceRequirement>,
+    pub invalidations: Vec<ActionInvalidationManifest>,
+}
+
+impl ActionContractManifest {
+    pub fn explain(&self) -> String {
+        let media = display_contract_items(&self.accepted_media_types);
+        let encodings = display_contract_items(&self.accepted_content_encodings);
+        let resources = self
+            .resources
+            .iter()
+            .map(|resource| {
+                format!(
+                    "{}({})",
+                    resource.id,
+                    display_contract_items(&resource.capabilities)
+                )
+            })
+            .collect::<Vec<_>>();
+        let invalidations = self
+            .invalidations
+            .iter()
+            .map(|intent| {
+                format!(
+                    "{}:{}({})",
+                    intent.cache_policy_id,
+                    intent.consistency,
+                    display_contract_items(&intent.tags)
+                )
+            })
+            .collect::<Vec<_>>();
+        format!(
+            "PLIEGO inspect action {}\nrevision: {}\ncontract: {}\nmedia: {}\ncontent encodings: {}\nlimits: encoded={} decoded={} form-fields={} output={}\nsecurity: origin={} csrf={} authentication={} authorization={}\nidempotency: {}\npost-commit grace: {} ms\nresources: {}\ninvalidations: {}",
+            self.id,
+            self.semantic_revision,
+            self.contract_sha256,
+            media,
+            encodings,
+            self.max_encoded_bytes,
+            self.max_decoded_bytes,
+            self.max_form_fields,
+            self.max_output_bytes,
+            self.origin_policy,
+            self.csrf_policy,
+            self.requires_authentication,
+            self.requires_authorization,
+            self.idempotency_policy_id.as_deref().unwrap_or("none"),
+            self.post_commit_grace_ms,
+            display_contract_items(&resources),
+            display_contract_items(&invalidations),
+        )
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LoaderContractManifest {
+    pub id: String,
+    pub semantic_revision: u32,
+    pub contract_sha256: String,
+    pub cache_policy_id: Option<String>,
+    pub max_output_bytes: usize,
+    pub deduplicates_in_request: bool,
+    pub resources: Vec<ContractResourceRequirement>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CacheContractManifest {
+    pub id: String,
+    pub semantic_revision: u32,
+    pub contract_sha256: String,
+    pub namespace: String,
+    pub compatibility_epoch: u32,
+    pub domain: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContractResourceRequirement {
+    pub id: String,
+    pub capabilities: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ActionInvalidationManifest {
+    pub cache_policy_id: String,
+    pub tags: Vec<String>,
+    pub consistency: String,
+}
+
 #[derive(Clone)]
 pub struct NativeRuntimeBuilder {
     graph: Arc<RouteGraph>,
@@ -113,6 +239,13 @@ pub struct NativeRuntimeBuilder {
     duplicate_error_boundaries: BTreeSet<String>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
     telemetry: Option<Arc<OpenTelemetryRuntime>>,
+    resources: ResourceRegistry,
+    action_policies: BTreeMap<String, ActionPolicy>,
+    duplicate_action_policies: BTreeSet<String>,
+    loader_policies: BTreeMap<String, LoaderPolicy>,
+    duplicate_loader_policies: BTreeSet<String>,
+    cache_policies: BTreeMap<String, CachePolicy>,
+    duplicate_cache_policies: BTreeSet<String>,
 }
 
 impl NativeRuntimeBuilder {
@@ -136,6 +269,13 @@ impl NativeRuntimeBuilder {
             duplicate_error_boundaries: BTreeSet::new(),
             receipt_sink: Arc::new(|_: RuntimeReceipt| {}),
             telemetry: None,
+            resources: ResourceRegistry::empty(),
+            action_policies: BTreeMap::new(),
+            duplicate_action_policies: BTreeSet::new(),
+            loader_policies: BTreeMap::new(),
+            duplicate_loader_policies: BTreeSet::new(),
+            cache_policies: BTreeMap::new(),
+            duplicate_cache_policies: BTreeSet::new(),
         })
     }
 
@@ -252,6 +392,35 @@ impl NativeRuntimeBuilder {
         self
     }
 
+    pub fn resources(mut self, resources: ResourceRegistry) -> Self {
+        self.resources = resources;
+        self
+    }
+
+    pub fn action_policy(mut self, policy: ActionPolicy) -> Self {
+        let id = policy.id().to_owned();
+        if self.action_policies.insert(id.clone(), policy).is_some() {
+            self.duplicate_action_policies.insert(id);
+        }
+        self
+    }
+
+    pub fn loader_policy(mut self, policy: LoaderPolicy) -> Self {
+        let id = policy.id().to_owned();
+        if self.loader_policies.insert(id.clone(), policy).is_some() {
+            self.duplicate_loader_policies.insert(id);
+        }
+        self
+    }
+
+    pub fn cache_policy(mut self, policy: CachePolicy) -> Self {
+        let id = policy.id().to_owned();
+        if self.cache_policies.insert(id.clone(), policy).is_some() {
+            self.duplicate_cache_policies.insert(id);
+        }
+        self
+    }
+
     /// Enable OpenTelemetry through the operator's configured global providers.
     pub fn open_telemetry(mut self, config: OpenTelemetryConfig) -> Self {
         self.telemetry = Some(Arc::new(OpenTelemetryRuntime::from_global(config)));
@@ -275,6 +444,15 @@ impl NativeRuntimeBuilder {
             return Err(RuntimeBuildError::DuplicateErrorBoundaryRegistration(
                 id.clone(),
             ));
+        }
+        if let Some(id) = self.duplicate_action_policies.iter().next() {
+            return Err(RuntimeBuildError::DuplicateActionPolicy(id.clone()));
+        }
+        if let Some(id) = self.duplicate_loader_policies.iter().next() {
+            return Err(RuntimeBuildError::DuplicateLoaderPolicy(id.clone()));
+        }
+        if let Some(id) = self.duplicate_cache_policies.iter().next() {
+            return Err(RuntimeBuildError::DuplicateCachePolicy(id.clone()));
         }
         let route_ids: BTreeSet<_> = self
             .graph
@@ -337,6 +515,125 @@ impl NativeRuntimeBuilder {
             RuntimeBuildError::MissingErrorBoundary,
             RuntimeBuildError::UnknownErrorBoundary,
         )?;
+        let action_ids = self
+            .graph
+            .routes()
+            .iter()
+            .flat_map(|route| route.action_ids().iter().cloned())
+            .collect::<BTreeSet<_>>();
+        validate_behavior_registry(
+            &action_ids,
+            self.action_policies.keys(),
+            RuntimeBuildError::MissingActionPolicy,
+            RuntimeBuildError::UnknownActionPolicy,
+        )?;
+        let loader_ids = self
+            .graph
+            .routes()
+            .iter()
+            .flat_map(|route| {
+                self.graph
+                    .route_loader_ids(route.id())
+                    .expect("sealed routes have loader identities")
+            })
+            .collect::<BTreeSet<_>>();
+        validate_behavior_registry(
+            &loader_ids,
+            self.loader_policies.keys(),
+            RuntimeBuildError::MissingLoaderPolicy,
+            RuntimeBuildError::UnknownLoaderPolicy,
+        )?;
+        let mut cache_ids = self
+            .graph
+            .routes()
+            .iter()
+            .filter_map(|route| route.cache_policy_id().map(str::to_owned))
+            .collect::<BTreeSet<_>>();
+        cache_ids.extend(
+            self.loader_policies
+                .values()
+                .filter_map(|policy| policy.cache_policy_id().map(str::to_owned)),
+        );
+        cache_ids.extend(
+            self.action_policies
+                .values()
+                .flat_map(|policy| policy.invalidation_intents())
+                .map(|intent| intent.cache_policy_id().to_owned()),
+        );
+        validate_behavior_registry(
+            &cache_ids,
+            self.cache_policies.keys(),
+            RuntimeBuildError::MissingCachePolicy,
+            RuntimeBuildError::UnknownCachePolicy,
+        )?;
+        for route in self.graph.routes() {
+            let route_resources = self
+                .graph
+                .route_resource_requirements(route.id())
+                .expect("sealed routes have resource requirements");
+            for action_id in route.action_ids() {
+                let policy = self
+                    .action_policies
+                    .get(action_id)
+                    .expect("action policy registry completeness was validated");
+                for requirement in policy.resource_requirements() {
+                    let declared = route_resources.get(requirement.id()).ok_or_else(|| {
+                        RuntimeBuildError::ActionResourceMismatch {
+                            route: route.id().to_owned(),
+                            action: action_id.clone(),
+                            resource: requirement.id().to_owned(),
+                        }
+                    })?;
+                    if requirement
+                        .capabilities()
+                        .iter()
+                        .any(|capability| !declared.contains(capability))
+                    {
+                        return Err(RuntimeBuildError::ActionResourceMismatch {
+                            route: route.id().to_owned(),
+                            action: action_id.clone(),
+                            resource: requirement.id().to_owned(),
+                        });
+                    }
+                }
+            }
+            for loader_id in self
+                .graph
+                .route_loader_ids(route.id())
+                .expect("sealed routes have loader identities")
+            {
+                let policy = self
+                    .loader_policies
+                    .get(&loader_id)
+                    .expect("loader policy registry completeness was validated");
+                for requirement in policy.resource_requirements() {
+                    let declared = route_resources.get(requirement.id()).ok_or_else(|| {
+                        RuntimeBuildError::LoaderResourceMismatch {
+                            route: route.id().to_owned(),
+                            loader: loader_id.clone(),
+                            resource: requirement.id().to_owned(),
+                        }
+                    })?;
+                    if requirement
+                        .capabilities()
+                        .iter()
+                        .any(|capability| !declared.contains(capability))
+                    {
+                        return Err(RuntimeBuildError::LoaderResourceMismatch {
+                            route: route.id().to_owned(),
+                            loader: loader_id,
+                            resource: requirement.id().to_owned(),
+                        });
+                    }
+                }
+            }
+        }
+        let contract_digest = runtime_contract_digest(
+            &self.graph,
+            &self.action_policies,
+            &self.loader_policies,
+            &self.cache_policies,
+        );
         let registry = Arc::new(RequestRegistry::new(self.limits.max_concurrent_requests));
         Ok(NativeRuntime {
             state: Arc::new(RuntimeState {
@@ -350,6 +647,11 @@ impl NativeRuntimeBuilder {
                 error_boundaries: self.error_boundaries,
                 receipt_sink: self.receipt_sink,
                 telemetry: self.telemetry,
+                resources: self.resources,
+                action_policies: Arc::new(self.action_policies),
+                loader_policies: Arc::new(self.loader_policies),
+                cache_policies: Arc::new(self.cache_policies),
+                contract_digest,
                 request_sequence: AtomicU64::new(0),
                 server_started: AtomicBool::new(false),
                 active_connections: AtomicUsize::new(0),
@@ -381,6 +683,39 @@ where
     Ok(())
 }
 
+fn runtime_contract_digest(
+    graph: &RouteGraph,
+    action_policies: &BTreeMap<String, ActionPolicy>,
+    loader_policies: &BTreeMap<String, LoaderPolicy>,
+    cache_policies: &BTreeMap<String, CachePolicy>,
+) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"pliego-runtime-contract-v1\0");
+    digest.update(graph.digest().as_bytes());
+    for (id, policy) in action_policies {
+        digest.update((id.len() as u64).to_be_bytes());
+        digest.update(id.as_bytes());
+        digest.update(policy.contract_digest().as_bytes());
+    }
+    for (id, policy) in loader_policies {
+        digest.update((id.len() as u64).to_be_bytes());
+        digest.update(id.as_bytes());
+        digest.update(policy.contract_digest().as_bytes());
+    }
+    for (id, policy) in cache_policies {
+        digest.update((id.len() as u64).to_be_bytes());
+        digest.update(id.as_bytes());
+        digest.update(policy.contract_digest().as_bytes());
+    }
+    let bytes = digest.finalize();
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(char::from_digit((byte >> 4) as u32, 16).expect("hex nibble is valid"));
+        output.push(char::from_digit((byte & 0x0f) as u32, 16).expect("hex nibble is valid"));
+    }
+    output
+}
+
 struct RuntimeState {
     graph: Arc<RouteGraph>,
     deployment_id: String,
@@ -392,6 +727,11 @@ struct RuntimeState {
     error_boundaries: BTreeMap<String, Arc<dyn RuntimeErrorBoundary>>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
     telemetry: Option<Arc<OpenTelemetryRuntime>>,
+    resources: ResourceRegistry,
+    action_policies: Arc<BTreeMap<String, ActionPolicy>>,
+    loader_policies: Arc<BTreeMap<String, LoaderPolicy>>,
+    cache_policies: Arc<BTreeMap<String, CachePolicy>>,
+    contract_digest: String,
     request_sequence: AtomicU64,
     server_started: AtomicBool,
     active_connections: AtomicUsize,
@@ -591,6 +931,126 @@ impl NativeRuntime {
     pub fn transport_policy_sha256(&self) -> String {
         self.state.transport_limits.digest()
     }
+
+    pub fn contract_sha256(&self) -> &str {
+        &self.state.contract_digest
+    }
+
+    pub fn contract_manifest(&self) -> RuntimeContractManifest {
+        RuntimeContractManifest {
+            contract: "dev.pliegors.runtime-contract/v1".to_owned(),
+            application_contract_sha256: self.state.contract_digest.clone(),
+            actions: self
+                .state
+                .action_policies
+                .values()
+                .map(action_contract_manifest)
+                .collect(),
+            loaders: self
+                .state
+                .loader_policies
+                .values()
+                .map(loader_contract_manifest)
+                .collect(),
+            caches: self
+                .state
+                .cache_policies
+                .values()
+                .map(cache_contract_manifest)
+                .collect(),
+        }
+    }
+}
+
+fn action_contract_manifest(policy: &ActionPolicy) -> ActionContractManifest {
+    ActionContractManifest {
+        id: policy.id().to_owned(),
+        semantic_revision: policy.semantic_revision(),
+        contract_sha256: policy.contract_digest(),
+        accepted_media_types: policy
+            .accepted_media_types()
+            .iter()
+            .map(|value| value.as_str().to_owned())
+            .collect(),
+        accepted_content_encodings: policy
+            .accepted_content_encodings()
+            .iter()
+            .map(|value| value.as_str().to_owned())
+            .collect(),
+        max_encoded_bytes: policy.max_encoded_bytes_value(),
+        max_decoded_bytes: policy.max_decoded_bytes_value(),
+        max_form_fields: policy.max_form_fields_value(),
+        max_output_bytes: policy.max_output_bytes_value(),
+        origin_policy: policy.origin_policy_value().as_str().to_owned(),
+        csrf_policy: policy.csrf_policy_value().as_str().to_owned(),
+        requires_authentication: policy.requires_authentication(),
+        requires_authorization: policy.requires_authorization(),
+        post_commit_grace_ms: policy.post_commit_grace_ms(),
+        idempotency_policy_id: policy.idempotency_policy_id().map(str::to_owned),
+        resources: contract_resources(policy.resource_requirements()),
+        invalidations: policy
+            .invalidation_intents()
+            .iter()
+            .map(|intent| ActionInvalidationManifest {
+                cache_policy_id: intent.cache_policy_id().to_owned(),
+                tags: intent
+                    .tags_value()
+                    .iter()
+                    .map(|tag| tag.as_str().to_owned())
+                    .collect(),
+                consistency: intent.consistency().as_str().to_owned(),
+            })
+            .collect(),
+    }
+}
+
+fn loader_contract_manifest(policy: &LoaderPolicy) -> LoaderContractManifest {
+    LoaderContractManifest {
+        id: policy.id().to_owned(),
+        semantic_revision: policy.semantic_revision(),
+        contract_sha256: policy.contract_digest(),
+        cache_policy_id: policy.cache_policy_id().map(str::to_owned),
+        max_output_bytes: policy.max_output_bytes_value(),
+        deduplicates_in_request: policy.deduplicates_in_request(),
+        resources: contract_resources(policy.resource_requirements()),
+    }
+}
+
+fn cache_contract_manifest(policy: &CachePolicy) -> CacheContractManifest {
+    CacheContractManifest {
+        id: policy.id().to_owned(),
+        semantic_revision: policy.semantic_revision(),
+        contract_sha256: policy.contract_digest(),
+        namespace: policy.namespace().to_owned(),
+        compatibility_epoch: policy.compatibility_epoch(),
+        domain: policy.domain().as_str().to_owned(),
+    }
+}
+
+fn contract_resources(
+    requirements: &[pliego_data::ResourceRequirement],
+) -> Vec<ContractResourceRequirement> {
+    let mut resources = requirements
+        .iter()
+        .map(|requirement| ContractResourceRequirement {
+            id: requirement.id().to_owned(),
+            capabilities: requirement
+                .capabilities()
+                .iter()
+                .map(str::to_owned)
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    resources.sort_by(|left, right| left.id.cmp(&right.id));
+    resources
+}
+
+fn display_contract_items(items: &[String]) -> String {
+    if items.is_empty() {
+        "none".to_owned()
+    } else {
+        items.join(", ")
+    }
 }
 
 struct ActiveConnection {
@@ -670,6 +1130,7 @@ async fn dispatch(
     .expect("deployment identity was validated by the builder");
     let scope = RequestScope::open(
         identity,
+        state.contract_digest.clone(),
         state.limits.clone(),
         state.receipt_sink.clone(),
         telemetry,
@@ -811,8 +1272,29 @@ async fn routed_response(
     }
     scope.set_route(&matched);
 
+    let data = match open_data_context(&state, &scope, &matched, &parts) {
+        Ok(data) => data,
+        Err(error) => {
+            let diagnostic = RuntimeDiagnostic::new(error.code(), bounded(&error.to_string(), 320))
+                .expect("data diagnostics are bounded");
+            let public = PublicError::new(
+                PublicErrorClass::InternalFailure,
+                StatusCode::INTERNAL_SERVER_ERROR,
+                error.code(),
+            );
+            return recover_error(&state, &scope, Some(&matched), public, diagnostic).await;
+        }
+    };
+
     let request = Request::from_parts(parts, body);
-    let context = RequestContext::new(scope.clone(), matched.clone());
+    let context = RequestContext::new(
+        scope.clone(),
+        matched.clone(),
+        data,
+        state.action_policies.clone(),
+        state.loader_policies.clone(),
+        state.cache_policies.clone(),
+    );
     if scope.transition(RequestState::HandlerRunning).is_err() {
         return lifecycle_failure_uncommitted(&scope);
     }
@@ -879,6 +1361,154 @@ async fn routed_response(
         }
     };
     response
+}
+
+fn open_data_context(
+    state: &RuntimeState,
+    scope: &RequestScope,
+    matched: &RouteMatch,
+    request: &http::request::Parts,
+) -> Result<DataContext, pliego_data::DataError> {
+    let mut grants = Vec::with_capacity(matched.resource_requirements().len());
+    for (resource_id, capabilities) in matched.resource_requirements() {
+        let mut grant = ResourceGrant::new(resource_id.clone())?;
+        for capability in capabilities {
+            grant = grant.allowing(capability.clone())?;
+        }
+        grants.push(grant);
+    }
+    let identity = DataIdentity::new(
+        scope.identity().request_id.clone(),
+        matched.route_id().to_owned(),
+        scope.identity().deployment_id.clone(),
+    )
+    .map_err(|error| pliego_data::DataError::LoaderFailure(error.to_string()))?;
+    let values = admitted_data_values(matched, request)?;
+    let mut policy_grants = DataPolicyGrants::new();
+    for id in matched.loader_ids() {
+        let policy = state
+            .loader_policies
+            .get(id)
+            .expect("loader registry was sealed with the route graph");
+        policy_grants = policy_grants.loader(policy)?;
+        if let Some(cache_id) = policy.cache_policy_id() {
+            policy_grants = policy_grants.cache(
+                state
+                    .cache_policies
+                    .get(cache_id)
+                    .expect("loader cache policy registry was sealed"),
+            )?;
+        }
+    }
+    for id in matched.action_ids() {
+        let policy = state
+            .action_policies
+            .get(id)
+            .expect("action registry was sealed with the route graph");
+        policy_grants = policy_grants.action(policy)?;
+        for intent in policy.invalidation_intents() {
+            policy_grants = policy_grants.cache(
+                state
+                    .cache_policies
+                    .get(intent.cache_policy_id())
+                    .expect("action invalidation cache policy registry was sealed"),
+            )?;
+        }
+    }
+    if let Some(id) = matched.cache_policy_id() {
+        policy_grants = policy_grants.cache(
+            state
+                .cache_policies
+                .get(id)
+                .expect("route cache policy registry was sealed"),
+        )?;
+    }
+    let (context, control) = DataContext::open_sealed(
+        identity,
+        scope.deadline(),
+        state.resources.clone(),
+        grants,
+        values,
+        policy_grants,
+        DataContextOptions {
+            max_receipts: state.limits.max_data_receipts,
+            max_cleanups: state.limits.max_data_cleanups,
+        },
+    )?;
+    scope.attach_data_context(context.clone());
+
+    let cleanup_control = control.clone();
+    scope
+        .register_internal_cleanup(move || cleanup_control.close())
+        .map_err(|error| pliego_data::DataError::LoaderFailure(error.to_string()))?;
+
+    let cancellation = scope.cancellation_token();
+    let completion = scope.completion_token();
+    let cancellation_scope = scope.clone();
+    tokio::spawn(async move {
+        tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => {
+                control.cancel(data_cancel_reason(
+                    cancellation_scope.cancel_reason().as_ref()
+                ));
+            }
+            _ = completion.cancelled() => {}
+        }
+    });
+    Ok(context)
+}
+
+fn admitted_data_values(
+    matched: &RouteMatch,
+    request: &http::request::Parts,
+) -> Result<DataRequestValues, pliego_data::DataError> {
+    let mut query = BTreeMap::<String, Vec<String>>::new();
+    if let Some(authored) = request.uri.query() {
+        validate_query_percent_encoding(authored)?;
+        let pairs =
+            serde_urlencoded::from_str::<Vec<(String, String)>>(authored).map_err(|_| {
+                pliego_data::DataError::RequestValues("query decoding failed".to_owned())
+            })?;
+        for (name, value) in pairs {
+            query.entry(name).or_default().push(value);
+        }
+    }
+    let metadata = BTreeMap::from([("method".to_owned(), request.method.as_str().to_owned())]);
+    DataRequestValues::new(matched.parameters().clone(), query, metadata)
+}
+
+fn validate_query_percent_encoding(value: &str) -> Result<(), pliego_data::DataError> {
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len()
+                || !bytes[index + 1].is_ascii_hexdigit()
+                || !bytes[index + 2].is_ascii_hexdigit()
+            {
+                return Err(pliego_data::DataError::RequestValues(
+                    "query contains invalid percent encoding".to_owned(),
+                ));
+            }
+            index += 3;
+        } else {
+            index += 1;
+        }
+    }
+    Ok(())
+}
+
+fn data_cancel_reason(reason: Option<&CancelReason>) -> DataCancelReason {
+    match reason {
+        Some(CancelReason::ClientDisconnect) => DataCancelReason::ClientDisconnect,
+        Some(CancelReason::Deadline) => DataCancelReason::Deadline,
+        Some(CancelReason::Shutdown) => DataCancelReason::Shutdown,
+        Some(CancelReason::ApplicationAbort) => DataCancelReason::ApplicationAbort,
+        Some(CancelReason::RequestBodyLimit) => DataCancelReason::RequestBodyLimit,
+        Some(CancelReason::ResponseBodyLimit) => DataCancelReason::ResponseBodyLimit,
+        None => DataCancelReason::ScopeClosed,
+    }
 }
 
 #[derive(Clone)]
@@ -1822,6 +2452,25 @@ pub enum RuntimeBuildError {
     MissingErrorBoundary(String),
     UnknownErrorBoundary(String),
     DuplicateErrorBoundaryRegistration(String),
+    MissingActionPolicy(String),
+    UnknownActionPolicy(String),
+    DuplicateActionPolicy(String),
+    ActionResourceMismatch {
+        route: String,
+        action: String,
+        resource: String,
+    },
+    MissingLoaderPolicy(String),
+    UnknownLoaderPolicy(String),
+    DuplicateLoaderPolicy(String),
+    LoaderResourceMismatch {
+        route: String,
+        loader: String,
+        resource: String,
+    },
+    MissingCachePolicy(String),
+    UnknownCachePolicy(String),
+    DuplicateCachePolicy(String),
 }
 
 impl Display for RuntimeBuildError {
@@ -1888,6 +2537,67 @@ impl Display for RuntimeBuildError {
                 write!(
                     formatter,
                     "error boundary ID {id} was registered more than once"
+                )
+            }
+            Self::MissingActionPolicy(id) => {
+                write!(
+                    formatter,
+                    "route graph references missing action policy {id}"
+                )
+            }
+            Self::UnknownActionPolicy(id) => {
+                write!(formatter, "action policy registry contains unknown ID {id}")
+            }
+            Self::DuplicateActionPolicy(id) => {
+                write!(
+                    formatter,
+                    "action policy ID {id} was registered more than once"
+                )
+            }
+            Self::ActionResourceMismatch {
+                route,
+                action,
+                resource,
+            } => write!(
+                formatter,
+                "route {route} does not seal resource {resource} required by action {action}"
+            ),
+            Self::MissingLoaderPolicy(id) => {
+                write!(
+                    formatter,
+                    "route graph references missing loader policy {id}"
+                )
+            }
+            Self::UnknownLoaderPolicy(id) => {
+                write!(formatter, "loader policy registry contains unknown ID {id}")
+            }
+            Self::DuplicateLoaderPolicy(id) => {
+                write!(
+                    formatter,
+                    "loader policy ID {id} was registered more than once"
+                )
+            }
+            Self::LoaderResourceMismatch {
+                route,
+                loader,
+                resource,
+            } => write!(
+                formatter,
+                "route {route} does not seal resource {resource} required by loader {loader}"
+            ),
+            Self::MissingCachePolicy(id) => {
+                write!(
+                    formatter,
+                    "route graph references missing cache policy {id}"
+                )
+            }
+            Self::UnknownCachePolicy(id) => {
+                write!(formatter, "cache policy registry contains unknown ID {id}")
+            }
+            Self::DuplicateCachePolicy(id) => {
+                write!(
+                    formatter,
+                    "cache policy ID {id} was registered more than once"
                 )
             }
         }

@@ -62,6 +62,7 @@ the official site.
 | R0-R7 framework hardening | Complete; preserved as regression gates | [Hardening roadmap](docs/28-hardening-roadmap.md) |
 | P8 trust and adoption | Complete for `v0.0.2` | [P8 contract](docs/35-p8-trust-and-adoption-contract.md) and [signed release evidence](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) |
 | G1 native runtime and dynamic rendering | Public component preview; G1 complete | [Component release](https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1), [runtime contract](docs/49-native-runtime-preview.md), and [transport/load/security evidence](docs/evidence/g1-transport-load-security.md) |
+| G2 data, actions, sessions, and cache | Complete on `main`; unreleased source beta | [G2 evidence](docs/evidence/g2-fullstack-beta.md), [umbrella RFC](docs/rfc/RFC-010-data-actions-cache.md), and [ASVS ownership map](security/asvs-v5.0.0-g2.json) |
 | OpenSDK `0.1.0-preview.1` | Public preview crate; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
 | Hyphae integration | Optional verified protocol boundary | [Verified sync guide](docs/29-hyphae-verified-sync-guide.md); no production gateway claim |
 | PliegoCSS `0.1.0-rc.2` | Optional experimental build-time companion | [Integration evidence](docs/evidence/pliegocss-optional-integration.md); never a runtime or starter requirement |
@@ -104,6 +105,11 @@ the official site.
   route-owned complete and streamed layouts, structured completion events,
   operator-enabled OpenTelemetry, real-socket adversarial cases, and fixed-load
   Linux RSS evidence.
+- an unreleased G2 source beta with capability-scoped resources and loaders,
+  progressive actions, truthful commit/cancellation state, idempotency, secure
+  server-side sessions, bounded uploads, SSRF policy, explicit public/private
+  runtime cache, causal invalidation, application contract manifests, and
+  receipt-driven CLI diagnostics.
 
 ## Direction
 
@@ -134,12 +140,21 @@ not select exporters, storage, retention, or inbound trace trust.
 OpenSDK continues as the provider-neutral extension boundary required by that
 runtime; public preview publication is not permission to call either API stable.
 
+G2 is complete on `main` as an unreleased source beta. Its two-runtime
+reference application proves progressive authenticated mutation, session
+rotation and revocation, idempotent replay, typed failures, cache isolation,
+read-your-writes invalidation, and redacted diagnostics. The included stores
+and invalidation coordinator are development/conformance adapters; production
+durability and cross-process delivery remain provider work, and G3 portability
+is still open.
+
 ## Packages
 
-All eighteen workspace crates are public. The fifteen packages below remain on
-the `0.0.2` CLI release line. The G1 router/runtime and `pliego-sdk` use the
-separate `0.1.0-preview.1` component line, so applications must pin exact
-versions and must not infer CLI integration.
+Eighteen of nineteen workspace crates are public. The fifteen packages below
+remain on the `0.0.2` CLI release line. The G1 router/runtime and `pliego-sdk`
+use the separate `0.1.0-preview.1` component line. The new `pliego-data` crate
+exists only on `main`, so applications must not infer registry or CLI
+availability from source-beta evidence.
 
 | Package | Responsibility |
 | --- | --- |
@@ -164,6 +179,7 @@ versions and must not infer CLI integration.
 | [`pliego-router`](https://crates.io/crates/pliego-router/0.1.0-preview.1) | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | Public `0.1.0-preview.1` |
 | [`pliego-runtime`](https://crates.io/crates/pliego-runtime/0.1.0-preview.1) | Bounded HTTP/1.1 and HTTP/2 lifecycle, route-owned complete/streamed layouts, structured events, operator-enabled OTel, and three SSR modes | Public `0.1.0-preview.1` |
 | [`pliego-sdk`](https://crates.io/crates/pliego-sdk/0.1.0-preview.1) | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | Public `0.1.0-preview.1` |
+| `pliego-data` | Provider-neutral resources, loaders, actions, sessions, idempotency, secrets, outbound HTTP policy, cache, and invalidation | Unreleased G2 source beta |
 
 ## Install
 
@@ -234,6 +250,24 @@ The Rust Wasm Component toolchain is the reference sandboxed implementation.
 The TypeScript and Python process bridges are conformance implementations, not
 sandboxed Component Model SDKs. Browser fixtures prove the explicit adapter
 lifecycle for React, Svelte, and Lit without replacing those ecosystems.
+
+## Evaluate the G2 source beta
+
+G2 is evaluated from one exact source revision until its component publication
+gate opens:
+
+```sh
+git clone https://github.com/celiumsai/pliegors.git
+cd pliegors
+cargo test -p pliego-data
+cargo test -p fullstack-pliego --test two_replicas
+cargo run -p fullstack-pliego
+```
+
+The reference server binds loopback by default. Its in-memory resources are
+conformance fixtures rather than production identity, storage, or cache
+services. Read the [G2 evidence](docs/evidence/g2-fullstack-beta.md) before
+adopting the source API.
 
 ## Release trust
 
@@ -322,6 +356,7 @@ using the native Windows CLI for normal project development.
 - [Compatibility and deprecation policy](docs/46-opensdk-compatibility-and-deprecation.md)
 - [Canonical product capability manifest](docs/47-product-capability-manifest.md)
 - [Full-stack runtime threat model](docs/48-fullstack-threat-model.md)
+- [G2 full-stack beta evidence](docs/evidence/g2-fullstack-beta.md)
 - [Optional PliegoCSS companion evidence](docs/evidence/pliegocss-optional-integration.md)
 - [OpenSDK planes and capability RFC](docs/rfc/RFC-006-opensdk-planes-and-capabilities.md)
 - [Portable build output RFC](docs/rfc/RFC-007-pliego-build-output-contract.md)

@@ -2,8 +2,13 @@
 
 use crate::telemetry::OpenTelemetryRequest;
 use crate::{RenderMode, RequestLimits};
+use pliego_data::{
+    ActionPolicy, CachePolicy, CacheReceipt, DataContext, DataReceipt, InvalidationEvent,
+    LoaderPolicy,
+};
 use pliego_router::RouteMatch;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -137,6 +142,10 @@ fn validate_identity(field: &'static str, value: &str) -> Result<(), ScopeError>
 pub struct RequestContext {
     scope: RequestScope,
     route: RouteMatch,
+    data: DataContext,
+    action_policies: Arc<BTreeMap<String, ActionPolicy>>,
+    loader_policies: Arc<BTreeMap<String, LoaderPolicy>>,
+    cache_policies: Arc<BTreeMap<String, CachePolicy>>,
 }
 
 #[derive(Clone)]
@@ -155,8 +164,22 @@ impl PreRouteContext {
 }
 
 impl RequestContext {
-    pub(crate) fn new(scope: RequestScope, route: RouteMatch) -> Self {
-        Self { scope, route }
+    pub(crate) fn new(
+        scope: RequestScope,
+        route: RouteMatch,
+        data: DataContext,
+        action_policies: Arc<BTreeMap<String, ActionPolicy>>,
+        loader_policies: Arc<BTreeMap<String, LoaderPolicy>>,
+        cache_policies: Arc<BTreeMap<String, CachePolicy>>,
+    ) -> Self {
+        Self {
+            scope,
+            route,
+            data,
+            action_policies,
+            loader_policies,
+            cache_policies,
+        }
     }
 
     pub fn scope(&self) -> &RequestScope {
@@ -165,6 +188,38 @@ impl RequestContext {
 
     pub fn route(&self) -> &RouteMatch {
         &self.route
+    }
+
+    pub fn data(&self) -> &DataContext {
+        &self.data
+    }
+
+    pub fn action_policy(&self, id: &str) -> Option<&ActionPolicy> {
+        if self.route.action_ids().iter().any(|current| current == id) {
+            self.action_policies.get(id)
+        } else {
+            None
+        }
+    }
+
+    pub fn loader_policy(&self, id: &str) -> Option<&LoaderPolicy> {
+        if self.route.loader_ids().iter().any(|current| current == id) {
+            self.loader_policies.get(id)
+        } else {
+            None
+        }
+    }
+
+    pub fn cache_policy(&self, id: &str) -> Option<&CachePolicy> {
+        self.cache_policies.get(id).filter(|_| {
+            self.route.cache_policy_id() == Some(id)
+                || self
+                    .route
+                    .loader_ids()
+                    .iter()
+                    .filter_map(|loader| self.loader_policies.get(loader))
+                    .any(|loader| loader.cache_policy_id() == Some(id))
+        })
     }
 
     pub fn parameter(&self, name: &str) -> Option<&str> {
@@ -206,6 +261,7 @@ impl RuntimeReceiptSink for InMemoryReceiptSink {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeReceipt {
     pub contract: String,
+    pub application_contract_sha256: String,
     pub request_id: String,
     pub deployment_id: String,
     pub route_id: Option<String>,
@@ -222,10 +278,95 @@ pub struct RuntimeReceipt {
     pub middleware: Vec<String>,
     pub error_boundary: Option<String>,
     pub diagnostics: Vec<RuntimeDiagnostic>,
+    pub data_receipts: Vec<DataReceipt>,
+    pub cache_receipts: Vec<CacheReceipt>,
+    pub invalidation_events: Vec<InvalidationEvent>,
+}
+
+impl RuntimeReceipt {
+    pub fn explain(&self) -> String {
+        let diagnostics = self
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .collect::<Vec<_>>();
+        let data = self
+            .data_receipts
+            .iter()
+            .map(|receipt| {
+                format!(
+                    "{:?}:{}@{}={:?}{}",
+                    receipt.operation,
+                    receipt.operation_id,
+                    receipt.semantic_revision,
+                    receipt.outcome,
+                    if receipt.deduplicated {
+                        " (deduplicated)"
+                    } else {
+                        ""
+                    }
+                )
+            })
+            .collect::<Vec<_>>();
+        let cache = self
+            .cache_receipts
+            .iter()
+            .map(|receipt| {
+                format!(
+                    "{}:{:?}:{}",
+                    receipt.policy_id, receipt.outcome, receipt.key_digest
+                )
+            })
+            .collect::<Vec<_>>();
+        let invalidations = self
+            .invalidation_events
+            .iter()
+            .map(|event| {
+                format!(
+                    "{}#{}({}/{})",
+                    event.policy_id,
+                    event.sequence,
+                    event.acknowledged_replicas,
+                    event.expected_acknowledgements
+                )
+            })
+            .collect::<Vec<_>>();
+        format!(
+            "PLIEGO why request {}\napplication contract: {}\ndeployment: {}\nroute: {}\noutcome: {:?}\nstate: {:?}\nstatus: {}\nresponse bytes: {}\nduration: {:?}\ndata: {}\ncache: {}\ninvalidations: {}\ndiagnostics: {}",
+            self.request_id,
+            self.application_contract_sha256,
+            self.deployment_id,
+            self.route_id.as_deref().unwrap_or("unresolved"),
+            self.outcome,
+            self.final_state,
+            self.response_status
+                .map(|status| status.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            self.response_bytes,
+            self.duration_bucket,
+            display_receipt_items(&data),
+            display_receipt_items(&cache),
+            display_receipt_items(&invalidations),
+            display_receipt_items(&diagnostics),
+        )
+    }
+}
+
+fn display_receipt_items(items: &[impl AsRef<str>]) -> String {
+    if items.is_empty() {
+        "none".to_owned()
+    } else {
+        items
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
 }
 
 struct ScopeInner {
     identity: RequestIdentity,
+    application_contract_sha256: String,
     limit_policy_sha256: String,
     limits: RequestLimits,
     started: Instant,
@@ -241,6 +382,7 @@ struct ScopeInner {
     cleanups: Mutex<Vec<Cleanup>>,
     internal_cleanups: Mutex<Vec<InternalCleanup>>,
     diagnostics: Mutex<Vec<RuntimeDiagnostic>>,
+    data_context: Mutex<Option<DataContext>>,
     response_status: Mutex<Option<u16>>,
     render_mode: Mutex<Option<RenderMode>>,
     middleware: Mutex<Vec<String>>,
@@ -259,6 +401,7 @@ pub struct RequestScope {
 impl RequestScope {
     pub(crate) fn open(
         identity: RequestIdentity,
+        application_contract_sha256: String,
         limits: RequestLimits,
         sink: Arc<dyn RuntimeReceiptSink>,
         telemetry: Option<Arc<OpenTelemetryRequest>>,
@@ -268,6 +411,7 @@ impl RequestScope {
         let scope = Self {
             inner: Arc::new(ScopeInner {
                 identity,
+                application_contract_sha256,
                 limit_policy_sha256: limits.digest(),
                 limits,
                 started,
@@ -283,6 +427,7 @@ impl RequestScope {
                 cleanups: Mutex::new(Vec::new()),
                 internal_cleanups: Mutex::new(Vec::new()),
                 diagnostics: Mutex::new(Vec::new()),
+                data_context: Mutex::new(None),
                 response_status: Mutex::new(None),
                 render_mode: Mutex::new(None),
                 middleware: Mutex::new(Vec::new()),
@@ -328,6 +473,14 @@ impl RequestScope {
 
     pub fn cancellation_token(&self) -> CancellationToken {
         self.inner.cancellation.clone()
+    }
+
+    pub(crate) fn completion_token(&self) -> CancellationToken {
+        self.inner.completion.clone()
+    }
+
+    pub(crate) fn attach_data_context(&self, context: DataContext) {
+        *lock(&self.inner.data_context) = Some(context);
     }
 
     pub fn is_cancelled(&self) -> bool {
@@ -526,8 +679,22 @@ impl RequestScope {
     }
 
     pub fn receipt(&self) -> RuntimeReceipt {
+        let (data_receipts, cache_receipts, invalidation_events) = {
+            let data_context = lock(&self.inner.data_context);
+            data_context
+                .as_ref()
+                .map(|context| {
+                    (
+                        context.receipts(),
+                        context.cache_receipts(),
+                        context.invalidation_events(),
+                    )
+                })
+                .unwrap_or_default()
+        };
         RuntimeReceipt {
             contract: "dev.pliegors.runtime-receipt/v1".to_owned(),
+            application_contract_sha256: self.inner.application_contract_sha256.clone(),
             request_id: self.inner.identity.request_id.clone(),
             deployment_id: self.inner.identity.deployment_id.clone(),
             route_id: lock(&self.inner.route_id).clone(),
@@ -544,6 +711,9 @@ impl RequestScope {
             middleware: lock(&self.inner.middleware).clone(),
             error_boundary: lock(&self.inner.error_boundary).clone(),
             diagnostics: self.diagnostics(),
+            data_receipts,
+            cache_receipts,
+            invalidation_events,
         }
     }
 
@@ -780,6 +950,7 @@ mod tests {
     fn scope(limits: RequestLimits, sink: Arc<dyn RuntimeReceiptSink>) -> RequestScope {
         RequestScope::open(
             RequestIdentity::new("request-1", "deployment-1").unwrap(),
+            "application-contract".to_owned(),
             limits,
             sink,
             None,
@@ -905,6 +1076,7 @@ mod tests {
     fn structured_log_projection_excludes_identity_and_diagnostic_messages() {
         let receipt = RuntimeReceipt {
             contract: "dev.pliegors.runtime-receipt/v1".to_owned(),
+            application_contract_sha256: "application-contract".to_owned(),
             request_id: "secret-request".to_owned(),
             deployment_id: "secret-deployment".to_owned(),
             route_id: Some("account".to_owned()),
@@ -923,6 +1095,9 @@ mod tests {
             diagnostics: vec![
                 RuntimeDiagnostic::new("PLG-RUN-500", "secret diagnostic message").unwrap(),
             ],
+            data_receipts: Vec::new(),
+            cache_receipts: Vec::new(),
+            invalidation_events: Vec::new(),
         };
         let fields = completion_log_fields(&receipt);
         assert_eq!(fields.route_id, "account");

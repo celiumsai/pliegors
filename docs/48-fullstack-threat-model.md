@@ -341,6 +341,11 @@ feature is called preview.
 - two-instance public/private cache isolation and invalidation tests; and
 - cross-user and cross-tenant leakage attempts.
 
+The closed source-beta evidence and exact control ownership are recorded in
+[the G2 evidence](evidence/g2-fullstack-beta.md) and
+[`security/asvs-v5.0.0-g2.json`](../security/asvs-v5.0.0-g2.json). This map is
+not an application compliance or certification claim.
+
 ### G3
 
 - exact PBOC validation before upload;

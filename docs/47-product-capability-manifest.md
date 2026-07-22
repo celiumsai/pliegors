@@ -67,6 +67,17 @@ runtime is wired into the CLI for those targets. G1 native runtime crates are a
 separate public preview; the Cloudflare application runtime remains
 `not-released` until G3 closes.
 
+G2 data, action, session, upload, outbound HTTP, and runtime-cache contracts are
+`source-preview` on `main`. `pliego-data` is listed in `unreleasedCrates`, and
+the current `v0.0.2` plus component prerelease do not contain that source beta.
+The crate-publication gate propagates this boundary: the modified runtime and
+CLI are deferred until the G2 dependency chain receives coordinated new
+versions, even when older packages with the same pre-G2 versions exist in the
+registry.
+The in-memory stores and two-replica coordinator are conformance adapters, not
+production distributed-service evidence. See
+[`evidence/g2-fullstack-beta.md`](evidence/g2-fullstack-beta.md).
+
 ## Evidence rules
 
 Every surface names at least one repository document. Evidence is interpreted

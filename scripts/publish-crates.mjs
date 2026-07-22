@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -22,6 +22,15 @@ const layers = [
 const ordered = layers.flat();
 const metadata = JSON.parse(run('cargo', ['metadata', '--no-deps', '--format-version', '1']));
 const packages = new Map(metadata.packages.map((pkg) => [pkg.name, pkg]));
+const product = JSON.parse(readFileSync(path.join(root, 'product.capabilities.json'), 'utf8'));
+const unreleased = new Set(product.framework.unreleasedCrates);
+for (const name of unreleased) {
+  const pkg = packages.get(name);
+  assert.ok(
+    pkg?.manifest_path.replaceAll('\\', '/').includes('/crates/'),
+    `unknown unreleased crate: ${name}`,
+  );
+}
 const targetDirectory = metadata.target_directory;
 const version = packages.get('pliego-cli')?.version;
 assert.match(version ?? '', /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u, 'invalid workspace version');
@@ -29,6 +38,7 @@ assert.deepEqual(
   ordered.toSorted(),
   [...packages.values()]
     .filter((pkg) => pkg.manifest_path.replaceAll('\\', '/').includes('/crates/'))
+    .filter((pkg) => !unreleased.has(pkg.name))
     .map((pkg) => pkg.name)
     .toSorted(),
   'publication order must cover every framework crate exactly once',
@@ -53,11 +63,19 @@ if (mode === '--check') {
   let checked = 0;
   let deferred = 0;
   const registryAvailability = new Map();
+  const sourcePreviewChain = new Set(unreleased);
   for (const name of ordered) {
     const pkg = packages.get(name);
     const internalDependencies = pkg.dependencies
       .filter((item) => item.name.startsWith('pliego-'))
       .map((item) => item.name);
+    const previewDependencies = internalDependencies.filter((dependency) => sourcePreviewChain.has(dependency));
+    if (previewDependencies.length > 0) {
+      sourcePreviewChain.add(name);
+      deferred += 1;
+      console.log(`defer ${name}: source-preview dependency chain: ${previewDependencies.join(', ')}`);
+      continue;
+    }
     const unavailableDependencies = [];
     for (const dependency of internalDependencies) {
       const dependencyVersion = packages.get(dependency).version;
@@ -88,6 +106,12 @@ if (mode === '--check') {
   );
   process.exit(0);
 }
+
+assert.equal(
+  unreleased.size,
+  0,
+  `publication is blocked until source-preview crates are promoted: ${[...unreleased].sort().join(', ')}`,
+);
 
 function assertPackagedOpenSdkWit() {
   const packagedWit = run('cargo', ['package', '--list', '--allow-dirty', '-p', 'pliego-sdk'])

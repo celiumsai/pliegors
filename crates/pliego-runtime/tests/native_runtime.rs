@@ -7,11 +7,14 @@ use pliego_router::{
     MiddlewareCapabilities, MiddlewareCapability, RouteGraphBuilder, RouteMethod, RouteScopeKind,
     RouteScopeSpec, RouteSpec,
 };
-use pliego_runtime::{Body, InMemoryReceiptSink, NativeRuntimeBuilder, RequestLimits};
 use pliego_runtime::{
-    CompleteRenderOptions, DocumentHead, LayoutDocument, LayoutLayer, RenderMode,
+    ActionNavigation, ActionPolicy, ActionRequestSecurity, ActionResponse, CompleteRenderOptions,
+    DataError, DocumentHead, LayoutDocument, LayoutLayer, RenderMode,
+    action_failure_to_handler_error, decode_action_request, progressive_action_response,
     render_layout_document,
 };
+use pliego_runtime::{Body, InMemoryReceiptSink, NativeRuntimeBuilder, RequestLimits};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::Notify;
@@ -75,6 +78,137 @@ async fn dispatches_real_axum_request_and_records_receipt() {
     assert_eq!(receipts[0].route_id.as_deref(), Some("hello"));
     assert_eq!(receipts[0].response_status, Some(200));
     assert_eq!(receipts[0].response_bytes, 12);
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct RenameInput {
+    name: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct RenameOutput {
+    normalized: String,
+}
+
+#[tokio::test]
+async fn progressive_form_action_runs_through_the_sealed_route_and_data_receipt() {
+    let graph = RouteGraphBuilder::new()
+        .route(
+            route("rename", RouteMethod::post(), "/account/rename")
+                .action("rename-account")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let policy = Arc::new(
+        ActionPolicy::new(
+            "rename-account",
+            1,
+            "rename-input",
+            "rename-errors",
+            "rename-output",
+        )
+        .unwrap(),
+    );
+    let security = Arc::new(
+        ActionRequestSecurity::new("https://example.com")
+            .unwrap()
+            .authenticated(true)
+            .authorized(true)
+            .csrf_verified(true),
+    );
+    let action = Arc::new(
+        |context: pliego_runtime::ActionContext, input: RenameInput| async move {
+            if input.name.trim().is_empty() {
+                return Ok::<_, DataError>(ActionResponse::<
+                    RenameOutput,
+                    std::collections::BTreeMap<String, String>,
+                >::Invalid {
+                    field_errors: std::collections::BTreeMap::from([(
+                        "name".to_owned(),
+                        "name is required".to_owned(),
+                    )]),
+                });
+            }
+            context.commit().begin_commit()?;
+            context.commit().committed()?;
+            Ok(ActionResponse::Success {
+                output: RenameOutput {
+                    normalized: input.name.trim().to_owned(),
+                },
+                navigation: ActionNavigation::SeeOther("/account".to_owned()),
+            })
+        },
+    );
+    let runtime = NativeRuntimeBuilder::new(graph, "action-deployment")
+        .unwrap()
+        .action_policy((*policy).clone())
+        .handler("rename", {
+            let policy = policy.clone();
+            let security = security.clone();
+            let action = action.clone();
+            move |context: pliego_runtime::RequestContext, request| {
+                let policy = policy.clone();
+                let security = security.clone();
+                let action = action.clone();
+                async move {
+                    let (input, admission) =
+                        decode_action_request::<RenameInput>(&context, &policy, request, &security)
+                            .await?;
+                    let response = context
+                        .data()
+                        .act(&policy, &admission, &*action, input)
+                        .await
+                        .map_err(action_failure_to_handler_error)?;
+                    progressive_action_response(&response)
+                }
+            }
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/account/rename")
+                .header("origin", "https://example.com")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("name=PliegoRS"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(response.headers().get("location").unwrap(), "/account");
+    to_bytes(response.into_body(), 1024).await.unwrap();
+    let receipts = sink.receipts();
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].data_receipts.len(), 1);
+    assert_eq!(receipts[0].data_receipts[0].operation_id, "rename-account");
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/account/rename")
+                .header("origin", "https://attacker.example")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("name=Stolen"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        to_bytes(response.into_body(), 1024).await.unwrap(),
+        "PLG-ACT-101\n"
+    );
 }
 
 #[tokio::test]
