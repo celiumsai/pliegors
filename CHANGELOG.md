@@ -15,6 +15,12 @@ This coordinated beta publishes all nineteen framework crates at one exact
 version and unifies the CLI, G1 native runtime, G2 data contracts, and OpenSDK
 preview. G3 portability and PBOC remain explicitly unreleased.
 
+### Fixed
+
+- Stream source-archive listings through a bounded, UTF-8-strict validator so
+  golden-path verification preserves every entry beyond 32 KiB while rejecting
+  traversal, non-canonical paths, excessive entries, and oversized listings.
+
 ### Added
 
 - Add a bounded native HTTP/1.1 and HTTP/2 accept loop with explicit

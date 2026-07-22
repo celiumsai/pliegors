@@ -171,6 +171,7 @@ async function main() {
     ['scripts/install.sh', 'install.sh'],
     ['scripts/run-golden-path.mjs', 'run-golden-path.mjs'],
     ['scripts/release-bundle-lib.mjs', 'release-bundle-lib.mjs'],
+    ['scripts/source-archive-listing.mjs', 'source-archive-listing.mjs'],
     ['scripts/verify-release-bundle.mjs', 'verify-release-bundle.mjs'],
   ];
   for (const [relative, name] of sourceFiles) {
@@ -195,6 +196,7 @@ async function main() {
       'install.sh',
       'run-golden-path.mjs',
       'release-bundle-lib.mjs',
+      'source-archive-listing.mjs',
       'REPRODUCIBILITY.json',
       SOURCE_ARCHIVE_NAME,
       'verify-release-bundle.mjs',

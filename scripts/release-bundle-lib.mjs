@@ -40,6 +40,7 @@ export function primaryAssetNames() {
     'install.sh',
     'run-golden-path.mjs',
     'release-bundle-lib.mjs',
+    'source-archive-listing.mjs',
     'REPRODUCIBILITY.json',
     SOURCE_ARCHIVE_NAME,
     'verify-release-bundle.mjs',
@@ -65,6 +66,7 @@ export function assetRole(name) {
   if (name === 'REPRODUCIBILITY.json') return 'reproducibility-evidence';
   if (name === 'verify-release-bundle.mjs') return 'bundle-verifier';
   if (name === 'release-bundle-lib.mjs') return 'bundle-verifier-library';
+  if (name === 'source-archive-listing.mjs') return 'source-archive-validator';
   throw new Error(`unknown release asset role: ${name}`);
 }
 

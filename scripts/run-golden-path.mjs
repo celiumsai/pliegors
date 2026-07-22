@@ -9,6 +9,7 @@ import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { createSourceArchiveListingParser } from './source-archive-listing.mjs';
 
 const KEY_FINGERPRINT = 'sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250';
 const SOURCE_ARCHIVE = 'pliegors-source.tar.gz';
@@ -57,16 +58,7 @@ try {
   if (dependencySource === 'candidate-source') {
     await step('extract-signed-source', async () => {
       const archive = path.join(release, SOURCE_ARCHIVE);
-      const listing = await run('tar', ['-tzf', archive], work);
-      const entries = listing.stdout.split(/\r?\n/u).filter(Boolean);
-      if (entries.length === 0 || entries.length > 10_000) throw new Error('source archive entry count is invalid');
-      for (const entry of entries) {
-        if (!entry.startsWith('pliegors-source/')
-          || entry.includes('\\')
-          || entry.split('/').includes('..')) {
-          throw new Error(`unsafe source archive entry: ${entry}`);
-        }
-      }
+      await validateSourceArchiveListing(archive, work);
       await mkdir(sourceParent, { recursive: true });
       await run('tar', ['-xzf', archive, '-C', sourceParent], work);
       await access(path.join(sourceRoot, 'Cargo.toml'));
@@ -362,6 +354,53 @@ function run(command, args, cwd) {
       settled = true;
       if (code === 0) resolve({ stdout, stderr });
       else reject(new Error(`${command} ${args.join(' ')} failed (${signal ?? code})\n${stdout}\n${stderr}`));
+    });
+  });
+}
+
+function validateSourceArchiveListing(archive, cwd) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('tar', ['-tzf', archive], {
+      cwd: spawnWorkingDirectory(cwd),
+      env: cleanEnvironment(),
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const parser = createSourceArchiveListingParser();
+    let stderr = '';
+    let parserError = null;
+    let settled = false;
+    child.stdout.on('data', (chunk) => {
+      if (parserError) return;
+      try {
+        parser.write(chunk);
+      } catch (error) {
+        parserError = error;
+        if (child.exitCode === null) child.kill();
+      }
+    });
+    child.stderr.on('data', (chunk) => { stderr = bounded(`${stderr}${chunk}`); });
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      if (child.exitCode === null) child.kill();
+      reject(parserError ?? error);
+    };
+    child.stdout.once('error', fail);
+    child.stderr.once('error', fail);
+    child.once('error', fail);
+    child.once('exit', (code, signal) => {
+      if (settled) return;
+      settled = true;
+      if (parserError) reject(parserError);
+      else if (code !== 0) reject(new Error(`tar -tzf failed (${signal ?? code})\n${stderr}`));
+      else {
+        try {
+          resolve(parser.finish());
+        } catch (error) {
+          reject(error);
+        }
+      }
     });
   });
 }
