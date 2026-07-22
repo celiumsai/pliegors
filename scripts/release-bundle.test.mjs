@@ -64,7 +64,7 @@ async function writeSignedFixture() {
       })),
     });
   }
-  for (const name of ['install.ps1', 'install.sh', 'run-golden-path.mjs', 'release-bundle-lib.mjs', SOURCE_ARCHIVE_NAME, 'verify-release-bundle.mjs']) {
+  for (const name of ['install.ps1', 'install.sh', 'run-golden-path.mjs', 'release-bundle-lib.mjs', 'source-archive-listing.mjs', SOURCE_ARCHIVE_NAME, 'verify-release-bundle.mjs']) {
     await writeFile(path.join(directory, name), `fixture:${name}\n`);
   }
   await writeFile(

@@ -223,6 +223,7 @@ const publicProjectFiles = [
   'scripts/verify-supply-chain-attestations.mjs',
   'scripts/verify-release-bundle.mjs',
   'scripts/run-golden-path.mjs',
+  'scripts/source-archive-listing.mjs',
   'scripts/check-golden-matrix.mjs',
   'scripts/check-telemetry-contract.mjs',
   'schemas/pliego.golden-path-report.schema.json',
