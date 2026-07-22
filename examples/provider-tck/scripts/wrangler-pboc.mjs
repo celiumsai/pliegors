@@ -4,6 +4,16 @@ import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+export function inspectorPortFor(httpPort, override) {
+  const candidate = override ?? String(Number(httpPort) + 10_000);
+  if (!/^[0-9]+$/u.test(candidate)) throw new Error('inspector port must be numeric');
+  const port = Number(candidate);
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`inspector port is outside 1..65535: ${candidate}`);
+  }
+  return String(port);
+}
+
 export async function createWranglerConfig(root, manifestPath, name) {
   const absoluteManifest = path.resolve(manifestPath);
   const source = (await readFile(absoluteManifest, 'utf8')).trim();
