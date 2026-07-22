@@ -1,7 +1,7 @@
 # G3 PBOC and provider conformance evidence
 
 **Gate:** G3 portable deployment  
-**Status:** Release candidate; protected CI and public prerelease promotion pending  
+**Status:** Protected provider conformance passed; public prerelease promotion pending
 **Date:** 2026-07-22  
 **Contract:** `dev.pliegors.g3-provider-evidence/v1`
 
@@ -20,7 +20,7 @@
 | G3-A09 | Provider secrets stay outside output | Closed schema plus recursive sentinel scan across every bundle file | PASS locally |
 | G3-A10 | OCI is portable and least privilege | Static musl binary, pinned distroless base, nonroot, read-only, no capabilities, no-new-privileges | PASS locally |
 | G3-A11 | MSRV and WASM targets compile | Rust 1.86 native/musl plus `wasm32-unknown-unknown` workers-rs build | PASS locally |
-| G3-A12 | Gate is reproducible in protected CI | Separate `g3-provider-conformance` job uploads JSON receipt and logs | PENDING protected run |
+| G3-A12 | Gate is reproducible in protected CI | Separate `g3-provider-conformance` job uploads JSON receipt and logs | PASS; run `29963913926`, artifact `8547268800` |
 | G3-A13 | Real Cloudflare edge executes the bundle | Wrangler deployment from sealed bundle and public edge replay | PASS platform proof; final release attestation pending |
 
 The local acceptance run used an uncommitted development revision and is not a
@@ -39,6 +39,14 @@ least-privilege OCI host at PBOC SHA-256
 `ca3eb6fb8e672605312c89f4292ba1f3eaf276331cb6814d0543fee45bec7cc0`.
 Because the source revision predates the final protected merge, this proves the
 provider path but is not the release attestation.
+
+The protected pull-request run at
+`https://github.com/celiumsai/pliegors/actions/runs/29963913926` repeated the
+complete local Worker, native Linux and least-privilege OCI matrix at merge
+revision `b9897cf4ad684943e398ddbebbe901fbfbd06058`. Artifact `8547268800`
+contains the canonical JSON receipt and logs. Its r1 and r2 PBOC SHA-256 values
+are `dd89490068d3e927e39fab20ed3262e13ab74dc29e4e120a26a4bdc31ea8d0ac`
+and `3b0a986ab1b722c13e633f5e32e6ef9c9318db09df87cc73c5c6a131eb0af9f5`.
 
 Authoritative hashes are generated from the protected commit by
 `scripts/run-provider-tck.mjs`; they are not copied from a developer working
