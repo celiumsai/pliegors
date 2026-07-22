@@ -26,7 +26,7 @@
   <a href="https://github.com/celiumsai/pliegors/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/celiumsai/pliegors"></a>
   <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/crates/l/pliego-cli.svg"></a>
   <a href="https://doc.rust-lang.org/stable/releases.html"><img alt="rustc 1.86+" src="https://img.shields.io/badge/rustc-1.86%2B-b7410e.svg"></a>
-  <img alt="Public preview" src="https://img.shields.io/badge/status-public_preview-d8ff2f.svg">
+  <img alt="Public beta" src="https://img.shields.io/badge/status-public_beta-d8ff2f.svg">
 </p>
 
 PliegoRS folds append-only event logs into interfaces. State is projected from
@@ -35,18 +35,17 @@ the same result. Useful HTML is emitted first; Rust/WASM resumes only the
 behavior the document needs. Mature browser libraries such as GSAP, Lenis, and
 Three.js remain JavaScript behind explicit lifecycle adapters.
 
-The current public release is [`v0.0.2`](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2),
-published on 2026-07-18. Fifteen framework crates are available on crates.io at
-`0.0.2`. PliegoRS remains pre-1.0 public-preview software: documented contracts
-are deliberate, while incompatible changes may still arrive in a new minor
-version with a changelog entry and migration guidance.
+The current public beta is [`v0.2.0-beta.1`](https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1),
+published on 2026-07-22. All nineteen framework crates are coordinated on
+crates.io at the exact `0.2.0-beta.1` version. PliegoRS remains pre-1.0
+software: documented contracts are deliberate, while incompatible changes may
+still arrive in a new prerelease or minor version with a changelog entry and
+migration guidance.
 
-The separate [G1 and OpenSDK component prerelease](https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1)
-publishes `pliego-router`, `pliego-runtime`, and `pliego-sdk` at
-`0.1.0-preview.1`. Their conformance suites passed on the tagged source, but
-they are not wired into the `0.0.2` CLI. RFC-006 and RFC-007 remain Draft, and
-ADR-006 remains Proposed; the previews must not be presented as stable or
-accepted APIs. The current `main` MSRV is Rust `1.86`.
+This beta unifies the previous `v0.0.2` CLI, the G1/OpenSDK component preview,
+and the G2 data contract in one exact package graph. RFC-006 and RFC-007 remain
+Draft, and ADR-006 remains Proposed; OpenSDK and the deployment contract must
+not be presented as stable or accepted APIs. The current MSRV is Rust `1.86`.
 
 [`product.capabilities.json`](product.capabilities.json) is the canonical,
 machine-readable inventory of what is released, available only from source,
@@ -58,12 +57,12 @@ the official site.
 
 | Surface | Status | Evidence |
 | --- | --- | --- |
-| PliegoRS `v0.0.2` | Current signed public release | [Release](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) and [changelog](CHANGELOG.md) |
+| PliegoRS `v0.2.0-beta.1` | Current signed public beta | [Release](https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1) and [changelog](CHANGELOG.md) |
 | R0-R7 framework hardening | Complete; preserved as regression gates | [Hardening roadmap](docs/28-hardening-roadmap.md) |
-| P8 trust and adoption | Complete for `v0.0.2` | [P8 contract](docs/35-p8-trust-and-adoption-contract.md) and [signed release evidence](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) |
-| G1 native runtime and dynamic rendering | Public component preview; G1 complete | [Component release](https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1), [runtime contract](docs/49-native-runtime-preview.md), and [transport/load/security evidence](docs/evidence/g1-transport-load-security.md) |
-| G2 data, actions, sessions, and cache | Complete on `main`; unreleased source beta | [G2 evidence](docs/evidence/g2-fullstack-beta.md), [umbrella RFC](docs/rfc/RFC-010-data-actions-cache.md), and [ASVS ownership map](security/asvs-v5.0.0-g2.json) |
-| OpenSDK `0.1.0-preview.1` | Public preview crate; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
+| P8 trust and adoption | Preserved as a release gate | [P8 contract](docs/35-p8-trust-and-adoption-contract.md) and [signed release](https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1) |
+| G1 native runtime and dynamic rendering | Public beta; G1 complete | [Runtime contract](docs/49-native-runtime-preview.md) and [transport/load/security evidence](docs/evidence/g1-transport-load-security.md) |
+| G2 data, actions, sessions, and cache | Public beta; G2 complete | [G2 evidence](docs/evidence/g2-fullstack-beta.md), [umbrella RFC](docs/rfc/RFC-010-data-actions-cache.md), and [ASVS ownership map](security/asvs-v5.0.0-g2.json) |
+| OpenSDK `0.2.0-beta.1` | Public beta crate; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
 | Hyphae integration | Optional verified protocol boundary | [Verified sync guide](docs/29-hyphae-verified-sync-guide.md); no production gateway claim |
 | PliegoCSS `0.1.0-rc.2` | Optional experimental build-time companion | [Integration evidence](docs/evidence/pliegocss-optional-integration.md); never a runtime or starter requirement |
 
@@ -105,7 +104,7 @@ the official site.
   route-owned complete and streamed layouts, structured completion events,
   operator-enabled OpenTelemetry, real-socket adversarial cases, and fixed-load
   Linux RSS evidence.
-- an unreleased G2 source beta with capability-scoped resources and loaders,
+- a public G2 beta with capability-scoped resources and loaders,
   progressive actions, truthful commit/cancellation state, idempotency, secure
   server-side sessions, bounded uploads, SSRF policy, explicit public/private
   runtime cache, causal invalidation, application contract manifests, and
@@ -127,7 +126,7 @@ telemetry. See the [execution backlog](docs/19-product-execution-backlog.md),
 [R7 evidence](docs/evidence/r7-external-flagship.md). Production Hyphae
 operation remains a separate system boundary.
 
-G1 is complete and available as a separately versioned component preview. The
+G1 is complete and available in the coordinated public beta. The
 native router and runtime cover bounded connection and request lifecycles,
 HTTP/1.1 and HTTP/2,
 inherited middleware, authored errors, and complete, ordered, and
@@ -140,21 +139,20 @@ not select exporters, storage, retention, or inbound trace trust.
 OpenSDK continues as the provider-neutral extension boundary required by that
 runtime; public preview publication is not permission to call either API stable.
 
-G2 is complete on `main` as an unreleased source beta. Its two-runtime
+G2 is complete in `0.2.0-beta.1`. Its two-runtime
 reference application proves progressive authenticated mutation, session
 rotation and revocation, idempotent replay, typed failures, cache isolation,
 read-your-writes invalidation, and redacted diagnostics. The included stores
 and invalidation coordinator are development/conformance adapters; production
 durability and cross-process delivery remain provider work, and G3 portability
-is still open.
+is still open. Its bundled stores are deliberately conformance-oriented rather
+than production durability providers.
 
 ## Packages
 
-Eighteen of nineteen workspace crates are public. The fifteen packages below
-remain on the `0.0.2` CLI release line. The G1 router/runtime and `pliego-sdk`
-use the separate `0.1.0-preview.1` component line. The new `pliego-data` crate
-exists only on `main`, so applications must not infer registry or CLI
-availability from source-beta evidence.
+All nineteen workspace crates are public at the exact `0.2.0-beta.1` version.
+Applications must keep every `pliego-*` dependency on that same version; mixed
+framework graphs are outside the compatibility contract.
 
 | Package | Responsibility |
 | --- | --- |
@@ -174,32 +172,33 @@ availability from source-beta evidence.
 | `pliego-starters` | Maintained embedded starter projects |
 | `pliego-cli` | Project creation, build, dev server, preview, and inspection |
 
-| Preview package | Responsibility | Status |
+| Beta package | Responsibility | Status |
 | --- | --- | --- |
-| [`pliego-router`](https://crates.io/crates/pliego-router/0.1.0-preview.1) | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | Public `0.1.0-preview.1` |
-| [`pliego-runtime`](https://crates.io/crates/pliego-runtime/0.1.0-preview.1) | Bounded HTTP/1.1 and HTTP/2 lifecycle, route-owned complete/streamed layouts, structured events, operator-enabled OTel, and three SSR modes | Public `0.1.0-preview.1` |
-| [`pliego-sdk`](https://crates.io/crates/pliego-sdk/0.1.0-preview.1) | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | Public `0.1.0-preview.1` |
-| `pliego-data` | Provider-neutral resources, loaders, actions, sessions, idempotency, secrets, outbound HTTP policy, cache, and invalidation | Unreleased G2 source beta |
+| [`pliego-router`](https://crates.io/crates/pliego-router/0.2.0-beta.1) | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | Public `0.2.0-beta.1` |
+| [`pliego-runtime`](https://crates.io/crates/pliego-runtime/0.2.0-beta.1) | Bounded HTTP/1.1 and HTTP/2 lifecycle, route-owned complete/streamed layouts, structured events, operator-enabled OTel, and three SSR modes | Public `0.2.0-beta.1` |
+| [`pliego-data`](https://crates.io/crates/pliego-data/0.2.0-beta.1) | Provider-neutral resources, loaders, actions, sessions, idempotency, secrets, outbound HTTP policy, cache, and invalidation | Public `0.2.0-beta.1` |
+| [`pliego-sdk`](https://crates.io/crates/pliego-sdk/0.2.0-beta.1) | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | Public `0.2.0-beta.1` |
 
 ## Install
 
 Install the CLI from crates.io:
 
 ```sh
-cargo install pliego-cli --version 0.0.2 --locked
+cargo install pliego-cli --version 0.2.0-beta.1 --locked
 pliego new my-site
 cd my-site
 pliego check
 pliego dev
 ```
 
-Pin the separately versioned server and OpenSDK previews explicitly:
+Pin all framework crates to the coordinated beta explicitly:
 
 ```toml
 [dependencies]
-pliego-router = "=0.1.0-preview.1"
-pliego-runtime = "=0.1.0-preview.1"
-pliego-sdk = "=0.1.0-preview.1"
+pliego-router = "=0.2.0-beta.1"
+pliego-runtime = "=0.2.0-beta.1"
+pliego-data = "=0.2.0-beta.1"
+pliego-sdk = "=0.2.0-beta.1"
 ```
 
 Diagnose an environment, create a redacted local reproduction archive, and
@@ -212,7 +211,7 @@ pliego upgrade --check
 pliego telemetry status
 ```
 
-The commands above are part of the published `0.0.2` CLI. They run locally and
+The commands above are part of the published `0.2.0-beta.1` CLI. They run locally and
 do not upload project data.
 
 ### Optional PliegoCSS companion
@@ -229,10 +228,10 @@ pliego css check --seed
 compilation, watch mode, manifests, and route/island bundles remain explicit
 `pliego-cssc` workflows and produce static CSS rather than a styling runtime.
 
-## Evaluate OpenSDK from `main`
+## Evaluate OpenSDK
 
-OpenSDK landed after `v0.0.2`, so evaluate it from a source checkout rather
-than expecting it in the crates.io CLI:
+OpenSDK ships in the coordinated beta. Its complete repository conformance path
+can be reproduced from an exact release checkout:
 
 ```sh
 git clone https://github.com/celiumsai/pliegors.git
@@ -251,10 +250,10 @@ The TypeScript and Python process bridges are conformance implementations, not
 sandboxed Component Model SDKs. Browser fixtures prove the explicit adapter
 lifecycle for React, Svelte, and Lit without replacing those ecosystems.
 
-## Evaluate the G2 source beta
+## Evaluate the G2 beta
 
-G2 is evaluated from one exact source revision until its component publication
-gate opens:
+G2 is published as part of the exact coordinated package graph. Its complete
+reference application remains in the release source:
 
 ```sh
 git clone https://github.com/celiumsai/pliegors.git
@@ -271,7 +270,7 @@ adopting the source API.
 
 ## Release trust
 
-The `v0.0.2` release contains 28 assets covering five platform targets, two
+The `v0.2.0-beta.1` release contains artifacts covering five platform targets, two
 installer formats, checksums, a reproducible source archive, verification
 tools, a CycloneDX SBOM, SLSA-compatible provenance, and the signed P8 golden
 matrix. Linux x86_64 and ARM64 are production targets; macOS x86_64/ARM64 and

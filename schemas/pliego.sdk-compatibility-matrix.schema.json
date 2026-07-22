@@ -7,7 +7,7 @@
   "required": ["contract", "protocolVersion", "source", "hosts", "toolchains", "surfaces", "deprecations"],
   "properties": {
     "contract": { "const": "dev.pliegors.sdk-compatibility/v1" },
-    "protocolVersion": { "const": "0.1.0-preview.1" },
+    "protocolVersion": { "const": "0.2.0-beta.1" },
     "source": { "const": "celiumsai/pliegors" },
     "hosts": {
       "type": "array",

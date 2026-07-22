@@ -1,7 +1,8 @@
 # Full-stack PliegoRS G2 reference
 
-This application is an executable conformance fixture for the unreleased G2
-full-stack contracts. It is intentionally small and has no JavaScript shell.
+This application is the executable conformance fixture for the G2 full-stack
+contracts published in `0.2.0-beta.1`. It is intentionally small and has no
+JavaScript shell.
 
 It proves:
 

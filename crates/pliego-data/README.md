@@ -78,10 +78,9 @@ evidence through the same public contracts.
 
 ## Status
 
-The G2 implementation is complete on `main` as an unreleased source beta.
-`pliego-data` is not in the current `v0.0.2` or component prerelease. Pin a
-source revision when evaluating it and expect another preview line to change
-the API.
+The G2 implementation is published on crates.io as `0.2.0-beta.1` in the
+coordinated framework graph. Pin every `pliego-*` crate to that exact version
+and expect another beta line to change the API.
 
 Read [RFC-010](../../docs/rfc/RFC-010-data-actions-cache.md), its four
 subcontracts, the [G2 evidence](../../docs/evidence/g2-fullstack-beta.md), and

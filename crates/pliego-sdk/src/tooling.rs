@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
 pub const JSON_RPC_VERSION: &str = "2.0";
-pub const TOOLING_PROTOCOL_VERSION: &str = "0.1.0-preview.1";
+pub const TOOLING_PROTOCOL_VERSION: &str = "0.2.0-beta.1";
 pub const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn handshake_is_transport_neutral_and_notifications_have_no_response() {
-        let mut host = RpcHost::new("0.1.0-preview.1").with_feature("diagnostic-links");
+        let mut host = RpcHost::new("0.2.0-beta.1").with_feature("diagnostic-links");
         let premature = host
             .handle(RpcRequest {
                 jsonrpc: "2.0".to_owned(),
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn mcp_client_uses_the_same_tooling_handshake_after_strict_initialization() {
-        let mut host = McpHost::new("0.1.0-preview.1").with_feature("diagnostic-links");
+        let mut host = McpHost::new("0.2.0-beta.1").with_feature("diagnostic-links");
         assert!(
             host.handle(RpcRequest {
                 jsonrpc: "2.0".to_owned(),

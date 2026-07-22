@@ -7,6 +7,14 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ## Unreleased
 
+No changes yet.
+
+## 0.2.0-beta.1 - 2026-07-22
+
+This coordinated beta publishes all nineteen framework crates at one exact
+version and unifies the CLI, G1 native runtime, G2 data contracts, and OpenSDK
+preview. G3 portability and PBOC remain explicitly unreleased.
+
 ### Added
 
 - Add a bounded native HTTP/1.1 and HTTP/2 accept loop with explicit
@@ -40,10 +48,10 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   graph, bounded complete, ordered, and boundary SSR, raw HTTP/1.1 lifecycle evidence,
   pre-route and route middleware, exact capability admission and effect mediation, safe authored
   error boundaries, receipts, cancellation, and a launchable reference app.
-- Add the OpenSDK `0.1.0-preview.1` contracts, conformance CLI, typed Wasmtime
+- Add the OpenSDK `0.2.0-beta.1` contracts, conformance CLI, typed Wasmtime
   Component host, effect broker, multilang/browser/tooling fixtures, and
   compatibility matrix.
-- Add the unreleased G2 `pliego-data` source beta with capability-scoped typed
+- Add the G2 `pliego-data` public beta with capability-scoped typed
   resources and loaders, progressive actions, truthful commit/cancellation
   state, principal-bound idempotency, server-side sessions, CSRF, opaque
   secrets, outbound HTTP admission, explicit runtime cache domains, and causal
@@ -61,14 +69,17 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   can use Wasmtime `36.0.8`, the first compatible patch line that resolves the
   RustSec advisories affecting the original `34.0.2` prototype.
 - Replace the stale website release summary with a bilingual, evidence-linked
-  changelog for Unreleased, `0.0.2`, and `0.0.1`, and align current-release copy
+  changelog for `0.2.0-beta.1`, the component preview, `0.0.2`, and `0.0.1`, and align current-release copy
   across the site and documentation.
 - Keep `main` as the sole persistent repository branch by replacing automated
   dependency-update branches with maintainer-batched, short-lived updates;
   dependency alerts and security scanners remain active.
-- Rewrite the repository README around the published `v0.0.2` and P8 evidence,
-  distinguish separately versioned component previews from the CLI, and add
-  current release-trust, documentation, platform, and branch-policy guidance.
+- Rewrite the repository README around the coordinated `v0.2.0-beta.1`, G1/G2,
+  OpenSDK, and preserved P8 gates, with current release-trust, documentation,
+  platform, and branch-policy guidance.
+- Register the native filesystem watcher before exposing the development port,
+  and keep the HMR acceptance project on Cargo's trusted target directory so
+  startup readiness is deterministic on Windows and Linux.
 
 ### Security
 
@@ -212,6 +223,7 @@ does not replace the complete `v0.0.2` CLI release.
 - Static preview delivery serves `security.txt` as UTF-8 plain text and keeps
   its disclosure metadata available under `/.well-known/security.txt`.
 
-[Unreleased]: https://github.com/celiumsai/pliegors/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/celiumsai/pliegors/compare/v0.2.0-beta.1...HEAD
+[0.2.0-beta.1]: https://github.com/celiumsai/pliegors/compare/preview-components-v0.1.0-preview.1...v0.2.0-beta.1
 [0.0.2]: https://github.com/celiumsai/pliegors/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/celiumsai/pliegors/releases/tag/v0.0.1

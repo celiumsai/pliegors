@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
-pub const OPENSDK_API_VERSION: &str = "0.1.0-preview.1";
+pub const OPENSDK_API_VERSION: &str = "0.2.0-beta.1";
 pub const OPENSDK_MANIFEST_SCHEMA: &str = "dev.pliegors.sdk-extension/v1";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -676,7 +676,7 @@ mod tests {
         ExtensionManifest {
             schema: OPENSDK_MANIFEST_SCHEMA.to_owned(),
             api_version: OPENSDK_API_VERSION.to_owned(),
-            host_version: ">=0.1.0-preview.1, <0.2.0".to_owned(),
+            host_version: ">=0.2.0-beta.1, <0.3.0".to_owned(),
             plane: Plane::Build,
             identity: ExtensionIdentity {
                 namespace: "celiums".to_owned(),
@@ -717,7 +717,7 @@ mod tests {
     fn admission_binds_bytes_versions_and_features() {
         let bytes = b"component";
         let host = HostContract::preview(
-            Version::parse("0.1.0-preview.1").unwrap(),
+            Version::parse("0.2.0-beta.1").unwrap(),
             CapabilityPolicy::deny_all(),
         )
         .with_feature("stream-input");
@@ -729,7 +729,7 @@ mod tests {
     #[test]
     fn incompatible_or_tampered_extensions_fail_before_admission() {
         let host = HostContract::preview(
-            Version::parse("0.1.0-preview.1").unwrap(),
+            Version::parse("0.2.0-beta.1").unwrap(),
             CapabilityPolicy::deny_all(),
         );
         assert!(matches!(
@@ -748,7 +748,7 @@ mod tests {
     fn pure_extensions_and_undeclared_capabilities_fail_closed() {
         let bytes = b"component";
         let host = HostContract::preview(
-            Version::parse("0.1.0-preview.1").unwrap(),
+            Version::parse("0.2.0-beta.1").unwrap(),
             CapabilityPolicy::deny_all(),
         );
         let mut overpowered = manifest(bytes);

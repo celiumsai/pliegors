@@ -2992,6 +2992,11 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
             (Some(error), None)
         }
     };
+    let (events, mut watcher) = native_watcher(&context.root).map_err(DevFailure::Project)?;
+    watcher
+        .watch(&context.root, RecursiveMode::Recursive)
+        .map_err(|error| DevFailure::Project(format!("cannot watch project: {error}")))?;
+
     let (server, root) =
         open_server(output_root, options, "dev", true).map_err(DevFailure::Server)?;
     let state = Arc::new(DevState::new(initial_failure));
@@ -2999,10 +3004,6 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
     let server_root = root.clone();
     std::thread::spawn(move || serve_requests(server, server_root, Some(server_state)));
 
-    let (events, mut watcher) = native_watcher(&context.root).map_err(DevFailure::Project)?;
-    watcher
-        .watch(&context.root, RecursiveMode::Recursive)
-        .map_err(|error| DevFailure::Project(format!("cannot watch project: {error}")))?;
     record_telemetry(telemetry::FunnelEvent::Dev);
     println!(
         "PLIEGO dev: watching {} with {:?}",

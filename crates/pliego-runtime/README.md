@@ -65,9 +65,8 @@ inbound `tracestate` and baggage are discarded so provider state remains
 local. Custom HTTP methods require an explicit bounded allowlist entry.
 Receipts retain only a coarse duration bucket.
 
-The crate is published on crates.io as `0.1.0-preview.1`. Its API may change on
-another preview line, it is not wired into the `0.0.2` CLI, and publication is
-not a stable production-support promise. See
+The crate is published on crates.io as `0.2.0-beta.1`. Its API may change on
+another beta line, and publication is not a stable production-support promise. See
 [`RFC-008`](../../docs/rfc/RFC-008-native-runtime.md).
 
 The conformance corpus includes raw TCP HTTP/1.1 and HTTP/2, multiplexed
@@ -76,10 +75,9 @@ slow-head and slow-reader peers, parser/body-policy cases, and an explicit
 2,000-request Linux RSS/latency harness. TLS and proxy identity remain host
 adapter work rather than implicit trust in forwarding headers.
 
-Current `main` also contains the unreleased G2 source beta: sealed loader,
+The coordinated beta also contains G2: sealed loader,
 action, session, idempotency, cache, upload, decompression, invalidation, and
-application-contract registries backed by `pliego-data`. These additions are
-not in the published `0.1.0-preview.1` runtime crate. G3 host adapters and a
+application-contract registries backed by `pliego-data`. G3 host adapters and a
 production `pliego serve` command remain unavailable.
 
 See the [G1 transport evidence](../../docs/evidence/g1-transport-load-security.md),

@@ -41,6 +41,11 @@ separately installed, exact PliegoCSS release candidate. PliegoCSS is never
 installed implicitly, linked into the server runtime, or required by the
 default starter.
 
+First-party Node packages are repository-owned implementation and conformance
+tooling, not npm registry products. Their manifests must remain `private: true`;
+release workflows may attach required scripts to GitHub Releases but must not
+run `npm publish`, `pnpm publish`, or `yarn publish`.
+
 ## Stability vocabulary
 
 Stability describes a specific surface, not the whole repository.

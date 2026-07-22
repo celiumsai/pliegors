@@ -1,7 +1,7 @@
 # Release-only golden environment matrix
 
 **Status:** implemented; hosted candidate and WSL2 evidence pending  
-**Target line:** `0.0.2`
+**Target line:** `0.2.0-beta.1`
 
 P8-A07 turns the first-use experience into a release gate. Every hosted row
 starts from the signed distribution bundle, installs the native CLI, creates a
@@ -98,7 +98,7 @@ The non-circular promotion order is:
 
 1. Run a canary candidate for the intended version and source revision. The
    eight hosted rows use the signed candidate source archive.
-2. Review the sealed bundle and publish all 15 exact-version crates from the
+2. Review the sealed bundle and publish all 19 exact-version crates from the
    same clean revision through the guarded publisher.
 3. Run the signed golden runner on WSL2 using the sealed canary bundle and
    `--dependency-source registry`.

@@ -1,6 +1,6 @@
 # DOM lifecycle contract
 
-**Status:** R4 stable (`pliego-dom` 0.0.1, adapter API v1)
+**Status:** R4 accepted (`pliego-dom` 0.2.0-beta.1, adapter API v1 preview)
 
 PliegoRS renders one validated `View` tree through two concrete paths: bounded
 HTML serialization and surgical browser DOM mounting. Both paths consume the

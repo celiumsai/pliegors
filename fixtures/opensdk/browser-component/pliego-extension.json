@@ -1,13 +1,13 @@
 {
   "schema": "dev.pliegors.sdk-extension/v1",
-  "apiVersion": "0.1.0-preview.1",
-  "hostVersion": ">=0.1.0-preview.1, <0.2.0",
+  "apiVersion": "0.2.0-beta.1",
+  "hostVersion": ">=0.2.0-beta.1, <0.3.0",
   "plane": "browser",
   "identity": {
     "namespace": "pliego",
     "name": "browser-component-fixture",
     "version": "0.1.0",
-    "digest": "sha256:a8d7f2e36b51ef23b157f7dd7c68a767adc114a2ba9c338e0b5d79db9b635093"
+    "digest": "sha256:70a08e7d2b4841eb778d8a47621ee2b218890bcbb55b372f46a81a4fea432e9a"
   },
   "entry": {
     "kind": "browser-esm",

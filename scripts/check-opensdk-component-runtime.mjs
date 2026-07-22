@@ -19,8 +19,8 @@ const component = await readFile(componentPath);
 const digest = `sha256:${createHash("sha256").update(component).digest("hex")}`;
 const manifest = {
   schema: "dev.pliegors.sdk-extension/v1",
-  apiVersion: "0.1.0-preview.1",
-  hostVersion: ">=0.1.0-preview.1, <0.2.0",
+  apiVersion: "0.2.0-beta.1",
+  hostVersion: ">=0.2.0-beta.1, <0.3.0",
   plane: "build",
   identity: {
     namespace: "pliego",

@@ -37,10 +37,10 @@ async function checkEditorClient() {
       jsonrpc: "2.0",
       id: 1,
       method: "pliego/handshake",
-      params: { protocolVersion: "0.1.0-preview.1" },
+      params: { protocolVersion: "0.2.0-beta.1" },
     });
     assert.equal(handshake.id, 1);
-    assert.equal(handshake.result.protocolVersion, "0.1.0-preview.1");
+    assert.equal(handshake.result.protocolVersion, "0.2.0-beta.1");
     assert.deepEqual(handshake.result.features, ["diagnostic-links"]);
     assert(handshake.result.methods.includes("pliego/diagnostics"));
     const diagnostics = await session.request({
@@ -117,7 +117,7 @@ async function checkMcpClient() {
       params: { name: "pliego_sdk_handshake", arguments: {} },
     });
     assert.equal(called.result.isError, false);
-    assert.equal(called.result.structuredContent.protocolVersion, "0.1.0-preview.1");
+    assert.equal(called.result.structuredContent.protocolVersion, "0.2.0-beta.1");
     assert.deepEqual(called.result.structuredContent.features, ["diagnostic-links"]);
   } finally {
     await session.close();
