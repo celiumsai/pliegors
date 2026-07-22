@@ -102,6 +102,11 @@ impl RequestLimits {
     }
 
     pub(crate) fn admit_head(&self, parts: &Parts) -> Result<(), LimitError> {
+        if parts.headers.contains_key(http::header::CONTENT_LENGTH)
+            && parts.headers.contains_key(http::header::TRANSFER_ENCODING)
+        {
+            return Err(LimitError::AmbiguousBodyLength);
+        }
         let target_bytes = parts.uri.to_string().len();
         if target_bytes > self.max_request_target_bytes {
             return Err(LimitError::RequestTarget {
@@ -142,6 +147,38 @@ impl RequestLimits {
         }
         Ok(())
     }
+
+    pub(crate) fn admit_body_format(&self, parts: &Parts) -> Result<(), LimitError> {
+        if parts.headers.contains_key(http::header::CONTENT_ENCODING) {
+            let mut saw_encoding = false;
+            for value in parts.headers.get_all(http::header::CONTENT_ENCODING) {
+                let value = value
+                    .to_str()
+                    .map_err(|_| LimitError::UnsupportedContentEncoding)?;
+                for encoding in value.split(',').map(str::trim) {
+                    saw_encoding = true;
+                    if encoding.is_empty() || !encoding.eq_ignore_ascii_case("identity") {
+                        return Err(LimitError::UnsupportedContentEncoding);
+                    }
+                }
+            }
+            if !saw_encoding {
+                return Err(LimitError::UnsupportedContentEncoding);
+            }
+        }
+        if let Some(value) = parts.headers.get(http::header::CONTENT_TYPE) {
+            if let Ok(value) = value.to_str() {
+                let media_type = value.split(';').next().unwrap_or_default().trim();
+                if media_type
+                    .get(..10)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("multipart/"))
+                {
+                    return Err(LimitError::UnsupportedMultipart);
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 fn encode_hex(bytes: &[u8]) -> String {
@@ -178,6 +215,9 @@ pub enum LimitError {
         actual: u64,
         maximum: u64,
     },
+    UnsupportedContentEncoding,
+    UnsupportedMultipart,
+    AmbiguousBodyLength,
 }
 
 impl LimitError {
@@ -188,6 +228,9 @@ impl LimitError {
             Self::HeaderCount { .. } | Self::HeaderBytes { .. } => "PLG-RUN-102",
             Self::InvalidContentLength => "PLG-RUN-103",
             Self::BodyBytes { .. } => "PLG-RUN-104",
+            Self::UnsupportedContentEncoding => "PLG-RUN-108",
+            Self::UnsupportedMultipart => "PLG-RUN-109",
+            Self::AmbiguousBodyLength => "PLG-RUN-110",
         }
     }
 }
@@ -226,6 +269,14 @@ impl Display for LimitError {
                     formatter,
                     "request body declares {actual} bytes; maximum is {maximum}"
                 )
+            }
+            Self::UnsupportedContentEncoding => formatter
+                .write_str("request content encoding is unsupported without a decoded-byte budget"),
+            Self::UnsupportedMultipart => formatter.write_str(
+                "multipart requests are unsupported without bounded part and storage policies",
+            ),
+            Self::AmbiguousBodyLength => {
+                formatter.write_str("request contains conflicting body framing headers")
             }
         }
     }
@@ -278,5 +329,40 @@ mod tests {
             RequestLimits::default().admit_head(&parts),
             Err(LimitError::BodyBytes { .. })
         ));
+    }
+
+    #[test]
+    fn rejects_implicit_decompression_and_multipart_parsing() {
+        for (name, value, expected) in [
+            (
+                "content-encoding",
+                "gzip",
+                LimitError::UnsupportedContentEncoding,
+            ),
+            (
+                "content-type",
+                "multipart/form-data; boundary=bounded",
+                LimitError::UnsupportedMultipart,
+            ),
+        ] {
+            let request = Request::builder()
+                .uri("/upload")
+                .header(name, value)
+                .body(())
+                .unwrap();
+            let (parts, _) = request.into_parts();
+            assert_eq!(
+                RequestLimits::default().admit_body_format(&parts),
+                Err(expected)
+            );
+        }
+        let request = Request::builder()
+            .uri("/upload")
+            .header("content-encoding", "identity")
+            .header("content-type", "application/octet-stream")
+            .body(())
+            .unwrap();
+        let (parts, _) = request.into_parts();
+        RequestLimits::default().admit_body_format(&parts).unwrap();
     }
 }

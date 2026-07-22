@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
+use tracing::{info, warn};
 
 type Cleanup = Box<dyn FnOnce(Option<CancelReason>) -> Result<(), String> + Send + 'static>;
 type InternalCleanup = Box<dyn FnOnce() + Send + 'static>;
@@ -565,8 +566,90 @@ impl RequestScope {
             if let Some(telemetry) = &self.inner.telemetry {
                 let _ = catch_unwind(AssertUnwindSafe(|| telemetry.finish(&receipt)));
             }
-            self.inner.sink.record(receipt);
+            emit_completion_log(&receipt);
+            if catch_unwind(AssertUnwindSafe(|| self.inner.sink.record(receipt))).is_err() {
+                warn!(
+                    target: "pliegors::request",
+                    code = "PLG-RUN-307",
+                    "PliegoRS receipt sink panicked"
+                );
+            }
         }
+    }
+}
+
+struct CompletionLogFields<'a> {
+    route_id: &'a str,
+    outcome: &'static str,
+    status: u16,
+    response_bytes: u64,
+    duration_bucket: &'static str,
+    render_mode: &'static str,
+    diagnostic_count: usize,
+    diagnostic_code: &'a str,
+}
+
+fn completion_log_fields(receipt: &RuntimeReceipt) -> CompletionLogFields<'_> {
+    CompletionLogFields {
+        route_id: receipt.route_id.as_deref().unwrap_or("_unmatched"),
+        outcome: outcome_label(&receipt.outcome),
+        status: receipt.response_status.unwrap_or(0),
+        response_bytes: receipt.response_bytes,
+        duration_bucket: duration_label(receipt.duration_bucket),
+        render_mode: receipt.render_mode.map(render_label).unwrap_or("none"),
+        diagnostic_count: receipt.diagnostics.len(),
+        diagnostic_code: receipt
+            .diagnostics
+            .last()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .unwrap_or("none"),
+    }
+}
+
+fn emit_completion_log(receipt: &RuntimeReceipt) {
+    let fields = completion_log_fields(receipt);
+    info!(
+        target: "pliegors::request",
+        contract = "dev.pliegors.runtime-log/v1",
+        route_id = fields.route_id,
+        outcome = fields.outcome,
+        status = fields.status,
+        response_bytes = fields.response_bytes,
+        duration_bucket = fields.duration_bucket,
+        render_mode = fields.render_mode,
+        diagnostic_count = fields.diagnostic_count,
+        diagnostic_code = fields.diagnostic_code,
+        "PliegoRS request completed"
+    );
+}
+
+fn outcome_label(outcome: &RequestOutcome) -> &'static str {
+    match outcome {
+        RequestOutcome::Pending => "pending",
+        RequestOutcome::Success => "success",
+        RequestOutcome::Rejected => "rejected",
+        RequestOutcome::Cancelled => "cancelled",
+        RequestOutcome::Failed => "failed",
+    }
+}
+
+fn duration_label(duration: RequestDurationBucket) -> &'static str {
+    match duration {
+        RequestDurationBucket::Under10Milliseconds => "under-10-ms",
+        RequestDurationBucket::Under50Milliseconds => "under-50-ms",
+        RequestDurationBucket::Under250Milliseconds => "under-250-ms",
+        RequestDurationBucket::Under1Second => "under-1-s",
+        RequestDurationBucket::Under5Seconds => "under-5-s",
+        RequestDurationBucket::AtLeast5Seconds => "at-least-5-s",
+    }
+}
+
+fn render_label(mode: RenderMode) -> &'static str {
+    match mode {
+        RenderMode::Complete => "complete",
+        RenderMode::Ordered => "ordered",
+        RenderMode::Boundary => "boundary",
+        RenderMode::Layout => "layout",
     }
 }
 
@@ -805,6 +888,69 @@ mod tests {
         assert_eq!(request.diagnostics().len(), 1);
         assert_eq!(request.diagnostics()[0].code, "PLG-RUN-302");
         assert!(request.diagnostics()[0].message.len() <= 512);
+    }
+
+    #[tokio::test]
+    async fn receipt_sink_panic_cannot_escape_request_cleanup() {
+        let request = scope(
+            RequestLimits::default(),
+            Arc::new(|_: RuntimeReceipt| panic!("operator sink failed")),
+        );
+        request.cancel(CancelReason::ApplicationAbort);
+        request.drain_and_close();
+        assert_eq!(request.state(), RequestState::Closed);
+    }
+
+    #[test]
+    fn structured_log_projection_excludes_identity_and_diagnostic_messages() {
+        let receipt = RuntimeReceipt {
+            contract: "dev.pliegors.runtime-receipt/v1".to_owned(),
+            request_id: "secret-request".to_owned(),
+            deployment_id: "secret-deployment".to_owned(),
+            route_id: Some("account".to_owned()),
+            route_scopes: vec!["private-scope".to_owned()],
+            route_layouts: vec!["private-layout".to_owned()],
+            limit_policy_sha256: "digest".to_owned(),
+            outcome: RequestOutcome::Failed,
+            final_state: RequestState::Closed,
+            cancel_reason: None,
+            response_status: Some(500),
+            response_bytes: 12,
+            duration_bucket: RequestDurationBucket::Under50Milliseconds,
+            render_mode: Some(RenderMode::Layout),
+            middleware: vec!["private-middleware".to_owned()],
+            error_boundary: Some("private-boundary".to_owned()),
+            diagnostics: vec![
+                RuntimeDiagnostic::new("PLG-RUN-500", "secret diagnostic message").unwrap(),
+            ],
+        };
+        let fields = completion_log_fields(&receipt);
+        assert_eq!(fields.route_id, "account");
+        assert_eq!(fields.outcome, "failed");
+        assert_eq!(fields.status, 500);
+        assert_eq!(fields.duration_bucket, "under-50-ms");
+        assert_eq!(fields.render_mode, "layout");
+        assert_eq!(fields.diagnostic_count, 1);
+        assert_eq!(fields.diagnostic_code, "PLG-RUN-500");
+        let projection = format!(
+            "{} {} {} {} {}",
+            fields.route_id,
+            fields.outcome,
+            fields.duration_bucket,
+            fields.render_mode,
+            fields.diagnostic_code
+        );
+        for secret in [
+            "secret-request",
+            "secret-deployment",
+            "secret diagnostic message",
+            "private-scope",
+            "private-layout",
+            "private-middleware",
+            "private-boundary",
+        ] {
+            assert!(!projection.contains(secret));
+        }
     }
 
     #[test]

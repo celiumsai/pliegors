@@ -1,0 +1,152 @@
+{
+  "schema": "dev.pliegors.asvs-control-map/v1",
+  "standard": "OWASP ASVS",
+  "standardVersion": "5.0.0",
+  "targetLevel": 2,
+  "scope": "PliegoRS G1 native runtime and dynamic rendering source preview",
+  "source": "https://github.com/OWASP/ASVS/tree/v5.0.0",
+  "reviewedAt": "2026-07-21",
+  "disclaimer": "This is a framework ownership map, not an application compliance claim.",
+  "controls": [
+    {
+      "id": "v5.0.0-1.1.1",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Route paths are percent-decoded exactly once before sealed matching; encoded separators, NUL, invalid UTF-8, and second-pass percent forms fail closed.",
+      "evidence": ["crates/pliego-runtime/src/host.rs", "crates/pliego-runtime/tests/native_runtime.rs"]
+    },
+    {
+      "id": "v5.0.0-1.1.2",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Typed Pliego DOM rendering applies contextual text and attribute escaping at final serialization.",
+      "evidence": ["crates/pliego-dom/src/lib.rs", "docs/evidence/g1-complete-render-foundation.md"]
+    },
+    {
+      "id": "v5.0.0-2.4.1",
+      "status": "shared",
+      "owner": "application-operator",
+      "scopeNote": "The framework bounds connections and concurrent requests globally. Per-user and business anti-automation policy remains application and edge ownership.",
+      "evidence": ["crates/pliego-runtime/src/transport.rs", "crates/pliego-runtime/tests/native_socket.rs"]
+    },
+    {
+      "id": "v5.0.0-3.4.3",
+      "status": "shared",
+      "owner": "application",
+      "scopeNote": "The reference application demonstrates CSP middleware, but PliegoRS cannot choose a correct application-specific policy automatically.",
+      "evidence": ["examples/native-pliego/src/main.rs", "docs/evidence/g1-dynamic-reference-foundation.md"]
+    },
+    {
+      "id": "v5.0.0-3.4.4",
+      "status": "shared",
+      "owner": "application",
+      "scopeNote": "The reference response-policy middleware emits X-Content-Type-Options. Applications retain response-policy ownership.",
+      "evidence": ["examples/native-pliego/src/main.rs", "docs/evidence/g1-dynamic-reference-foundation.md"]
+    },
+    {
+      "id": "v5.0.0-3.4.5",
+      "status": "shared",
+      "owner": "application",
+      "scopeNote": "The reference response-policy middleware emits Referrer-Policy. Applications retain policy selection.",
+      "evidence": ["examples/native-pliego/src/main.rs", "docs/evidence/g1-dynamic-reference-foundation.md"]
+    },
+    {
+      "id": "v5.0.0-4.1.3",
+      "status": "shared",
+      "owner": "host-adapter",
+      "scopeNote": "Core routing and telemetry do not trust forwarding headers. A future proxy-aware host adapter must declare and verify its trust boundary explicitly.",
+      "evidence": ["crates/pliego-runtime/src/telemetry.rs", "docs/48-fullstack-threat-model.md"]
+    },
+    {
+      "id": "v5.0.0-4.2.1",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "One Hyper parser owns framing. Conflicting Content-Length and Transfer-Encoding are rejected by PliegoRS before the handler, and HTTP/2 uses version-specific framing.",
+      "evidence": ["crates/pliego-runtime/src/limits.rs", "crates/pliego-runtime/tests/native_socket.rs"]
+    },
+    {
+      "id": "v5.0.0-5.1.1",
+      "status": "not-applicable",
+      "owner": "G2-application",
+      "scopeNote": "G1 exposes no file-upload or multipart parser. Multipart requests fail closed until G2 defines part, filename, storage, and expanded-size policies.",
+      "evidence": ["crates/pliego-runtime/src/limits.rs", "docs/49-native-runtime-preview.md"]
+    },
+    {
+      "id": "v5.0.0-5.2.3",
+      "status": "not-applicable",
+      "owner": "G2-application",
+      "scopeNote": "G1 performs no archive or request decompression. Non-identity Content-Encoding fails closed until an independent decoded-byte budget exists.",
+      "evidence": ["crates/pliego-runtime/src/limits.rs", "crates/pliego-runtime/tests/native_socket.rs"]
+    },
+    {
+      "id": "v5.0.0-15.1.2",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Cargo.lock is committed, dependency review is automated, and the release path emits SBOM and provenance artifacts.",
+      "evidence": ["Cargo.lock", ".github/workflows/release.yml", "docs/evidence/r6-candidate-distribution.md"]
+    },
+    {
+      "id": "v5.0.0-15.1.3",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Runtime, render, boundary, transport, and shutdown budgets are documented with overload and fixed-load evidence.",
+      "evidence": ["docs/49-native-runtime-preview.md", "docs/evidence/g1-transport-load-security.md"]
+    },
+    {
+      "id": "v5.0.0-15.2.2",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Admission, deadlines, backpressure, stream limits, slow-peer timeouts, cancellation, and bounded shutdown are enforced by tests.",
+      "evidence": ["crates/pliego-runtime/tests/native_socket.rs", "crates/pliego-runtime/tests/native_load.rs"]
+    },
+    {
+      "id": "v5.0.0-15.3.7",
+      "status": "shared",
+      "owner": "G2-application",
+      "scopeNote": "G1 keeps route path, query, headers, and body distinct and performs no merged parameter extraction. Typed form and action decoding remain G2 work.",
+      "evidence": ["crates/pliego-runtime/src/host.rs", "docs/rfc/RFC-010-data-actions-cache.md"]
+    },
+    {
+      "id": "v5.0.0-16.1.1",
+      "status": "shared",
+      "owner": "operator",
+      "scopeNote": "PliegoRS documents its bounded event and OTel field inventory. Destination, retention, access, and alert policy belong to the operator.",
+      "evidence": ["docs/49-native-runtime-preview.md", "docs/evidence/g1-opentelemetry-foundation.md"]
+    },
+    {
+      "id": "v5.0.0-16.2.5",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Default request logs and OTel signals exclude concrete paths, queries, headers, cookies, bodies, identities, and diagnostic messages.",
+      "evidence": ["crates/pliego-runtime/src/scope.rs", "crates/pliego-runtime/tests/opentelemetry.rs"]
+    },
+    {
+      "id": "v5.0.0-16.3.3",
+      "status": "partial",
+      "owner": "framework-operator",
+      "scopeNote": "Lifecycle rejections emit bounded diagnostic codes. Parser-level connection failures remain generic transport events and require operator correlation.",
+      "evidence": ["crates/pliego-runtime/src/scope.rs", "crates/pliego-runtime/src/host.rs"]
+    },
+    {
+      "id": "v5.0.0-16.4.1",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Tracing fields are typed values from bounded enums, sealed route IDs, numeric counters, and finite diagnostic codes; messages and user strings are excluded.",
+      "evidence": ["crates/pliego-runtime/src/scope.rs", "crates/pliego-runtime/src/telemetry.rs"]
+    },
+    {
+      "id": "v5.0.0-16.5.1",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Authored boundaries receive public classes and codes only; built-in failures expose stable codes without stack traces or internal messages.",
+      "evidence": ["crates/pliego-runtime/src/error.rs", "crates/pliego-runtime/tests/native_runtime.rs"]
+    },
+    {
+      "id": "v5.0.0-16.5.3",
+      "status": "verified",
+      "owner": "framework",
+      "scopeNote": "Middleware capability mismatches, panics, malformed inputs, body limits, and invalid lifecycle transitions fail closed with bounded cleanup.",
+      "evidence": ["crates/pliego-runtime/src/host.rs", "crates/pliego-runtime/tests/native_runtime.rs"]
+    }
+  ]
+}

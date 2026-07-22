@@ -9,6 +9,15 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Added
 
+- Add a bounded native HTTP/1.1 and HTTP/2 accept loop with explicit
+  connection, slow-head, read/write idle, multiplexing, flow-control, and
+  graceful-drain policies plus real-socket conformance.
+- Add route-owned layout shells for ordered and asynchronous boundary streams,
+  preserving sealed ownership, pre-commit slot validation, one output budget,
+  cancellation, cleanup, and receipt identity.
+- Add bounded `pliegors::request` structured completion events, panic-isolated
+  receipt sinks, a machine-checked OWASP ASVS 5.0.0 G1 ownership map, and a
+  reproducible fixed-load Linux latency/RSS harness.
 - Add operator-enabled OpenTelemetry server spans and HTTP metrics across the
   full response-body lifecycle, with default-new traces, opt-in W3C parent
   acceptance, bounded method/route/error cardinality, secret-redaction
@@ -52,6 +61,10 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Security
 
+- Reject conflicting `Content-Length` plus `Transfer-Encoding`, implicit
+  request decompression, and multipart parsing before handlers until their
+  independent bounded policies exist; add slowloris, stalled-reader,
+  connection-exhaustion, header-exhaustion, and HTTP/2 overload cases.
 - Resolve the `fast-uri` host-confusion advisory and override Cloudflare's
   vulnerable transitive `sharp` pin with `0.35.3`; all three npm audit surfaces
   now pass at high severity.

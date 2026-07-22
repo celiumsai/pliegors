@@ -21,6 +21,7 @@ const DOCTYPE: &str = "<!doctype html>";
 const DOCUMENT_SUFFIX: &str = "</body></html>";
 const MAX_DOCUMENT_ASSETS: usize = 128;
 const MAX_DOCUMENT_METADATA_BYTES: usize = 64 * 1_024;
+const LAYOUT_STREAM_SLOT: &str = "PLIEGORS_INTERNAL_STREAM_SLOT_7F4D9C2A";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -436,6 +437,94 @@ pub struct LayoutDocument {
     body: View,
 }
 
+/// A streamed document whose shell is composed only from layouts owned by the
+/// sealed route match.
+#[derive(Clone)]
+pub struct LayoutStreamDocument {
+    expected_layouts: Vec<String>,
+    layers: BTreeMap<String, LayoutLayer>,
+    page_head: DocumentHead,
+}
+
+impl LayoutStreamDocument {
+    pub fn new(route: &pliego_router::RouteMatch) -> Self {
+        Self {
+            expected_layouts: route.layout_ids().to_vec(),
+            layers: BTreeMap::new(),
+            page_head: DocumentHead::default(),
+        }
+    }
+
+    pub fn layout(mut self, layer: LayoutLayer) -> Result<Self, ServerRenderError> {
+        if !self.expected_layouts.contains(&layer.id) {
+            return Err(ServerRenderError::LayoutNotDeclared(layer.id));
+        }
+        let id = layer.id.clone();
+        if self.layers.insert(id.clone(), layer).is_some() {
+            return Err(ServerRenderError::DuplicateLayout(id));
+        }
+        Ok(self)
+    }
+
+    pub fn head(mut self, head: DocumentHead) -> Self {
+        self.page_head = head;
+        self
+    }
+
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.page_head.language = Some(language.into());
+        self
+    }
+
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.page_head.title = Some(title.into());
+        self
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.page_head.description = Some(description.into());
+        self
+    }
+
+    pub fn canonical(mut self, canonical: impl Into<String>) -> Self {
+        self.page_head.canonical = Some(canonical.into());
+        self
+    }
+
+    pub fn stylesheet(mut self, path: impl Into<String>) -> Self {
+        self.page_head.stylesheets.push(path.into());
+        self
+    }
+
+    pub fn module_script(mut self, path: impl Into<String>) -> Self {
+        self.page_head.module_scripts.push(path.into());
+        self
+    }
+
+    fn shell(&self, limits: RenderLimits) -> Result<(String, String), ServerRenderError> {
+        let metadata =
+            compose_layout_metadata(&self.expected_layouts, &self.layers, &self.page_head)?;
+        let body = compose_layout_body(
+            &self.expected_layouts,
+            &self.layers,
+            View::Text(LAYOUT_STREAM_SLOT.to_owned()),
+        );
+        let rendered = render_view(&body, CompleteRenderOptions::new(limits))?;
+        let mut slots = rendered.match_indices(LAYOUT_STREAM_SLOT);
+        let Some((start, _)) = slots.next() else {
+            return Err(ServerRenderError::LayoutStreamSlotViolation);
+        };
+        if slots.next().is_some() {
+            return Err(ServerRenderError::LayoutStreamSlotViolation);
+        }
+        let mut prefix = document_prefix(&metadata)?;
+        prefix.push_str(&rendered[..start]);
+        let mut suffix = rendered[start + LAYOUT_STREAM_SLOT.len()..].to_owned();
+        suffix.push_str(DOCUMENT_SUFFIX);
+        Ok((prefix, suffix))
+    }
+}
+
 impl LayoutDocument {
     pub fn new(route: &pliego_router::RouteMatch, body: View) -> Self {
         Self {
@@ -493,45 +582,59 @@ impl LayoutDocument {
     }
 
     fn compose(&self) -> Result<CompleteDocument, ServerRenderError> {
-        for id in &self.expected_layouts {
-            if !self.layers.contains_key(id) {
-                return Err(ServerRenderError::MissingLayout(id.clone()));
-            }
-        }
-
-        let mut metadata = DocumentMetadata {
-            language: "en".to_owned(),
-            title: String::new(),
-            description: None,
-            canonical: None,
-            stylesheets: Vec::new(),
-            module_scripts: Vec::new(),
-        };
-        for id in &self.expected_layouts {
-            merge_document_head(
-                &mut metadata,
-                &self
-                    .layers
-                    .get(id)
-                    .expect("every expected layout was admitted")
-                    .head,
-            );
-        }
-        merge_document_head(&mut metadata, &self.page_head);
-        if metadata.title.is_empty() {
-            return Err(ServerRenderError::MissingDocumentTitle);
-        }
-
-        let mut body = self.body.clone();
-        for id in self.expected_layouts.iter().rev() {
-            let layer = self
-                .layers
-                .get(id)
-                .expect("every expected layout was admitted");
-            body = layer.compose(body);
-        }
+        let metadata =
+            compose_layout_metadata(&self.expected_layouts, &self.layers, &self.page_head)?;
+        let body = compose_layout_body(&self.expected_layouts, &self.layers, self.body.clone());
         Ok(CompleteDocument { metadata, body })
     }
+}
+
+fn compose_layout_metadata(
+    expected_layouts: &[String],
+    layers: &BTreeMap<String, LayoutLayer>,
+    page_head: &DocumentHead,
+) -> Result<DocumentMetadata, ServerRenderError> {
+    for id in expected_layouts {
+        if !layers.contains_key(id) {
+            return Err(ServerRenderError::MissingLayout(id.clone()));
+        }
+    }
+    let mut metadata = DocumentMetadata {
+        language: "en".to_owned(),
+        title: String::new(),
+        description: None,
+        canonical: None,
+        stylesheets: Vec::new(),
+        module_scripts: Vec::new(),
+    };
+    for id in expected_layouts {
+        merge_document_head(
+            &mut metadata,
+            &layers
+                .get(id)
+                .expect("every expected layout was admitted")
+                .head,
+        );
+    }
+    merge_document_head(&mut metadata, page_head);
+    if metadata.title.is_empty() {
+        return Err(ServerRenderError::MissingDocumentTitle);
+    }
+    Ok(metadata)
+}
+
+fn compose_layout_body(
+    expected_layouts: &[String],
+    layers: &BTreeMap<String, LayoutLayer>,
+    mut body: View,
+) -> View {
+    for id in expected_layouts.iter().rev() {
+        body = layers
+            .get(id)
+            .expect("every expected layout was admitted")
+            .compose(body);
+    }
+    body
 }
 
 fn merge_document_head(metadata: &mut DocumentMetadata, head: &DocumentHead) {
@@ -749,12 +852,45 @@ pub fn render_ordered_document<S>(
 where
     S: Stream<Item = OrderedViewChunk> + Send + 'static,
 {
-    validate_body_status(options.status).map_err(ServerRenderError::into_handler_error)?;
     let prefix =
         document_prefix(&document.metadata).map_err(ServerRenderError::into_handler_error)?;
+    ordered_response(
+        prefix,
+        DOCUMENT_SUFFIX.to_owned(),
+        chunks,
+        options,
+        RenderMode::Ordered,
+    )
+}
+
+pub fn render_layout_ordered_document<S>(
+    document: &LayoutStreamDocument,
+    chunks: S,
+    options: OrderedRenderOptions,
+) -> Result<Response<Body>, HandlerError>
+where
+    S: Stream<Item = OrderedViewChunk> + Send + 'static,
+{
+    let (prefix, suffix) = document
+        .shell(options.limits)
+        .map_err(ServerRenderError::into_handler_error)?;
+    ordered_response(prefix, suffix, chunks, options, RenderMode::Layout)
+}
+
+fn ordered_response<S>(
+    prefix: String,
+    suffix: String,
+    chunks: S,
+    options: OrderedRenderOptions,
+    mode: RenderMode,
+) -> Result<Response<Body>, HandlerError>
+where
+    S: Stream<Item = OrderedViewChunk> + Send + 'static,
+{
+    validate_body_status(options.status).map_err(ServerRenderError::into_handler_error)?;
     let overhead = prefix
         .len()
-        .checked_add(DOCUMENT_SUFFIX.len())
+        .checked_add(suffix.len())
         .ok_or(ServerRenderError::OutputLimitTooSmall)
         .map_err(ServerRenderError::into_handler_error)?;
     let remaining = options
@@ -767,6 +903,7 @@ where
         input: Box::pin(chunks),
         phase: OrderedPhase::Prefix,
         prefix: Some(Bytes::from(prefix)),
+        suffix: Some(Bytes::from(suffix)),
         remaining,
         chunks: 0,
         options,
@@ -777,7 +914,7 @@ where
         CONTENT_TYPE,
         http::HeaderValue::from_static("text/html; charset=utf-8"),
     );
-    response.extensions_mut().insert(RenderMode::Ordered);
+    response.extensions_mut().insert(mode);
     Ok(response)
 }
 
@@ -789,9 +926,42 @@ pub fn render_boundary_document<I>(
 where
     I: IntoIterator<Item = AsyncBoundary>,
 {
-    validate_body_status(options.status).map_err(ServerRenderError::into_handler_error)?;
     let prefix =
         document_prefix(&document.metadata).map_err(ServerRenderError::into_handler_error)?;
+    boundary_response(
+        prefix,
+        DOCUMENT_SUFFIX.to_owned(),
+        boundaries,
+        options,
+        RenderMode::Boundary,
+    )
+}
+
+pub fn render_layout_boundary_document<I>(
+    document: &LayoutStreamDocument,
+    boundaries: I,
+    options: BoundaryRenderOptions,
+) -> Result<Response<Body>, HandlerError>
+where
+    I: IntoIterator<Item = AsyncBoundary>,
+{
+    let (prefix, suffix) = document
+        .shell(options.limits)
+        .map_err(ServerRenderError::into_handler_error)?;
+    boundary_response(prefix, suffix, boundaries, options, RenderMode::Layout)
+}
+
+fn boundary_response<I>(
+    prefix: String,
+    suffix: String,
+    boundaries: I,
+    options: BoundaryRenderOptions,
+    mode: RenderMode,
+) -> Result<Response<Body>, HandlerError>
+where
+    I: IntoIterator<Item = AsyncBoundary>,
+{
+    validate_body_status(options.status).map_err(ServerRenderError::into_handler_error)?;
     let mut pending = VecDeque::new();
     let mut ids = HashSet::new();
     let mut placeholder_bytes = 0usize;
@@ -818,7 +988,7 @@ where
 
     let overhead = prefix
         .len()
-        .checked_add(DOCUMENT_SUFFIX.len())
+        .checked_add(suffix.len())
         .and_then(|value| value.checked_add(placeholder_bytes))
         .ok_or(ServerRenderError::OutputLimitTooSmall)
         .map_err(ServerRenderError::into_handler_error)?;
@@ -835,6 +1005,7 @@ where
         active_ids: VecDeque::new(),
         phase: BoundaryPhase::Prefix,
         prefix: Some(Bytes::from(prefix)),
+        suffix: Some(Bytes::from(suffix)),
         remaining,
         options,
     };
@@ -846,7 +1017,7 @@ where
         CONTENT_TYPE,
         http::HeaderValue::from_static("text/html; charset=utf-8"),
     );
-    response.extensions_mut().insert(RenderMode::Boundary);
+    response.extensions_mut().insert(mode);
     Ok(response)
 }
 
@@ -862,6 +1033,7 @@ struct OrderedBodyStream<S> {
     input: Pin<Box<S>>,
     phase: OrderedPhase,
     prefix: Option<Bytes>,
+    suffix: Option<Bytes>,
     remaining: usize,
     chunks: usize,
     options: OrderedRenderOptions,
@@ -937,7 +1109,7 @@ where
                 }
                 OrderedPhase::Suffix => {
                     state.phase = OrderedPhase::Done;
-                    return Poll::Ready(Some(Ok(Bytes::from_static(DOCUMENT_SUFFIX.as_bytes()))));
+                    return Poll::Ready(state.suffix.take().map(Ok));
                 }
                 OrderedPhase::Done => return Poll::Ready(None),
             }
@@ -966,6 +1138,7 @@ struct BoundaryBodyStream {
     active_ids: VecDeque<String>,
     phase: BoundaryPhase,
     prefix: Option<Bytes>,
+    suffix: Option<Bytes>,
     remaining: usize,
     options: BoundaryRenderOptions,
 }
@@ -1090,7 +1263,7 @@ impl Stream for BoundaryBodyStream {
                 }
                 BoundaryPhase::Suffix => {
                     state.phase = BoundaryPhase::Done;
-                    return Poll::Ready(Some(Ok(Bytes::from_static(DOCUMENT_SUFFIX.as_bytes()))));
+                    return Poll::Ready(state.suffix.take().map(Ok));
                 }
                 BoundaryPhase::Done => return Poll::Ready(None),
             }
@@ -1350,6 +1523,7 @@ pub enum ServerRenderError {
     DuplicateLayout(String),
     MissingLayout(String),
     MissingDocumentTitle,
+    LayoutStreamSlotViolation,
     DocumentMetadataLimit { maximum: usize },
     TooManyChunks { maximum: usize },
     TooManyBoundaries { maximum: usize },
@@ -1383,7 +1557,8 @@ impl ServerRenderError {
             | Self::LayoutNotDeclared(_)
             | Self::DuplicateLayout(_)
             | Self::MissingLayout(_)
-            | Self::MissingDocumentTitle => "PLG-REN-008",
+            | Self::MissingDocumentTitle
+            | Self::LayoutStreamSlotViolation => "PLG-REN-008",
             Self::DocumentMetadataLimit { .. } => "PLG-REN-006",
             Self::TooManyChunks { .. } => "PLG-REN-202",
             Self::TooManyBoundaries { .. } => "PLG-REN-205",
@@ -1452,6 +1627,9 @@ impl Display for ServerRenderError {
             }
             Self::MissingDocumentTitle => {
                 formatter.write_str("layout document requires a page or layout title")
+            }
+            Self::LayoutStreamSlotViolation => {
+                formatter.write_str("streaming layout shell did not contain exactly one child slot")
             }
             Self::DocumentMetadataLimit { maximum } => {
                 write!(
@@ -1644,6 +1822,102 @@ mod tests {
         assert!(html.contains(
             "<div class=\"root\"><nav>PLIEGO</nav><section class=\"docs\"><article>Owned page</article></section></div>"
         ));
+    }
+
+    #[tokio::test]
+    async fn sealed_layout_shell_wraps_ordered_and_boundary_streams() {
+        use pliego_router::{
+            RouteGraphBuilder, RouteMethod, RouteScopeKind, RouteScopeSpec, RouteSpec,
+        };
+
+        let graph = RouteGraphBuilder::new()
+            .scope(RouteScopeSpec::new("root-layout", RouteScopeKind::Layout).unwrap())
+            .scope(
+                RouteScopeSpec::new("docs-layout", RouteScopeKind::Layout)
+                    .unwrap()
+                    .parent("root-layout")
+                    .unwrap(),
+            )
+            .route(
+                RouteSpec::new("guide", RouteMethod::get(), "/guide")
+                    .unwrap()
+                    .scope("docs-layout")
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap();
+        let matched = graph.resolve(&RouteMethod::get(), "/guide").unwrap();
+        let root = LayoutLayer::new("root-layout")
+            .unwrap()
+            .before(el("nav").child("PLIEGO"))
+            .wrap(el("div").class("root"))
+            .head(DocumentHead::new().language("es-CO").title("Fallback"));
+        let docs = LayoutLayer::new("docs-layout")
+            .unwrap()
+            .wrap(el("section").class("docs"))
+            .after(el("footer").child("End"));
+        let document = LayoutStreamDocument::new(&matched)
+            .layout(root)
+            .unwrap()
+            .layout(docs)
+            .unwrap()
+            .title("Streamed guide");
+
+        let chunks = futures_util::stream::iter([
+            OrderedViewChunk::new(|| el("p").child("first").into_view()),
+            OrderedViewChunk::new(|| el("p").child("second").into_view()),
+        ]);
+        let response =
+            render_layout_ordered_document(&document, chunks, OrderedRenderOptions::default())
+                .unwrap();
+        assert_eq!(
+            response.extensions().get::<RenderMode>(),
+            Some(&RenderMode::Layout)
+        );
+        let html = axum::body::to_bytes(response.into_body(), 16 * 1024)
+            .await
+            .unwrap();
+        let html = std::str::from_utf8(&html).unwrap();
+        assert!(!html.contains(LAYOUT_STREAM_SLOT));
+        assert!(html.contains(
+            "<div class=\"root\"><nav>PLIEGO</nav><section class=\"docs\"><p>first</p><p>second</p></section><footer>End</footer></div>"
+        ));
+
+        let boundary = AsyncBoundary::map("profile", async { "ready" }, |value| {
+            el("strong").child(value).into_view()
+        })
+        .unwrap();
+        let response = render_layout_boundary_document(
+            &document,
+            [boundary],
+            BoundaryRenderOptions::default(),
+        )
+        .unwrap();
+        let html = axum::body::to_bytes(response.into_body(), 16 * 1024)
+            .await
+            .unwrap();
+        let html = std::str::from_utf8(&html).unwrap();
+        assert!(html.contains(
+            "<section class=\"docs\"><template data-pliego-boundary=\"profile\"></template><strong>ready</strong></section>"
+        ));
+
+        let colliding = LayoutStreamDocument::new(&matched)
+            .layout(
+                LayoutLayer::new("root-layout")
+                    .unwrap()
+                    .before(text(LAYOUT_STREAM_SLOT)),
+            )
+            .unwrap()
+            .layout(LayoutLayer::new("docs-layout").unwrap())
+            .unwrap()
+            .title("Collision");
+        let error = render_layout_ordered_document(
+            &colliding,
+            futures_util::stream::empty(),
+            OrderedRenderOptions::default(),
+        )
+        .unwrap_err();
+        assert_eq!(error.diagnostic().code, "PLG-REN-008");
     }
 
     #[test]

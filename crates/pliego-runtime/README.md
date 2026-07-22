@@ -29,14 +29,25 @@ number of declared futures concurrently, emits stable inert placeholders, and
 delivers resolved HTML in declaration order without requiring client-side
 JavaScript.
 
-Complete responses may use `LayoutDocument` to bind composition to the exact
-root-to-leaf layout identities in the sealed route match. Each `LayoutLayer`
+Complete responses use `LayoutDocument`, while ordered and boundary streams
+use `LayoutStreamDocument`, to bind composition to the exact root-to-leaf
+layout identities in the sealed route match. Each `LayoutLayer`
 transforms one private child frame through typed `before`, `after`, and `wrap`
 operations, so it cannot drop or duplicate the child. Missing, duplicate, or
 foreign layers fail before response commitment. Head contributions merge in
 route ownership order, leaf/page scalars win, asset order stays stable, and
 exact duplicate assets are emitted once. Groups never masquerade as layouts,
 and receipts record both the complete scope chain and layout-only identity.
+Streamed shells validate one internal child slot before commitment and account
+for shell plus streamed chunks under one output budget.
+
+`NativeRuntime::serve` uses one configurable Hyper HTTP/1.1 and HTTP/2 parser
+path behind a bounded accept loop. `TransportLimits` caps connections, the
+absolute HTTP/1 head deadline, read/write inactivity, HTTP/2 streams,
+flow-control windows, and send buffers. The runtime rejects conflicting body
+framing, implicit request decompression, and multipart parsing until their
+independent G2 policies exist. Every completed request also emits one bounded
+`pliegors::request` structured event; operator receipt sinks are panic-isolated.
 
 `NativeRuntimeBuilder::open_telemetry` binds the runtime to global
 OpenTelemetry providers configured by the operator. PliegoRS does not install
@@ -58,12 +69,14 @@ does not promote the `native-http-runtime` or `dynamic-ssr` capabilities in
 `product.capabilities.json`. See
 [`RFC-008`](../../docs/rfc/RFC-008-native-runtime.md).
 
-The conformance corpus includes raw TCP HTTP/1.1 loopback requests and a
-graceful-shutdown case with a pending streamed response. HTTP/2, TLS, proxy,
-slow-peer, and fixed-load evidence remain open gate work.
+The conformance corpus includes raw TCP HTTP/1.1 and HTTP/2, multiplexed
+overload, graceful shutdown with a pending stream, connection admission,
+slow-head and slow-reader peers, parser/body-policy cases, and an explicit
+2,000-request Linux RSS/latency harness. TLS and proxy identity remain host
+adapter work rather than implicit trust in forwarding headers.
 
-This foundation is intentionally incomplete. It does not yet expose
-layout composition for streamed modes, layout loaders or cleanup,
-structured runtime logs, multipart/decompression policies, or a production
-`pliego serve` command. HTTP/2, load, and broader security evidence still gate
-the production-observability claim.
+This source preview still does not expose G2 loaders, actions, caches,
+sessions, uploads, multipart/decompression parsers, G3 host adapters, or a
+production `pliego serve` command. See the
+[G1 transport evidence](../../docs/evidence/g1-transport-load-security.md) and
+[ASVS ownership map](../../security/asvs-v5.0.0-g1.json) for the exact boundary.

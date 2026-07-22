@@ -14,6 +14,7 @@ mod middleware;
 mod render;
 mod scope;
 mod telemetry;
+mod transport;
 
 pub use error::{
     ErrorBoundaryContext, ErrorBoundaryFuture, PublicError, PublicErrorClass, RuntimeErrorBoundary,
@@ -26,10 +27,11 @@ pub use limits::{LimitError, RequestLimits};
 pub use middleware::{MiddlewareNext, PreRouteNext, RuntimeMiddleware, RuntimePreRouteMiddleware};
 pub use render::{
     AsyncBoundary, BoundaryDocument, BoundaryRenderOptions, CompleteDocument,
-    CompleteRenderOptions, DocumentHead, LayoutDocument, LayoutLayer, OrderedDocument,
-    OrderedRenderOptions, OrderedViewChunk, RenderMode, RenderSeedMode, ServerRenderError,
-    render_boundary_document, render_complete_document, render_complete_fragment,
-    render_layout_document, render_ordered_document,
+    CompleteRenderOptions, DocumentHead, LayoutDocument, LayoutLayer, LayoutStreamDocument,
+    OrderedDocument, OrderedRenderOptions, OrderedViewChunk, RenderMode, RenderSeedMode,
+    ServerRenderError, render_boundary_document, render_complete_document,
+    render_complete_fragment, render_layout_boundary_document, render_layout_document,
+    render_layout_ordered_document, render_ordered_document,
 };
 pub use scope::{
     CancelReason, InMemoryReceiptSink, PreRouteContext, RequestContext, RequestDurationBucket,
@@ -37,6 +39,7 @@ pub use scope::{
     RuntimeReceiptSink, ScopeError,
 };
 pub use telemetry::{HttpScheme, OpenTelemetryConfig, OpenTelemetryConfigError, RemoteTracePolicy};
+pub use transport::{TransportLimitError, TransportLimits};
 
 pub use axum::body::Body;
 pub use http::{Request, Response, StatusCode};

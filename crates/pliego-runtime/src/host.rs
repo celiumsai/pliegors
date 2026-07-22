@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::telemetry::OpenTelemetryRuntime;
+use crate::transport::TimedIo;
 use crate::{
     CancelReason, ErrorBoundaryContext, LimitError, MiddlewareNext, OpenTelemetryConfig,
     PreRouteContext, PreRouteNext, PublicError, PublicErrorClass, RequestContext, RequestIdentity,
     RequestLimits, RequestScope, RequestState, RuntimeDiagnostic, RuntimeErrorBoundary,
     RuntimeMiddleware, RuntimePreRouteMiddleware, RuntimeReceipt, RuntimeReceiptSink, ScopeError,
+    TransportLimitError, TransportLimits,
 };
 use axum::Router;
 use axum::body::{Body, Bytes};
@@ -14,21 +16,28 @@ use futures_util::FutureExt;
 use http::{Request, Response, StatusCode};
 use http_body::{Body as HttpBody, Frame, SizeHint};
 use http_body_util::{BodyExt, Limited};
+use hyper::body::Incoming;
+use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
+use hyper_util::server::conn::auto::Builder as ConnectionBuilder;
+use hyper_util::service::TowerToHyperService;
 use pliego_router::{
     MiddlewareCapabilities, MiddlewareCapability, ResolveError, RouteGraph, RouteMatch, RouteMethod,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
-use std::future::{Future, IntoFuture};
+use std::future::Future;
 use std::io;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::task::{Context, Poll};
 use tokio::net::TcpListener;
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
+use tower::ServiceExt;
 use tracing::{debug, warn};
 
 pub type HandlerFuture =
@@ -94,6 +103,7 @@ pub struct NativeRuntimeBuilder {
     graph: Arc<RouteGraph>,
     deployment_id: String,
     limits: RequestLimits,
+    transport_limits: TransportLimits,
     handlers: BTreeMap<String, Arc<dyn RuntimeHandler>>,
     middleware: BTreeMap<String, MiddlewareRegistration>,
     pre_route_middleware: BTreeMap<String, PreRouteMiddlewareRegistration>,
@@ -116,6 +126,7 @@ impl NativeRuntimeBuilder {
             graph: Arc::new(graph),
             deployment_id,
             limits: RequestLimits::default(),
+            transport_limits: TransportLimits::default(),
             handlers: BTreeMap::new(),
             middleware: BTreeMap::new(),
             pre_route_middleware: BTreeMap::new(),
@@ -131,6 +142,12 @@ impl NativeRuntimeBuilder {
     pub fn limits(mut self, limits: RequestLimits) -> Result<Self, RuntimeBuildError> {
         limits.validate()?;
         self.limits = limits;
+        Ok(self)
+    }
+
+    pub fn transport_limits(mut self, limits: TransportLimits) -> Result<Self, RuntimeBuildError> {
+        limits.validate()?;
+        self.transport_limits = limits;
         Ok(self)
     }
 
@@ -243,6 +260,7 @@ impl NativeRuntimeBuilder {
 
     pub fn build(self) -> Result<NativeRuntime, RuntimeBuildError> {
         self.limits.validate()?;
+        self.transport_limits.validate()?;
         if let Some(id) = self.duplicate_middleware.iter().next() {
             return Err(RuntimeBuildError::DuplicateMiddlewareRegistration(
                 id.clone(),
@@ -325,6 +343,7 @@ impl NativeRuntimeBuilder {
                 graph: self.graph,
                 deployment_id: self.deployment_id,
                 limits: self.limits,
+                transport_limits: self.transport_limits,
                 handlers: self.handlers,
                 middleware: self.middleware,
                 pre_route_middleware: self.pre_route_middleware,
@@ -332,6 +351,9 @@ impl NativeRuntimeBuilder {
                 receipt_sink: self.receipt_sink,
                 telemetry: self.telemetry,
                 request_sequence: AtomicU64::new(0),
+                server_started: AtomicBool::new(false),
+                active_connections: AtomicUsize::new(0),
+                rejected_connections: AtomicU64::new(0),
                 registry,
             }),
         })
@@ -363,6 +385,7 @@ struct RuntimeState {
     graph: Arc<RouteGraph>,
     deployment_id: String,
     limits: RequestLimits,
+    transport_limits: TransportLimits,
     handlers: BTreeMap<String, Arc<dyn RuntimeHandler>>,
     middleware: BTreeMap<String, MiddlewareRegistration>,
     pre_route_middleware: BTreeMap<String, PreRouteMiddlewareRegistration>,
@@ -370,6 +393,9 @@ struct RuntimeState {
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
     telemetry: Option<Arc<OpenTelemetryRuntime>>,
     request_sequence: AtomicU64,
+    server_started: AtomicBool,
+    active_connections: AtomicUsize,
+    rejected_connections: AtomicU64,
     registry: Arc<RequestRegistry>,
 }
 
@@ -458,30 +484,91 @@ impl NativeRuntime {
     where
         F: Future<Output = ()> + Send + 'static,
     {
+        if self
+            .state
+            .server_started
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "PliegoRS runtime server has already been started",
+            ));
+        }
         let registry = self.state.registry.clone();
         let drain_deadline = self.state.limits.graceful_shutdown_deadline();
-        let shutdown_started = CancellationToken::new();
-        let shutdown_observer = shutdown_started.clone();
-        let graceful = async move {
-            shutdown.await;
-            registry.begin_shutdown();
-            shutdown_started.cancel();
-        };
-        let server = axum::serve(listener, self.router())
-            .with_graceful_shutdown(graceful)
-            .into_future();
-        tokio::pin!(server);
-        tokio::select! {
-            result = &mut server => result,
-            _ = shutdown_observer.cancelled() => {
-                match tokio::time::timeout(drain_deadline, &mut server).await {
-                    Ok(result) => result,
-                    Err(_) => Err(io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        "PliegoRS graceful shutdown exceeded its drain deadline",
-                    )),
+        let connection_shutdown = CancellationToken::new();
+        let connection_slots =
+            Arc::new(Semaphore::new(self.state.transport_limits.max_connections));
+        let mut connections = JoinSet::new();
+        let mut accept_error = None;
+        tokio::pin!(shutdown);
+
+        loop {
+            tokio::select! {
+                biased;
+                _ = &mut shutdown => break,
+                result = listener.accept() => {
+                    let (stream, _) = match result {
+                        Ok(connection) => connection,
+                        Err(error) => {
+                            accept_error = Some(error);
+                            break;
+                        }
+                    };
+                    let permit = match connection_slots.clone().try_acquire_owned() {
+                        Ok(permit) => permit,
+                        Err(_) => {
+                            self.state.rejected_connections.fetch_add(1, Ordering::AcqRel);
+                            drop(stream);
+                            continue;
+                        }
+                    };
+                    let state = self.state.clone();
+                    let router = self.router();
+                    let connection_shutdown = connection_shutdown.clone();
+                    connections.spawn(async move {
+                        let _permit = permit;
+                        let _active = ActiveConnection::new(state.clone());
+                        serve_connection(
+                            stream,
+                            router,
+                            state.limits.clone(),
+                            state.transport_limits.clone(),
+                            connection_shutdown,
+                        )
+                        .await;
+                    });
+                }
+                result = connections.join_next(), if !connections.is_empty() => {
+                    if result.is_some_and(|result| result.is_err()) {
+                        warn!(target: "pliegors::transport", "PliegoRS connection task failed");
+                    }
                 }
             }
+        }
+
+        registry.begin_shutdown();
+        connection_shutdown.cancel();
+        let drain = async {
+            while let Some(result) = connections.join_next().await {
+                if result.is_err() {
+                    warn!(target: "pliegors::transport", "PliegoRS connection task failed");
+                }
+            }
+        };
+        if tokio::time::timeout(drain_deadline, drain).await.is_err() {
+            connections.abort_all();
+            while connections.join_next().await.is_some() {}
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "PliegoRS graceful shutdown exceeded its drain deadline",
+            ));
+        }
+        if let Some(error) = accept_error {
+            Err(error)
+        } else {
+            Ok(())
         }
     }
 
@@ -491,6 +578,77 @@ impl NativeRuntime {
 
     pub fn active_request_count(&self) -> usize {
         self.state.registry.active_count()
+    }
+
+    pub fn active_connection_count(&self) -> usize {
+        self.state.active_connections.load(Ordering::Acquire)
+    }
+
+    pub fn rejected_connection_count(&self) -> u64 {
+        self.state.rejected_connections.load(Ordering::Acquire)
+    }
+
+    pub fn transport_policy_sha256(&self) -> String {
+        self.state.transport_limits.digest()
+    }
+}
+
+struct ActiveConnection {
+    state: Arc<RuntimeState>,
+}
+
+impl ActiveConnection {
+    fn new(state: Arc<RuntimeState>) -> Self {
+        state.active_connections.fetch_add(1, Ordering::AcqRel);
+        Self { state }
+    }
+}
+
+impl Drop for ActiveConnection {
+    fn drop(&mut self) {
+        self.state.active_connections.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+async fn serve_connection(
+    stream: tokio::net::TcpStream,
+    router: Router,
+    request_limits: RequestLimits,
+    limits: TransportLimits,
+    shutdown: CancellationToken,
+) {
+    let io = TokioIo::new(TimedIo::new(stream, &limits));
+    let service = router.map_request(|request: Request<Incoming>| request.map(Body::new));
+    let service = TowerToHyperService::new(service);
+    let mut builder = ConnectionBuilder::new(TokioExecutor::new());
+    builder
+        .http1()
+        .timer(TokioTimer::new())
+        .header_read_timeout(limits.http1_header_read_timeout())
+        .max_headers(request_limits.max_header_count)
+        .max_buf_size(request_limits.max_header_bytes.max(8 * 1_024));
+    builder
+        .http2()
+        .timer(TokioTimer::new())
+        .max_concurrent_streams(limits.http2_max_concurrent_streams)
+        .max_header_list_size(request_limits.max_header_bytes as u32)
+        .initial_stream_window_size(limits.http2_initial_stream_window_bytes)
+        .initial_connection_window_size(limits.http2_initial_connection_window_bytes)
+        .max_send_buf_size(limits.http2_max_send_buffer_bytes);
+    let connection = builder.serve_connection_with_upgrades(io, service);
+    tokio::pin!(connection);
+    tokio::select! {
+        result = &mut connection => {
+            if result.is_err() {
+                debug!(target: "pliegors::transport", "PliegoRS transport connection closed");
+            }
+        }
+        _ = shutdown.cancelled() => {
+            connection.as_mut().graceful_shutdown();
+            if connection.await.is_err() {
+                debug!(target: "pliegors::transport", "PliegoRS transport connection closed during drain");
+            }
+        }
     }
 }
 
@@ -550,6 +708,14 @@ async fn dispatch(
         let status = limit_status(&error);
         let diagnostic = RuntimeDiagnostic::new(error.code(), bounded(&error.to_string(), 320))
             .expect("limit diagnostics are bounded");
+        let public = PublicError::new(PublicErrorClass::InvalidRequest, status, error.code());
+        let response = recover_error(&state, &scope, None, public, diagnostic).await;
+        return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
+    }
+    if let Err(error) = state.limits.admit_body_format(&parts) {
+        let status = limit_status(&error);
+        let diagnostic = RuntimeDiagnostic::new(error.code(), bounded(&error.to_string(), 320))
+            .expect("body format diagnostics are bounded");
         let public = PublicError::new(PublicErrorClass::InvalidRequest, status, error.code());
         let response = recover_error(&state, &scope, None, public, diagnostic).await;
         return wrap_handler_response(scope, response).unwrap_or_else(|_| fallback_response());
@@ -1383,9 +1549,13 @@ fn limit_status(error: &LimitError) -> StatusCode {
             StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE
         }
         LimitError::BodyBytes { .. } => StatusCode::PAYLOAD_TOO_LARGE,
+        LimitError::UnsupportedContentEncoding | LimitError::UnsupportedMultipart => {
+            StatusCode::UNSUPPORTED_MEDIA_TYPE
+        }
         LimitError::InvalidPolicy { .. }
         | LimitError::RequestTarget { .. }
-        | LimitError::InvalidContentLength => StatusCode::BAD_REQUEST,
+        | LimitError::InvalidContentLength
+        | LimitError::AmbiguousBodyLength => StatusCode::BAD_REQUEST,
     }
 }
 
@@ -1634,6 +1804,7 @@ impl std::error::Error for CancelledBody {}
 #[derive(Debug)]
 pub enum RuntimeBuildError {
     InvalidLimits(LimitError),
+    InvalidTransportLimits(TransportLimitError),
     InvalidIdentity(ScopeError),
     MissingHandler(String),
     UnknownHandler(String),
@@ -1657,6 +1828,7 @@ impl Display for RuntimeBuildError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidLimits(error) => Display::fmt(error, formatter),
+            Self::InvalidTransportLimits(error) => Display::fmt(error, formatter),
             Self::InvalidIdentity(error) => Display::fmt(error, formatter),
             Self::MissingHandler(route) => {
                 write!(formatter, "route {route} has no runtime handler")
@@ -1727,6 +1899,12 @@ impl std::error::Error for RuntimeBuildError {}
 impl From<LimitError> for RuntimeBuildError {
     fn from(value: LimitError) -> Self {
         Self::InvalidLimits(value)
+    }
+}
+
+impl From<TransportLimitError> for RuntimeBuildError {
+    fn from(value: TransportLimitError) -> Self {
+        Self::InvalidTransportLimits(value)
     }
 }
 

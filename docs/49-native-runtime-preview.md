@@ -1,6 +1,6 @@
 # Native runtime preview source
 
-**Status:** Unreleased G1 source work
+**Status:** G1 closure candidate; unreleased source work
 
 The workspace contains `pliego-router` and `pliego-runtime` at
 `0.1.0-preview.1`. They are implementation work for G1, are not published on
@@ -15,9 +15,11 @@ not depend on Axum or a deployment provider.
 
 `pliego-runtime` owns request admission, scope lifecycle, deadlines,
 cancellation, cleanup, response commitment, response-body accounting,
-diagnostics, receipts, operator-enabled telemetry, layout-owned complete
-documents, and complete/ordered/boundary server-rendering modes. Axum, Hyper,
-Tower, and Tokio retain HTTP transport, service, and executor ownership.
+diagnostics, receipts, structured request events, operator-enabled telemetry,
+route-owned complete and streamed layout shells, and
+complete/ordered/boundary server-rendering modes. Hyper retains HTTP parsing,
+Axum retains service composition, and Tokio retains transport execution;
+PliegoRS owns bounded connection admission and the explicit transport policy.
 
 ## Complete rendering
 
@@ -61,7 +63,7 @@ let options = CompleteRenderOptions::default()
 markers. In either mode, text and attributes are escaped by their owning typed
 renderer, and the receipt records `renderMode: "complete"`.
 
-## Layout-owned complete documents
+## Route-owned layout documents
 
 `RouteMatch::layout_ids()` exposes only layout scopes from the sealed graph;
 pathless groups remain available through `scope_ids()` but never claim document
@@ -93,19 +95,42 @@ let response = render_layout_document(
 )?;
 ```
 
-Composition walks layouts leaf to root so the final tree follows sealed
+Complete composition walks layouts leaf to root so the final tree follows sealed
 root-to-leaf ownership. `before`, `after`, and `wrap` transform a private child
-frame that application code cannot clone, extract, or omit; the implementation
-does not parse or replace HTML strings. Missing, duplicate, foreign, or invalid
+frame that application code cannot clone, extract, or omit. Missing, duplicate, foreign, or invalid
 layout identities return `PLG-REN-008` before commitment. Scalar head fields
 use inner/page precedence; stylesheet and module script declarations retain
 root-to-leaf order and exact duplicates are emitted once. The complete response
 is bounded by the same metadata, depth, node, and byte limits and records
 `renderMode: "layout"` plus `routeLayouts` in its receipt.
 
-This first contract composes complete documents. Ordered and asynchronous
-boundary modes do not yet accept layout frames, and layouts do not yet own
-loaders or request cleanup.
+`LayoutStreamDocument` applies the same sealed ownership and head merge to
+ordered and asynchronous boundary streams. The entire typed shell is rendered
+and validated before commitment, split around one reserved internal child
+slot, and then streamed under one shell-plus-content byte budget. Absence,
+duplication, or authored collision of that slot fails pre-commit with
+`PLG-REN-008`. Request cancellation and LIFO cleanup remain owned by the same
+scope through the last streamed frame.
+
+```rust
+use pliego_runtime::{
+    LayoutStreamDocument, OrderedRenderOptions,
+    render_layout_ordered_document,
+};
+
+let document = LayoutStreamDocument::new(context.route())
+    .layout(shell)?
+    .title("Profile");
+
+let response = render_layout_ordered_document(
+    &document,
+    chunks,
+    OrderedRenderOptions::default(),
+)?;
+```
+
+Data loaders and resource handles begin in G2; G1 does not invent ambient
+network or database authority inside a layout.
 
 ## Operator-enabled OpenTelemetry
 
@@ -159,6 +184,18 @@ valid parent parsed by the W3C propagator. Inbound `tracestate`, baggage, and
 other propagation formats are discarded so a peer cannot inject provider
 state into exported telemetry. Runtime receipts stay exporter-independent and
 record a coarse duration bucket rather than precise wall time.
+
+## Structured request events
+
+Every terminal request emits one `tracing` event on target
+`pliegors::request` with contract `dev.pliegors.runtime-log/v1`. The exact
+fields are sealed route ID, outcome, status, response bytes, coarse duration
+bucket, render mode, diagnostic count, and bounded diagnostic code. Concrete
+path and query, headers, cookies, body, user/request/deployment identity, and
+diagnostic messages are excluded. PliegoRS selects no subscriber, formatter,
+destination, clock, retention, or alert policy; those remain operator-owned.
+Receipt sink and OpenTelemetry callbacks are panic-isolated from request
+cleanup.
 
 ## Ordered rendering
 
@@ -273,6 +310,19 @@ boundary through the host-owned body.
 - request deadline; and
 - graceful-shutdown drain time.
 
+`TransportLimits` separately bounds active connections, HTTP/1 head-read
+time, read/write inactivity, HTTP/2 concurrent streams, flow-control windows,
+and per-stream send buffers. Header count and bytes come from `RequestLimits`
+and are applied to both the parser and runtime admission. The transport policy
+has its own deterministic SHA-256 digest available through
+`NativeRuntime::transport_policy_sha256()`.
+
+Non-identity `Content-Encoding`, multipart media types, and conflicting
+`Content-Length` plus `Transfer-Encoding` fail closed with `PLG-RUN-108`,
+`PLG-RUN-109`, and `PLG-RUN-110`. PliegoRS performs no implicit decompression
+or multipart parsing before G2 supplies independent decoded-byte, part-count,
+filename, and storage policies.
+
 `RenderLimits` separately bounds DOM depth, node count, and total document
 output. Raising a policy changes the limit-policy digest stored in every
 runtime receipt.
@@ -287,6 +337,9 @@ The source implementation currently demonstrates:
 - cancellation wakeups for pending response streams;
 - client-disconnect and shutdown cleanup;
 - raw TCP HTTP/1.1 loopback dispatch and graceful shutdown;
+- real TCP HTTP/2 prior-knowledge dispatch and multiplexed overload behavior;
+- connection admission, absolute slow-head timeout, slow-reader release, and
+  fixed-load Linux RSS/latency evidence;
 - graph-bound route middleware with consume-once `Next` and reverse response
   unwinding before commitment;
 - graph-digested middleware capability declarations with exact startup
@@ -298,8 +351,10 @@ The source implementation currently demonstrates:
 - root and route error boundaries that receive no internal diagnostic message;
 - bounded group/layout scope inheritance with deterministic middleware,
   outward error recovery, and scope identity in receipts;
-- route-bound complete-document composition with exactly one structural child
-  slot per layout, deterministic head merging, and layout identity in receipts;
+- route-bound complete and streamed layout composition with exactly one child
+  slot, deterministic head merging, and layout identity in receipts;
+- bounded structured completion logs that exclude user values and isolate
+  operator sink panics;
 - operator-enabled OpenTelemetry spans and HTTP metrics across the complete
   body lifecycle, with W3C propagation opt-in and bounded redaction/cardinality;
 - exactly-once bounded receipts; and
@@ -325,13 +380,16 @@ The root boundary renders bounded no-JavaScript HTML for not-found, access,
 invalid-request, and internal failures. A socket smoke verifies the policy on
 both successful and authored 404 responses.
 
-## Deliberately absent
+## Deliberately outside G1
 
-The following remain gate work:
+The following remain later-gate work:
 
-- layout composition for streamed modes plus layout-owned loaders and cleanup;
-- structured runtime logs and exporter-specific operational guidance;
-- multipart and decompression policies;
-- real socket HTTP/2 conformance; and
-- fixed-load latency, RSS, disconnect, slow-peer, overload, and shutdown
-  evidence.
+- G2 typed loaders, actions, caches, sessions, uploads, multipart parsing, and
+  bounded decompression;
+- G3 TLS/proxy/OCI/Cloudflare host adapters and portable deployment evidence;
+- G4 independent-team adoption;
+- G6 operator-specific retention, alerting, incident, and SLO policy; and
+- HTTP/3 and WebSockets, which have no current gate promise.
+
+The exact G1 transport measurements and ASVS ownership map are recorded in
+[transport, load, and security evidence](evidence/g1-transport-load-security.md).

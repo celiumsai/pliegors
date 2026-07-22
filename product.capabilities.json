@@ -97,10 +97,10 @@
       "stability": "none",
       "gate": "G1",
       "summary": "Request-time synchronous, asynchronous, and streamed server rendering with explicit boundaries.",
-      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md", "docs/evidence/g1-async-boundary-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md"],
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md", "docs/evidence/g1-async-boundary-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
         "No request-time SSR or streaming API is part of the current public release.",
-        "Source preview implements bounded complete, ordered, and declaration-ordered async SSR, route-owned complete layouts, and authored errors; streamed layouts, load evidence, and conformance remain incomplete."
+        "The G1 source candidate implements three bounded SSR modes, route-owned complete and streamed layouts, authored errors, and load/security conformance; registry publication and released CLI wiring remain absent."
       ]
     },
     {
@@ -111,10 +111,10 @@
       "stability": "none",
       "gate": "G1",
       "summary": "Nested layouts, typed dynamic parameters, route handlers, middleware, and authored error boundaries.",
-      "evidence": ["docs/rfc/RFC-009-route-graph.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md"],
+      "evidence": ["docs/rfc/RFC-009-route-graph.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
           "Unreleased source covers bounded grammar, collision admission, deterministic matching and digest, method dispatch, capability-mediated pre-route plus inherited group/layout/route middleware, and scoped error boundaries.",
-          "Complete documents bind structural child slots and head metadata to sealed layouts; generated parameter types, streamed-layout semantics, fuzzing, and host conformance remain incomplete."
+          "Complete and streamed documents bind structural child slots and head metadata to sealed layouts; generated parameter source types remain later work and the preview crates are not yet published."
       ]
     },
     {
@@ -136,10 +136,10 @@
       "stability": "none",
       "gate": "G1",
       "summary": "A production Axum, Hyper, Tower, and Tokio host with bounded requests, cancellation, streaming, and graceful shutdown.",
-      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-native-socket-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md"],
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-native-socket-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-opentelemetry-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
         "The unreleased source is a lifecycle foundation, not a production-conformant server release.",
-        "Streamed-layout semantics, structured logs, load evidence, and the remaining threat-model corpus remain incomplete; tiny_http remains limited to development and static preview commands."
+        "The G1 source candidate has HTTP/2, streamed layouts, bounded logs, load evidence, and a scoped security corpus. Registry publication and CLI wiring remain absent; tiny_http stays limited to development and static preview."
       ]
     },
     {
