@@ -4,7 +4,7 @@
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import process from 'node:process';
-import { createWranglerConfig } from './wrangler-pboc.mjs';
+import { createWranglerConfig, inspectorPortFor } from './wrangler-pboc.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const manifestPath = path.resolve(
@@ -27,6 +27,8 @@ const wrangler = path.join(
   'bin',
   'wrangler.js',
 );
+const port = process.env.PLIEGO_CF_PORT ?? '8788';
+const inspectorPort = inspectorPortFor(port, process.env.PLIEGO_CF_INSPECTOR_PORT);
 const child = spawn(
   process.execPath,
   [
@@ -36,7 +38,9 @@ const child = spawn(
     configPath,
     '--local',
     '--port',
-    process.env.PLIEGO_CF_PORT ?? '8788',
+    port,
+    '--inspector-port',
+    inspectorPort,
   ],
   {
     cwd: root,
