@@ -127,6 +127,7 @@ for (const route of expected) {
 }
 
 for (const asset of [
+  "_headers",
   "capabilities.json",
   "assets/pliegors.css",
   "assets/pliegors_site_boot.js",
@@ -149,6 +150,18 @@ for (const asset of [
   } catch {
     failures.push(`${asset}: missing`);
   }
+}
+
+const cloudflareHeaders = await readFile(path.join(root, "_headers"), "utf8").catch(() => "");
+for (const required of [
+  "Content-Security-Policy:",
+  "frame-ancestors 'none'",
+  "script-src 'self' 'sha256-dFteBm6p2lwsICXtHbqwlUeFvWpSpc3OZgDQ63S4P50=' 'wasm-unsafe-eval'",
+  "Strict-Transport-Security: max-age=31536000; includeSubDomains",
+  "X-Content-Type-Options: nosniff",
+  "X-Frame-Options: DENY",
+]) {
+  if (!cloudflareHeaders.includes(required)) failures.push(`_headers: missing ${required}`);
 }
 
 const canonicalCapabilities = await readFile(path.join(repository, "product.capabilities.json"));
