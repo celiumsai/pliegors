@@ -9,6 +9,50 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 No changes yet.
 
+## 0.3.0-beta.1 - 2026-07-22
+
+This coordinated beta publishes all twenty-one framework crates at one exact
+version and promotes G3 portable deployment to preview stability. PBOC remains
+`v1alpha1`; this release is not a 1.0 stability promise.
+
+### Added
+
+- Add `pliego-pboc`, a provider-neutral build-output manifest with canonical
+  bytes, exact artifact verification, closed-schema validation, feature
+  negotiation, cache and secret-reference contracts, deterministic routing,
+  and stable diagnostics.
+- Add `pliego-cloudflare`, a Rust Workers adapter that admits the same sealed
+  PBOC executed by the native host and rejects incompatible route, runtime,
+  function, capability, and secret-binding contracts before dispatch.
+- Add `pliego pboc validate`, `pliego pboc admit`, and `pliego pboc
+  compatibility` for pre-upload bundle verification, native/Cloudflare host
+  admission, rolling transitions, and fail-closed rollback checks.
+- Add a same-build provider TCK covering complete responses, ordered streaming,
+  immutable assets, routing errors, version skew, rollback replay, provider
+  secret exclusion, and a real Cloudflare edge replay.
+- Add a static-musl reference server and pinned distroless OCI image running as
+  nonroot with a read-only filesystem, all capabilities dropped, and
+  `no-new-privileges`.
+- Add the machine-checked G3 ASVS ownership map, portable deployment guide,
+  PBOC JSON Schema, provider evidence, and a protected CI conformance job.
+
+### Changed
+
+- Coordinate G1, G2, G3, OpenSDK, the CLI, and all twenty-one public crates on
+  exact version `0.3.0-beta.1`; first-party Node packages remain private
+  repository tooling and are not published to the npm registry.
+- Carry the PBOC manifest into Cloudflare as a verified Worker text module so
+  deployment does not depend on provider variable-size limits or mutable KV.
+
+### Security
+
+- Fail closed on missing, extra, modified, or symlinked PBOC artifacts and on
+  unknown required host features before upload.
+- Keep provider credentials outside portable output and scan every declared
+  bundle file for a per-run secret sentinel.
+- Require exact application, compatibility epoch, state schema, sequence, and
+  release-chain relationships for rolling deployment and rollback.
+
 ## 0.2.0-beta.1 - 2026-07-22
 
 This coordinated beta publishes all nineteen framework crates at one exact
@@ -229,7 +273,8 @@ does not replace the complete `v0.0.2` CLI release.
 - Static preview delivery serves `security.txt` as UTF-8 plain text and keeps
   its disclosure metadata available under `/.well-known/security.txt`.
 
-[Unreleased]: https://github.com/celiumsai/pliegors/compare/v0.2.0-beta.1...HEAD
+[Unreleased]: https://github.com/celiumsai/pliegors/compare/v0.3.0-beta.1...HEAD
+[0.3.0-beta.1]: https://github.com/celiumsai/pliegors/compare/v0.2.0-beta.1...v0.3.0-beta.1
 [0.2.0-beta.1]: https://github.com/celiumsai/pliegors/compare/preview-components-v0.1.0-preview.1...v0.2.0-beta.1
 [0.0.2]: https://github.com/celiumsai/pliegors/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/celiumsai/pliegors/releases/tag/v0.0.1

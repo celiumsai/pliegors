@@ -3,8 +3,8 @@
 **Status:** G1 complete; coordinated public beta
 
 The workspace contains `pliego-router` and `pliego-runtime` at
-`0.2.0-beta.1`. Both are published on crates.io and tracked by the coordinated
-[`v0.2.0-beta.1` release](https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1).
+`0.3.0-beta.1`. Both are published on crates.io and tracked by the coordinated
+[`v0.3.0-beta.1` release](https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1).
 They share one exact package graph with the CLI and remain preview APIs.
 
 ## Ownership boundary
@@ -386,7 +386,8 @@ The following remain later-gate work:
 
 - G2 typed loaders, actions, caches, sessions, uploads, multipart parsing, and
   bounded decompression;
-- G3 TLS/proxy/OCI/Cloudflare host adapters and portable deployment evidence;
+- TLS termination and provider-specific proxy trust policy beyond the G3
+  PBOC, OCI, and Cloudflare preview;
 - G4 independent-team adoption;
 - G6 operator-specific retention, alerting, incident, and SLO policy; and
 - HTTP/3 and WebSockets, which have no current gate promise.

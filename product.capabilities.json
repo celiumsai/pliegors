@@ -4,11 +4,11 @@
   "framework": {
     "name": "PliegoRS",
     "channel": "public-beta",
-    "releasedVersion": "0.2.0-beta.1",
-    "workspaceVersion": "0.2.0-beta.1",
-    "openSdkVersion": "0.2.0-beta.1",
+    "releasedVersion": "0.3.0-beta.1",
+    "workspaceVersion": "0.3.0-beta.1",
+    "openSdkVersion": "0.3.0-beta.1",
     "license": "Apache-2.0",
-    "releasedCrateCount": 19,
+    "releasedCrateCount": 21,
     "unreleasedCrates": []
   },
   "support": {
@@ -60,12 +60,12 @@
       "id": "cloudflare-runtime",
       "label": "Cloudflare application runtime",
       "domain": "deployment",
-      "availability": "not-released",
-      "stability": "none",
+      "availability": "released",
+      "stability": "preview",
       "gate": "G3",
       "summary": "A conformant Cloudflare Workers runtime for portable PliegoRS server applications.",
-      "evidence": ["docs/rfc/RFC-007-pliego-build-output-contract.md", "docs/rfc/RFC-008-native-runtime.md"],
-      "limitations": ["The current Cloudflare package serves the static documentation site; it is not the PliegoRS application runtime."]
+      "evidence": ["docs/50-pboc-portable-deployment.md", "docs/evidence/g3-pboc-provider-conformance.md"],
+      "limitations": ["The v1alpha1 adapter covers HTTP, ordered streams, assets, host admission, secret references, and deployment compatibility. Provider data services, schedules, durable objects, and billing remain outside PBOC."]
     },
     {
       "id": "data-actions-cache",
@@ -100,7 +100,7 @@
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md", "docs/evidence/g1-async-boundary-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
         "The public preview crate exposes three bounded SSR modes and route-owned complete and streamed layouts.",
-        "The 0.2.0-beta.1 CLI coordinates G1 and G2 as one exact prerelease package graph."
+        "The 0.3.0-beta.1 CLI coordinates G1, G2, and G3 as one exact prerelease package graph."
       ]
     },
     {
@@ -138,8 +138,8 @@
       "summary": "A native Axum, Hyper, Tower, and Tokio host with bounded requests, cancellation, streaming, and graceful shutdown.",
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-native-socket-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-opentelemetry-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
-        "The crate is a public preview, not a stable production-support promise; TLS, proxy trust, and portable host adapters remain G3 work.",
-        "The 0.2.0-beta.1 CLI coordinates this crate but does not yet expose a production application-server command; tiny_http stays limited to development and static preview commands."
+        "The crate is a public preview, not a stable production-support promise; TLS termination and proxy trust remain explicit operator boundaries.",
+        "The 0.3.0-beta.1 CLI exposes PBOC validation, admission, and compatibility commands; application-specific native launch remains owned by the packaged executable."
       ]
     },
     {
@@ -162,7 +162,7 @@
       "gate": "G5",
       "summary": "Typed WebAssembly Component admission, resource budgets, capabilities, effect receipts, and conformance fixtures.",
       "evidence": ["docs/42-opensdk-foundation.md", "docs/43-opensdk-multilang-conformance.md"],
-      "limitations": ["OpenSDK 0.2.0-beta.1 remains a prerelease contract; RFC-006 and ADR-006 still govern stabilization work."]
+      "limitations": ["OpenSDK 0.3.0-beta.1 remains a prerelease contract; RFC-006 and ADR-006 still govern stabilization work."]
     },
     {
       "id": "opensdk-server",
@@ -179,12 +179,12 @@
       "id": "pboc",
       "label": "Pliego Build Output Contract",
       "domain": "deployment",
-      "availability": "not-released",
-      "stability": "none",
+      "availability": "released",
+      "stability": "preview",
       "gate": "G3",
       "summary": "A provider-neutral, digest-bound, executable output contract shared by independent deployment hosts.",
-      "evidence": ["docs/rfc/RFC-007-pliego-build-output-contract.md"],
-      "limitations": ["RFC-007 is Draft and no native plus Cloudflare conformance corpus has closed the stability gate."]
+      "evidence": ["docs/rfc/RFC-007-pliego-build-output-contract.md", "docs/50-pboc-portable-deployment.md", "docs/evidence/g3-pboc-provider-conformance.md"],
+      "limitations": ["PBOC v1alpha1 is a preview contract. Its schema and diagnostics may change before 1.0, and portable stateful provider resources are not yet defined."]
     },
     {
       "id": "pliegocss-companion",
@@ -229,12 +229,12 @@
       "id": "server-deployment",
       "label": "Native and OCI application deployment",
       "domain": "deployment",
-      "availability": "not-released",
-      "stability": "none",
+      "availability": "released",
+      "stability": "preview",
       "gate": "G3",
       "summary": "A portable Linux and OCI server artifact with runtime capabilities, rolling deployment, and rollback evidence.",
-      "evidence": ["docs/rfc/RFC-007-pliego-build-output-contract.md", "docs/rfc/RFC-008-native-runtime.md"],
-      "limitations": ["Released CLI platform archives are development and build tools, not full-stack application server artifacts."]
+      "evidence": ["docs/50-pboc-portable-deployment.md", "docs/evidence/g3-pboc-provider-conformance.md"],
+      "limitations": ["The reference OCI target is Linux musl and stateless. Stateful migrations require application-specific compatibility evidence, and production ingress policy remains operator-owned."]
     },
     {
       "id": "typed-content",

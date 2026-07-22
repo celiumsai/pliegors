@@ -35,6 +35,19 @@ const maps = [
       'v5.0.0-16.2.5',
     ],
   },
+  {
+    gate: 'G3',
+    path: 'security/asvs-v5.0.0-g3.json',
+    minimum: 12,
+    required: [
+      'v5.0.0-1.1.1',
+      'v5.0.0-4.2.1',
+      'v5.0.0-15.1.2',
+      'v5.0.0-15.2.2',
+      'v5.0.0-16.2.5',
+      'v5.0.0-16.5.3',
+    ],
+  },
 ];
 
 const statuses = new Set(['verified', 'partial', 'shared', 'not-applicable']);

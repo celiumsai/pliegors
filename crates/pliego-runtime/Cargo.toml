@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 [package]
 name = "pliego-runtime"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
@@ -26,6 +26,7 @@ hyper-util = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 pliego-router = { workspace = true }
+pliego-pboc = { workspace = true }
 pliego-data = { workspace = true }
 pliego-dom = { workspace = true }
 serde = { workspace = true }

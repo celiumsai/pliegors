@@ -1,6 +1,6 @@
 # OpenSDK tooling protocol
 
-**OpenSDK protocol:** `0.2.0-beta.1`
+**OpenSDK protocol:** `0.3.0-beta.1`
 **MCP adapter:** `2025-11-25`
 **Transport:** newline-delimited JSON-RPC 2.0 over stdio
 
@@ -17,7 +17,7 @@ npm run check:opensdk:tooling
 ```
 
 The native handshake request includes
-`params.protocolVersion = "0.2.0-beta.1"`; omission or mismatch fails before
+`params.protocolVersion = "0.3.0-beta.1"`; omission or mismatch fails before
 diagnostics are available. MCP `initialize` requires a protocol version,
 capabilities object, and bounded client name/version. The reference tool accepts
 only the empty arguments object declared by its input schema.

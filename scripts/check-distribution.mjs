@@ -23,9 +23,9 @@ for (const name of unreleasedCrates) {
 }
 const crates = allCrates.filter((pkg) => !unreleasedCrates.has(pkg.name));
 const expected = [
-  'pliego-adapters', 'pliego-artifact', 'pliego-assets', 'pliego-cli', 'pliego-content', 'pliego-data', 'pliego-dom',
+  'pliego-adapters', 'pliego-artifact', 'pliego-assets', 'pliego-cli', 'pliego-cloudflare', 'pliego-content', 'pliego-data', 'pliego-dom',
   'pliego-fold', 'pliego-hyphae', 'pliego-inspect', 'pliego-log', 'pliego-macros',
-  'pliego-reactive', 'pliego-resume', 'pliego-router', 'pliego-runtime', 'pliego-sdk', 'pliego-ssg',
+  'pliego-pboc', 'pliego-reactive', 'pliego-resume', 'pliego-router', 'pliego-runtime', 'pliego-sdk', 'pliego-ssg',
   'pliego-starters',
 ].sort();
 assert.deepEqual(crates.map((pkg) => pkg.name), expected);

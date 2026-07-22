@@ -14,7 +14,7 @@ The output conforms to `schemas/pliego.sdk-compatibility-matrix.schema.json`. It
 - `preview`: versioned and tested, but may make breaking changes in a new preview protocol.
 - `stable`: preserves the contract for the documented compatibility window.
 
-OpenSDK `0.2.0-beta.1` is preview. Process bridges for TypeScript and Python are conformance implementations, not sandboxed Component Model SDKs. Rust is the reference Component Model toolchain.
+OpenSDK `0.3.0-beta.1` is preview. Process bridges for TypeScript and Python are conformance implementations, not sandboxed Component Model SDKs. Rust is the reference Component Model toolchain.
 
 ## Deprecation contract
 
@@ -33,4 +33,4 @@ Security fixes may disable unsafe behavior immediately. The contract identifier 
 
 ## Source boundary
 
-The matrix source is `celiumsai/pliegors`. It never describes or requires the private implementation of `pliego.run`; a future deployment provider integrates only through public, provider-neutral contracts and conformance suites.
+The matrix source is `celiumsai/pliegors`. It never describes or requires a provider's private implementation; deployment products integrate only through public, provider-neutral contracts and conformance suites.

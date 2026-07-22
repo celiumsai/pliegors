@@ -48,7 +48,7 @@ does not upload the archive; inspect it before attaching it to an issue.
 
 ```sh
 pliego upgrade --check
-pliego upgrade --check --target 0.2.0-beta.1 --format json
+pliego upgrade --check --target 0.3.0-beta.1 --format json
 ```
 
 The default target is the running CLI version. The command validates the strict

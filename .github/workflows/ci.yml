@@ -49,6 +49,9 @@ jobs:
       - name: Install site deployment tooling
         run: npm ci --prefix workers/pliegors-site
 
+      - name: Install provider conformance tooling
+        run: npm ci --prefix examples/provider-tck
+
       - name: Validate email Worker
         run: npm run check:email-worker
 
@@ -57,6 +60,7 @@ jobs:
           npm audit --audit-level=high
           npm audit --prefix workers/pliegors-email --audit-level=high
           npm audit --prefix workers/pliegors-site --audit-level=high
+          npm audit --prefix examples/provider-tck --audit-level=high
 
       - name: Check formatting
         run: |
@@ -111,6 +115,15 @@ jobs:
           --locked
           -- -D warnings
 
+      - name: Lint Cloudflare PBOC target
+        run: >-
+          cargo clippy --target wasm32-unknown-unknown
+          -p pliego-cloudflare
+          -p provider-tck
+          --lib
+          --locked
+          -- -D warnings
+
       - name: Reject unowned WASM lifetime escapes
         run: npm run check:wasm-lifetimes
 
@@ -119,6 +132,9 @@ jobs:
 
       - name: Check canonical product capabilities
         run: npm run check:product-truth
+
+      - name: Check PBOC schema contract
+        run: npm run check:pboc
 
       - name: Check scoped ASVS ownership map
         run: npm run check:security-map
@@ -308,3 +324,52 @@ jobs:
 
       - name: Check Phase 1 deterministic contract
         run: npm run check:phase-1
+
+  g3-provider-conformance:
+    name: G3 native, OCI, and Cloudflare conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: >-
+          rustup toolchain install 1.86.0
+          --profile minimal
+          --target wasm32-unknown-unknown
+          --target x86_64-unknown-linux-musl
+
+      - name: Install musl linker
+        run: sudo apt-get update && sudo apt-get install --yes musl-tools
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install contract tooling
+        run: |
+          npm ci
+          npm ci --prefix examples/provider-tck
+
+      - name: Audit provider dependencies
+        run: |
+          npm audit --audit-level=high
+          npm audit --prefix examples/provider-tck --audit-level=high
+
+      - name: Run sealed provider conformance
+        run: npm run check:provider-tck
+
+      - name: Preserve G3 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: g3-provider-conformance
+          path: |
+            target/provider-tck/evidence.json
+            target/provider-tck/*.log
+          if-no-files-found: warn

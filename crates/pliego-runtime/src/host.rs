@@ -28,7 +28,6 @@ use pliego_router::{
     MiddlewareCapabilities, MiddlewareCapability, ResolveError, RouteGraph, RouteMatch, RouteMethod,
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::future::Future;
@@ -689,31 +688,19 @@ fn runtime_contract_digest(
     loader_policies: &BTreeMap<String, LoaderPolicy>,
     cache_policies: &BTreeMap<String, CachePolicy>,
 ) -> String {
-    let mut digest = Sha256::new();
-    digest.update(b"pliego-runtime-contract-v1\0");
-    digest.update(graph.digest().as_bytes());
-    for (id, policy) in action_policies {
-        digest.update((id.len() as u64).to_be_bytes());
-        digest.update(id.as_bytes());
-        digest.update(policy.contract_digest().as_bytes());
-    }
-    for (id, policy) in loader_policies {
-        digest.update((id.len() as u64).to_be_bytes());
-        digest.update(id.as_bytes());
-        digest.update(policy.contract_digest().as_bytes());
-    }
-    for (id, policy) in cache_policies {
-        digest.update((id.len() as u64).to_be_bytes());
-        digest.update(id.as_bytes());
-        digest.update(policy.contract_digest().as_bytes());
-    }
-    let bytes = digest.finalize();
-    let mut output = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        output.push(char::from_digit((byte >> 4) as u32, 16).expect("hex nibble is valid"));
-        output.push(char::from_digit((byte & 0x0f) as u32, 16).expect("hex nibble is valid"));
-    }
-    output
+    let actions = action_policies
+        .iter()
+        .map(|(id, policy)| pliego_pboc::RuntimeContractBinding::new(id, policy.contract_digest()))
+        .collect::<Vec<_>>();
+    let loaders = loader_policies
+        .iter()
+        .map(|(id, policy)| pliego_pboc::RuntimeContractBinding::new(id, policy.contract_digest()))
+        .collect::<Vec<_>>();
+    let caches = cache_policies
+        .iter()
+        .map(|(id, policy)| pliego_pboc::RuntimeContractBinding::new(id, policy.contract_digest()))
+        .collect::<Vec<_>>();
+    pliego_pboc::runtime_contract_sha256_v1(graph.digest(), &actions, &loaders, &caches)
 }
 
 struct RuntimeState {
@@ -814,6 +801,19 @@ pub struct NativeRuntime {
 }
 
 impl NativeRuntime {
+    pub fn admit_pboc(
+        &self,
+        manifest: &pliego_pboc::PbocManifest,
+        host_version: impl Into<String>,
+    ) -> Result<pliego_pboc::HostAdmission, crate::NativePbocError> {
+        crate::pboc::admit_native_pboc(
+            manifest,
+            host_version,
+            self.state.graph.digest(),
+            &self.state.contract_digest,
+        )
+    }
+
     pub fn router(&self) -> Router {
         Router::new()
             .fallback(dispatch)

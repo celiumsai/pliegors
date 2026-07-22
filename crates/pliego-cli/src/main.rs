@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod development;
+mod pboc;
 mod runtime_diagnostics;
 mod sdk;
 mod telemetry;
@@ -125,6 +126,7 @@ enum FailureKind {
     Telemetry,
     Usage,
     Project,
+    Pboc,
     Scaffold,
     Check,
     Build,
@@ -145,6 +147,7 @@ impl FailureKind {
             Self::Artifact => 6,
             Self::Server => 7,
             Self::Sdk => 9,
+            Self::Pboc => 10,
         }
     }
 
@@ -154,6 +157,7 @@ impl FailureKind {
             Self::Telemetry => "telemetry",
             Self::Usage => "usage",
             Self::Project => "project",
+            Self::Pboc => "pboc",
             Self::Scaffold => "scaffold",
             Self::Check => "check",
             Self::Build => "build",
@@ -169,6 +173,7 @@ impl FailureKind {
             Self::Telemetry => "PLG-TEL-001",
             Self::Usage => "PLG-ARG-001",
             Self::Project => "PLG-PRJ-001",
+            Self::Pboc => "PLG-PBOC-001",
             Self::Scaffold => "PLG-NEW-001",
             Self::Check => "PLG-ENV-001",
             Self::Build => "PLG-BLD-001",
@@ -188,6 +193,9 @@ impl FailureKind {
                 "Run `pliego help` or `pliego templates` to inspect the command contract."
             }
             Self::Project => "Run the command inside a project and validate `pliego.toml`.",
+            Self::Pboc => {
+                "Validate the sealed bundle, host features, and compatibility chain before deployment."
+            }
             Self::Scaffold => {
                 "Choose an empty destination and an explicit dependency source when developing locally."
             }
@@ -558,6 +566,18 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
             )
         });
     }
+    if command == "pboc" {
+        return pboc::run(arguments.collect()).map_err(|error| {
+            CliFailure::new(
+                if error.is_usage() {
+                    FailureKind::Usage
+                } else {
+                    FailureKind::Pboc
+                },
+                error.to_string(),
+            )
+        });
+    }
     if command == "why" {
         let diagnostic_arguments = arguments.clone().collect::<Vec<_>>();
         if diagnostic_arguments
@@ -653,7 +673,7 @@ fn print_help() {
         "FULL-STACK DIAGNOSTICS:\n  pliego inspect action <id> [--contract <runtime-contract.json>]\n  pliego why request <runtime-receipt.json>\n  pliego why cache <cache-receipt-or-invalidation.json>\n"
     );
     println!(
-        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego telemetry <status|enable|preview|export|disable> [options]\n  pliego sdk <check|test> <manifest> [--input <transform.json>] [--grant <capability>] [--feature <id>] [--format <human|json>]\n  pliego sdk compatibility [--format <human|json>]\n  pliego sdk tooling-host --protocol <pliego|mcp> [--feature <id>]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport, SDK admission, upgrade checks, and voluntary telemetry exports are local and never upload project data.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
+        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego telemetry <status|enable|preview|export|disable> [options]\n  pliego sdk <check|test> <manifest> [--input <transform.json>] [--grant <capability>] [--feature <id>] [--format <human|json>]\n  pliego sdk compatibility [--format <human|json>]\n  pliego sdk tooling-host --protocol <pliego|mcp> [--feature <id>]\n  pliego pboc validate <manifest> [--root <bundle>]\n  pliego pboc admit <manifest> --host <native|cloudflare> [--root <bundle>] [--host-version <version>]\n  pliego pboc compatibility <active> <candidate> --direction <rolling|rollback>\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport, SDK admission, PBOC admission, upgrade checks, and voluntary telemetry exports are local and never upload project data.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );
 }
 
@@ -4193,6 +4213,7 @@ mod tests {
         assert_eq!(FailureKind::Artifact.code(), 6);
         assert_eq!(FailureKind::Server.code(), 7);
         assert_eq!(FailureKind::Sdk.code(), 9);
+        assert_eq!(FailureKind::Pboc.code(), 10);
     }
 
     #[test]

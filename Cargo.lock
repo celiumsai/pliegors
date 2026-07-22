@@ -113,7 +113,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "itoa",
- "matchit",
+ "matchit 0.8.4",
  "memchr",
  "mime",
  "percent-encoding",
@@ -249,6 +249,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "chrono"
+version = "0.4.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
+dependencies = [
+ "js-sys",
+ "num-traits",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "chunked_transfer"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -265,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "content-collections-pliegors"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "pliego-content",
  "pliego-dom",
@@ -615,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "fullstack-pliego"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "http",
  "http-body-util",
@@ -657,6 +668,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "futures-io"
+version = "0.3.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4577ecaa3c4f96589d473f679a71b596316f6641bc350038b962a5daf0085d7a"
+
+[[package]]
 name = "futures-macro"
 version = "0.3.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -686,9 +703,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a77a90a256fce34da66415271e30f94ee91c57b04b8a2c042d9cf3220179deaa"
 dependencies = [
  "futures-core",
+ "futures-io",
  "futures-macro",
  "futures-sink",
  "futures-task",
+ "memchr",
  "pin-project-lite",
  "slab",
 ]
@@ -1129,6 +1148,12 @@ dependencies = [
 
 [[package]]
 name = "matchit"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
+
+[[package]]
+name = "matchit"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
@@ -1172,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "minimal-pliego"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "pliego-dom",
  "pliego-ssg",
@@ -1218,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "native-pliego"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "futures-util",
  "http-body-util",
@@ -1351,6 +1376,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
+name = "pin-project"
+version = "1.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2466b2336ed02bcdca6b294417127b90ec92038d1d5c4fbeac971a922e0e0924"
+dependencies = [
+ "pin-project-internal",
+]
+
+[[package]]
+name = "pin-project-internal"
+version = "1.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c96395f0a926bc13b1c17622aaddda1ecb55d49c8f1bf9777e4d877800a43f8b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1358,7 +1403,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pliego-adapters"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "pliego-dom",
  "serde_json",
@@ -1367,7 +1412,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-artifact"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1380,7 +1425,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-assets"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1391,12 +1436,14 @@ dependencies = [
 
 [[package]]
 name = "pliego-cli"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
  "notify",
  "pliego-artifact",
+ "pliego-cloudflare",
+ "pliego-pboc",
  "pliego-runtime",
  "pliego-sdk",
  "pliego-starters",
@@ -1410,8 +1457,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pliego-cloudflare"
+version = "0.3.0-beta.1"
+dependencies = [
+ "pliego-pboc",
+ "serde",
+ "serde_json",
+ "worker",
+]
+
+[[package]]
 name = "pliego-content"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1425,7 +1482,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-data"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "base64",
  "futures-util",
@@ -1441,7 +1498,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-dom"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "js-sys",
  "pliego-reactive",
@@ -1452,7 +1509,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-fold"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "pliego-log",
  "pliego-reactive",
@@ -1463,7 +1520,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-hyphae"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "js-sys",
  "pliego-log",
@@ -1477,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-inspect"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1488,7 +1545,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-log"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1497,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-macros"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1506,15 +1563,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "pliego-pboc"
+version = "0.3.0-beta.1"
+dependencies = [
+ "pliego-router",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "unicode-casefold",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "pliego-reactive"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "wasm-bindgen-test",
 ]
 
 [[package]]
 name = "pliego-resume"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "pliego-dom",
  "serde_json",
@@ -1522,7 +1592,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-router"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1533,7 +1603,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-runtime"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "axum",
  "bytes",
@@ -1549,6 +1619,7 @@ dependencies = [
  "opentelemetry_sdk",
  "pliego-data",
  "pliego-dom",
+ "pliego-pboc",
  "pliego-router",
  "serde",
  "serde_json",
@@ -1563,7 +1634,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-sdk"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "psm",
  "semver",
@@ -1580,7 +1651,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-ssg"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1592,11 +1663,11 @@ dependencies = [
 
 [[package]]
 name = "pliego-starters"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 
 [[package]]
 name = "pliegors-site"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "pliego-adapters",
  "pliego-content",
@@ -1609,7 +1680,7 @@ dependencies = [
 
 [[package]]
 name = "pliegors-site-client"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "js-sys",
  "pliego-dom",
@@ -1696,6 +1767,24 @@ dependencies = [
  "syn",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "provider-tck"
+version = "0.3.0-beta.1"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "js-sys",
+ "pliego-cloudflare",
+ "pliego-pboc",
+ "pliego-router",
+ "pliego-runtime",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "worker",
 ]
 
 [[package]]
@@ -1921,6 +2010,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2045,7 +2145,7 @@ dependencies = [
 
 [[package]]
 name = "spike"
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 dependencies = [
  "pliego-dom",
  "pliego-fold",
@@ -2587,6 +2687,19 @@ dependencies = [
  "indexmap",
  "wasm-encoder 0.233.0",
  "wasmparser 0.233.0",
+]
+
+[[package]]
+name = "wasm-streams"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d1ec4f6517c9e11ae630e200b2b65d193279042e28edd4a2cda233e46670bbb"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -3184,6 +3297,64 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser 0.236.1",
+]
+
+[[package]]
+name = "worker"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7267f3baa986254a8dace6f6a7c6ab88aef59f00c03aaad6749e048b5faaf6f6"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "futures-channel",
+ "futures-util",
+ "http",
+ "http-body",
+ "js-sys",
+ "matchit 0.7.3",
+ "pin-project",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "serde_urlencoded",
+ "tokio",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-streams",
+ "web-sys",
+ "worker-macros",
+ "worker-sys",
+]
+
+[[package]]
+name = "worker-macros"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7410081121531ec2fa111ab17b911efc601d7b6d590c0a92b847874ebeff0030"
+dependencies = [
+ "async-trait",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-macro-support",
+ "worker-sys",
+]
+
+[[package]]
+name = "worker-sys"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4777582bf8a04174a034cb336f3702eb0e5cb444a67fdaa4fd44454ff7e2dd95"
+dependencies = [
+ "cfg-if",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

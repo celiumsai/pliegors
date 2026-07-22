@@ -15,8 +15,8 @@ const layers = [
     'pliego-data', 'pliego-log', 'pliego-macros', 'pliego-reactive', 'pliego-router', 'pliego-sdk',
     'pliego-starters',
   ],
-  ['pliego-dom', 'pliego-fold', 'pliego-hyphae'],
-  ['pliego-adapters', 'pliego-resume', 'pliego-runtime', 'pliego-ssg'],
+  ['pliego-dom', 'pliego-fold', 'pliego-hyphae', 'pliego-pboc'],
+  ['pliego-adapters', 'pliego-cloudflare', 'pliego-resume', 'pliego-runtime', 'pliego-ssg'],
   ['pliego-cli'],
 ];
 const ordered = layers.flat();

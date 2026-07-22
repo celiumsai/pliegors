@@ -354,6 +354,11 @@ not an application compliance or certification claim.
 - rolling version-skew and rollback tests; and
 - proof that provider credentials are absent from portable output.
 
+The G3 corpus and exact control ownership are recorded in
+[the provider conformance evidence](evidence/g3-pboc-provider-conformance.md)
+and [`security/asvs-v5.0.0-g3.json`](../security/asvs-v5.0.0-g3.json). The map
+defines repository and operator responsibility; it is not a certification.
+
 ## Residual risks
 
 - Native application and middleware code is trusted process code.
