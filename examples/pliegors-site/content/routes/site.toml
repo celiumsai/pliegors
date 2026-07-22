@@ -98,6 +98,12 @@ pageType = "web-page"
 robots = "index-follow"
 
 [[routes]]
+path = "/docs/portable-deployment"
+page = "docs-portable-deployment"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
 path = "/docs/fullstack-beta"
 page = "docs-fullstack-beta"
 pageType = "web-page"

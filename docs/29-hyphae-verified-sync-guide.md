@@ -233,7 +233,7 @@ spike must opt in explicitly:
 
 ```toml
 [dependencies.pliego-hyphae]
-version = "=0.2.0-beta.1"
+version = "=0.3.0-beta.1"
 features = ["experimental-legacy"]
 ```
 

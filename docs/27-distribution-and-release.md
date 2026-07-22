@@ -1,6 +1,6 @@
 # Distribution and release
 
-**Status:** `0.2.0-beta.1` is the coordinated PliegoRS public beta. The
+**Status:** `0.3.0-beta.1` is the coordinated PliegoRS public beta. The
 repository, crates.io packages, signed GitHub Release, and `pliegors.dev`
 documentation are public surfaces for the same exact revision.
 
@@ -33,7 +33,7 @@ channel does not imply that a preview API has reached the `stable` API tier.
 The normal developer installation is:
 
 ```sh
-cargo install pliego-cli --version 0.2.0-beta.1 --locked
+cargo install pliego-cli --version 0.3.0-beta.1 --locked
 pliego version
 pliego new my-site
 cd my-site
@@ -42,7 +42,7 @@ pliego dev
 ```
 
 Generated projects use exact registry dependencies such as
-`pliego-ssg = { version = "=0.2.0-beta.1" }`. Every first-party crate in a project must
+`pliego-ssg = { version = "=0.3.0-beta.1" }`. Every first-party crate in a project must
 remain on one version. Local framework development is explicit:
 `pliego new my-site --framework-path <checkout>` or `PLIEGO_FRAMEWORK_PATH`
 replaces registry requirements with local path dependencies.
@@ -71,7 +71,7 @@ login used for a release is removed with `cargo logout` after publication.
 | Development | `x86_64-pc-windows-msvc` | Built and smoke-tested; not a production deployment commitment. |
 
 macOS artifacts are not notarized and Windows artifacts are not Authenticode
-signed in `0.2.0-beta.1`. Those platforms are development surfaces; their archive
+signed in `0.3.0-beta.1`. Those platforms are development surfaces; their archive
 hashes and release-manifest entries remain verified. Linux is the production
 server target for this release.
 
@@ -132,9 +132,9 @@ sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
 With GitHub CLI and Node.js installed:
 
 ```sh
-mkdir pliegors-v0.2.0-beta.1
-cd pliegors-v0.2.0-beta.1
-gh release download v0.2.0-beta.1 --repo celiumsai/pliegors
+mkdir pliegors-v0.3.0-beta.1
+cd pliegors-v0.3.0-beta.1
+gh release download v0.3.0-beta.1 --repo celiumsai/pliegors
 node verify-release-bundle.mjs \
   --dir . \
   --expected-key-fingerprint sha256:97df5a29b5d4be6f626634b6824eebea5f2e7fcfa9c93ed644a3a2913dad7250
@@ -151,13 +151,13 @@ After full-bundle verification, install the matching local archive:
 ```sh
 sh ./install.sh \
   --archive ./pliego-x86_64-unknown-linux-gnu.zip \
-  --version 0.2.0-beta.1
+  --version 0.3.0-beta.1
 ```
 
 ```powershell
 .\install.ps1 `
   -ArchivePath .\pliego-x86_64-pc-windows-msvc.zip `
-  -Version 0.2.0-beta.1
+  -Version 0.3.0-beta.1
 ```
 
 Network selection is always explicit: `--version <semver>` / `-Version`, or

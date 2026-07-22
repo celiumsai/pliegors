@@ -1,0 +1,17 @@
+{
+  "name": "@pliego/provider-tck-cloudflare",
+  "version": "0.3.0-beta.1",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-worker.mjs",
+    "check": "node scripts/check-worker.mjs",
+    "deploy:pboc": "node scripts/deploy-worker.mjs",
+    "dev": "node scripts/dev-worker.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.113.0"
+  },
+  "overrides": {
+    "sharp": "0.35.3"
+  }
+}

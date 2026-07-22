@@ -1,5 +1,5 @@
 key = "docs-fullstack-beta"
 title = { en = "Full-stack Public Beta | PliegoRS G2", es = "Beta Pública Full-stack | PliegoRS G2" }
-description = { en = "Evaluate the PliegoRS 0.2.0-beta.1 G2 contracts for typed loaders, progressive actions, secure sessions, cache isolation, causal invalidation, and diagnostics.", es = "Evalúa los contratos G2 de PliegoRS 0.2.0-beta.1 para loaders tipados, actions progresivas, sesiones seguras, aislamiento de cache, invalidación causal y diagnósticos." }
+description = { en = "Evaluate the PliegoRS 0.3.0-beta.1 G2 contracts for typed loaders, progressive actions, secure sessions, cache isolation, causal invalidation, and diagnostics.", es = "Evalúa los contratos G2 de PliegoRS 0.3.0-beta.1 para loaders tipados, actions progresivas, sesiones seguras, aislamiento de cache, invalidación causal y diagnósticos." }
 image = "/media/pliegors/ledger-wide.webp"
 imageAlt = { en = "A precision ledger representing the sealed PliegoRS G2 application contract", es = "Un ledger de precisión que representa el contrato sellado de aplicación PliegoRS G2" }

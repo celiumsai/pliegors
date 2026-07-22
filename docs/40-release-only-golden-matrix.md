@@ -1,7 +1,7 @@
 # Release-only golden environment matrix
 
 **Status:** implemented; hosted candidate and WSL2 evidence pending  
-**Target line:** `0.2.0-beta.1`
+**Target line:** `0.3.0-beta.1`
 
 P8-A07 turns the first-use experience into a release gate. Every hosted row
 starts from the signed distribution bundle, installs the native CLI, creates a

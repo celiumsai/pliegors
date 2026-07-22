@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+
+FROM gcr.io/distroless/static-debian12@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
+
+LABEL org.opencontainers.image.title="PliegoRS Provider TCK" \
+      org.opencontainers.image.source="https://github.com/celiumsai/pliegors" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+WORKDIR /opt/pliego/app
+COPY --chown=65532:65532 . /opt/pliego/app
+USER 65532:65532
+
+ENV PLIEGO_PBOC_ROOT=/opt/pliego/app \
+    PLIEGO_ADDR=0.0.0.0:4330
+EXPOSE 4330
+ENTRYPOINT ["/opt/pliego/app/artifacts/native/server"]

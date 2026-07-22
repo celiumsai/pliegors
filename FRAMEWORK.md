@@ -188,9 +188,11 @@ HTTP, dynamic SSR, and routing are part of the coordinated public beta. G2 loade
 actions, sessions, idempotency, uploads, outbound HTTP policy, runtime cache,
 and causal invalidation are published in that same exact package graph.
 The included G2 stores are development/conformance adapters. Production
-durability, PBOC execution, OCI/Cloudflare host portability, and Cloudflare
-application hosting remain outside the released contract until the G3
-publication and evidence gates close.
+durability remains provider work. G3 PBOC execution, Linux OCI packaging,
+rolling/rollback compatibility, and Cloudflare application hosting are public
+preview surfaces in `0.3.0-beta.1`, backed by the same sealed-build provider
+corpus. Portable databases, queues, schedules, durable objects, provider
+billing, and automatic state migration remain outside that contract.
 
 ## Release gate
 

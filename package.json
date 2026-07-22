@@ -1,12 +1,14 @@
 {
   "name": "@pliego/pliegors-workspace",
-  "version": "0.2.0-beta.1",
+  "version": "0.3.0-beta.1",
   "private": true,
   "type": "module",
   "scripts": {
     "bundle:phase-1-evidence": "node scripts/bundle-phase-1-evidence.mjs",
     "check:docs": "node scripts/check-doc-links.mjs",
     "check:product-truth": "node scripts/check-product-truth.mjs",
+    "check:pboc": "node scripts/check-pboc-contract.mjs",
+    "check:provider-tck": "node scripts/run-provider-tck.mjs",
     "check:security-map": "node scripts/check-security-map.mjs",
     "check:g2-browser": "node scripts/check-g2-browser.mjs",
     "check:crates": "node scripts/publish-crates.mjs --check",

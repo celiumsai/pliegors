@@ -1,8 +1,8 @@
 # RFC-007: Pliego Build Output Contract
 
-**Status:** Draft
-**Target:** `0.2.0`
-**Last updated:** 2026-07-18
+**Status:** Implemented preview; stabilization pending
+**Target:** `0.3.0-beta.1`
+**Last updated:** 2026-07-22
 
 ## Summary
 
@@ -29,31 +29,55 @@ but does not own or extend it through private required fields.
 - making a deployment portable when it explicitly chooses a provider-only
   capability.
 
-## Proposed top-level model
+## Implemented top-level model
 
 ```text
 schema
 framework identity
-build identity and provenance
+build identity, artifact ledger, SBOM and provenance
+compatibility epoch, sequence, state schema and rollback declaration
+capabilities[]
+artifacts[]
+targets[]
 assets[]
 routes[]
 functions[]
-cache policies[]
+cachePolicies[]
 permissions[]
-secret references[]
-telemetry hooks[]
-adapter requirements[]
+secretReferences[]
+telemetryHooks[]
 ```
 
-Every path is normalized and relative. Every byte-bearing object has a digest.
+The wire identifier is `dev.pliegors.pboc/v1alpha1`. Every path is normalized
+and relative. Every artifact records bytes, SHA-256, role, and media type.
 Secret references contain identifiers and purpose, never secret values. A host
-must reject unknown required capabilities before uploading any artifact.
+rejects unknown required capabilities before uploading any artifact. Unknown
+JSON fields fail closed.
+
+The implemented Rust authority is `pliego-pboc`; the machine schema is
+`schemas/pliego.pboc.schema.json`. `verify_bundle` rejects missing, additional,
+modified, linked, or non-portable files. `HostAdmission` selects one exact
+target and returns the upload set, unsupported optional features, and required
+secret references.
+
+## Compatibility contract
+
+Rolling coexistence requires one application ID, compatibility epoch, and
+state schema; a higher sequence; and an exact `previousReleaseId` link. Rollback
+requires the reverse sequence, the same identity/epoch/schema, the exact link,
+and `rollbackSafe: true` on the active release. Both checks emit bounded JSON
+receipts and stable `PLG-PBOC-100` through `PLG-PBOC-106` failures.
+
+The declaration never proves an irreversible data migration safe. Stateful
+applications and providers retain migration-specific evidence ownership.
 
 ## Portability gate
 
-PBOC does not become stable until one corpus passes unchanged on the official
-Cloudflare target and a native reference host. Host-specific additions live in
-namespaced optional sections and cannot be required by the core fixture.
+The G3 corpus executes one sealed PBOC unchanged on the Rust native/OCI host and
+the Rust Cloudflare Workers host. It covers complete responses, ordered
+streaming, immutable assets, cache headers, 404/405 semantics, required-feature
+rejection, rolling skew, rollback, and provider-secret exclusion. Passing G3
+promotes PBOC to public preview, not stable 1.0.
 
 ## Repository boundary
 
@@ -62,9 +86,15 @@ host are public. Pliego.run UI, orchestrator, deployment engine, billing,
 Cloudflare account configuration, and operational policy remain in a private
 repository.
 
-## Open questions
+## Deferred beyond v1alpha1
 
-- whether cache tags are opaque strings or typed dependency edges;
-- function streaming and commit-boundary representation;
-- portable queue, durable object, and scheduled task subsets;
-- receipt format for cost estimation versus final billed usage.
+- typed cache dependency edges beyond opaque tags;
+- asynchronous boundary parity beyond complete and ordered streaming;
+- portable queue, object storage, durable object, and scheduled task subsets;
+- provider cost-estimate and final-billing receipts; and
+- additional independent deployment hosts.
+
+The operational guide is
+[`docs/50-pboc-portable-deployment.md`](../50-pboc-portable-deployment.md) and
+the acceptance record is
+[`docs/evidence/g3-pboc-provider-conformance.md`](../evidence/g3-pboc-provider-conformance.md).

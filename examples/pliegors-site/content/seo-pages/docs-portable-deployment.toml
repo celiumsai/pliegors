@@ -1,0 +1,5 @@
+key = "docs-portable-deployment"
+title = { en = "Portable Deployment | PliegoRS PBOC", es = "Despliegue portable | PBOC de PliegoRS" }
+description = { en = "Validate a sealed PliegoRS PBOC, admit native Linux/OCI or Cloudflare Workers, and prove rolling and rollback compatibility before upload.", es = "Valida un PBOC sellado de PliegoRS, admite Linux/OCI nativo o Cloudflare Workers y demuestra compatibilidad rolling y rollback antes del upload." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A PliegoRS artifact ledger representing one portable deployment contract", es = "Un ledger de artefactos de PliegoRS que representa un contrato de despliegue portable" }

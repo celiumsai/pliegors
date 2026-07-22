@@ -12,6 +12,7 @@ mod error;
 mod host;
 mod limits;
 mod middleware;
+mod pboc;
 mod render;
 mod scope;
 mod session;
@@ -35,6 +36,7 @@ pub use host::{
 };
 pub use limits::{LimitError, RequestLimits};
 pub use middleware::{MiddlewareNext, PreRouteNext, RuntimeMiddleware, RuntimePreRouteMiddleware};
+pub use pboc::{NATIVE_PBOC_TARGET_ID, NativePbocError, native_pboc_host_profile};
 pub use render::{
     AsyncBoundary, BoundaryDocument, BoundaryRenderOptions, CompleteDocument,
     CompleteRenderOptions, DocumentHead, LayoutDocument, LayoutLayer, LayoutStreamDocument,

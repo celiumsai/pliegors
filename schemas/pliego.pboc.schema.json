@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.pboc.schema.json",
+  "title": "Pliego Build Output Contract v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "framework", "build", "compatibility", "capabilities", "artifacts", "targets", "assets", "routes", "functions", "cachePolicies", "permissions", "secretReferences", "telemetryHooks"],
+  "properties": {
+    "schema": { "const": "dev.pliegors.pboc/v1alpha1" },
+    "framework": { "$ref": "#/$defs/framework" },
+    "build": { "$ref": "#/$defs/build" },
+    "compatibility": { "$ref": "#/$defs/compatibility" },
+    "capabilities": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/feature" } },
+    "artifacts": { "type": "array", "minItems": 1, "maxItems": 100000, "items": { "$ref": "#/$defs/artifact" } },
+    "targets": { "type": "array", "minItems": 1, "maxItems": 100000, "items": { "$ref": "#/$defs/target" } },
+    "assets": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/asset" } },
+    "routes": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/route" } },
+    "functions": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/function" } },
+    "cachePolicies": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/cachePolicy" } },
+    "permissions": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/permission" } },
+    "secretReferences": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/secret" } },
+    "telemetryHooks": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/telemetry" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z][a-z0-9.-]*[a-z0-9]$|^[a-z]$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^/\\\\][^\\\\]*[^/\\\\]$|^[^/\\\\]$" },
+    "requestPath": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^/" },
+    "feature": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version", "required"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "version": { "type": "integer", "minimum": 1 }, "required": { "type": "boolean" } }
+    },
+    "framework": {
+      "type": "object", "additionalProperties": false, "required": ["name", "version", "sourceRevision"],
+      "properties": { "name": { "$ref": "#/$defs/id" }, "version": { "type": "string", "minLength": 1, "maxLength": 4096 }, "sourceRevision": { "$ref": "#/$defs/revision" } }
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false, "required": ["sbomPath", "provenancePath", "sourceRevision"],
+      "properties": { "sbomPath": { "$ref": "#/$defs/path" }, "provenancePath": { "$ref": "#/$defs/path" }, "sourceRevision": { "$ref": "#/$defs/revision" } }
+    },
+    "build": {
+      "type": "object", "additionalProperties": false, "required": ["applicationId", "releaseId", "routeGraphSha256", "runtimeContractSha256", "artifactLedgerSha256", "provenance"],
+      "properties": { "applicationId": { "$ref": "#/$defs/id" }, "releaseId": { "$ref": "#/$defs/id" }, "routeGraphSha256": { "$ref": "#/$defs/sha256" }, "runtimeContractSha256": { "$ref": "#/$defs/sha256" }, "artifactLedgerSha256": { "$ref": "#/$defs/sha256" }, "provenance": { "$ref": "#/$defs/provenance" } }
+    },
+    "compatibility": {
+      "type": "object", "additionalProperties": false, "required": ["epoch", "sequence", "stateSchema", "previousReleaseId", "rollbackSafe"],
+      "properties": { "epoch": { "type": "integer", "minimum": 1 }, "sequence": { "type": "integer", "minimum": 1 }, "stateSchema": { "$ref": "#/$defs/id" }, "previousReleaseId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }, "rollbackSafe": { "type": "boolean" } }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false, "required": ["path", "bytes", "sha256", "role", "mediaType"],
+      "properties": { "path": { "$ref": "#/$defs/path" }, "bytes": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" }, "role": { "enum": ["static-asset", "native-executable", "cloudflare-module", "sbom", "provenance", "configuration"] }, "mediaType": { "type": "string", "minLength": 1, "maxLength": 4096 } }
+    },
+    "target": {
+      "type": "object", "additionalProperties": false, "required": ["id", "hostKind", "artifactPaths", "requiredFeatures", "optionalFeatures"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "hostKind": { "enum": ["native-oci", "cloudflare-workers"] }, "artifactPaths": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/path" } }, "requiredFeatures": { "type": "array", "items": { "$ref": "#/$defs/feature" } }, "optionalFeatures": { "type": "array", "items": { "$ref": "#/$defs/feature" } } }
+    },
+    "asset": {
+      "type": "object", "additionalProperties": false, "required": ["requestPath", "artifactPath", "cachePolicyId", "immutable"],
+      "properties": { "requestPath": { "$ref": "#/$defs/requestPath" }, "artifactPath": { "$ref": "#/$defs/path" }, "cachePolicyId": { "$ref": "#/$defs/id" }, "immutable": { "type": "boolean" } }
+    },
+    "route": {
+      "type": "object", "additionalProperties": false, "required": ["id", "method", "pattern", "kind", "assetPath", "functionId", "renderMode", "cachePolicyId", "requiredFeatures"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "method": { "type": "string", "pattern": "^[A-Z]+$", "maxLength": 32 }, "pattern": { "$ref": "#/$defs/requestPath" }, "kind": { "enum": ["static", "dynamic"] }, "assetPath": { "anyOf": [{ "$ref": "#/$defs/path" }, { "type": "null" }] }, "functionId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }, "renderMode": { "enum": ["complete", "ordered", "boundary", "resource"] }, "cachePolicyId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }, "requiredFeatures": { "type": "array", "items": { "$ref": "#/$defs/feature" } } }
+    },
+    "function": {
+      "type": "object", "additionalProperties": false, "required": ["id", "entrypoint", "renderModes", "maxResponseBytes", "secretReferences", "permissionIds"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "entrypoint": { "$ref": "#/$defs/id" }, "renderModes": { "type": "array", "minItems": 1, "items": { "enum": ["complete", "ordered", "boundary", "resource"] } }, "maxResponseBytes": { "type": "integer", "minimum": 1 }, "secretReferences": { "type": "array", "items": { "$ref": "#/$defs/id" } }, "permissionIds": { "type": "array", "items": { "$ref": "#/$defs/id" } } }
+    },
+    "cachePolicy": {
+      "type": "object", "additionalProperties": false, "required": ["id", "domain", "revalidation", "maxAgeSeconds", "staleWhileRevalidateSeconds", "varyHeaders", "tags"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "domain": { "enum": ["public", "private", "session", "request"] }, "revalidation": { "enum": ["immutable", "time-bound", "tag-bound", "no-store"] }, "maxAgeSeconds": { "type": ["integer", "null"], "minimum": 0 }, "staleWhileRevalidateSeconds": { "type": ["integer", "null"], "minimum": 0 }, "varyHeaders": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 4096 } }, "tags": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 4096 } } }
+    },
+    "permission": {
+      "type": "object", "additionalProperties": false, "required": ["id", "resource", "capabilities", "required"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "resource": { "$ref": "#/$defs/id" }, "capabilities": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 4096 } }, "required": { "type": "boolean" } }
+    },
+    "secret": {
+      "type": "object", "additionalProperties": false, "required": ["id", "purpose", "required"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "purpose": { "type": "string", "minLength": 1, "maxLength": 4096 }, "required": { "type": "boolean" } }
+    },
+    "telemetry": {
+      "type": "object", "additionalProperties": false, "required": ["id", "signal", "required", "redactedFields"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "signal": { "$ref": "#/$defs/id" }, "required": { "type": "boolean" }, "redactedFields": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 4096 } } }
+    }
+  }
+}

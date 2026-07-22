@@ -23,6 +23,7 @@ const routes = [
   "/docs/browser-runtime",
   "/docs/dom-lifecycle",
   "/docs/native-runtime",
+  "/docs/portable-deployment",
   "/docs/fullstack-beta",
   "/docs/opensdk",
   "/docs/opensdk-components",
@@ -206,8 +207,8 @@ for (const asset of ["/media/pliegors/fold-hero.webp", "/media/pliegors/ledger-w
 for (const statement of ["R0-R7", "public beta"]) {
   if (!homeHtml.toLowerCase().includes(statement.toLowerCase())) failures.push(`home: missing current release statement ${statement}`);
 }
-if (!homeHtml.includes("PLIEGORS / 0.2.0-BETA.1 / PUBLIC BETA")) {
-  failures.push("home: current release marker is not 0.2.0-beta.1");
+if (!homeHtml.includes("PLIEGORS / 0.3.0-BETA.1 / PUBLIC BETA")) {
+  failures.push("home: current release marker is not 0.3.0-beta.1");
 }
 
 const changelogPages = [
@@ -220,11 +221,13 @@ for (const [route, file, localizedTitle] of changelogPages) {
   const entries = elements(document, "article")
     .map((node) => attribute(node, "data-change-entry"))
     .filter(Boolean);
-  if (JSON.stringify(entries) !== JSON.stringify(["v0-2-0-beta-1", "preview-components-v0-1-0-preview-1", "v0-0-2", "v0-0-1"])) {
+  if (JSON.stringify(entries) !== JSON.stringify(["v0-3-0-beta-1", "v0-2-0-beta-1", "preview-components-v0-1-0-preview-1", "v0-0-2", "v0-0-1"])) {
     failures.push(`${route}: changelog entries are incomplete or out of order`);
   }
   for (const required of [
     localizedTitle,
+    "0.3.0-beta.1",
+    "https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1",
     "0.2.0-beta.1",
     "2026-07-22",
     "https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1",
@@ -242,14 +245,15 @@ for (const [route, file, localizedTitle] of changelogPages) {
 const docsHtml = await readFile(path.join(root, "docs/index.html"), "utf8").catch(() => "");
 const docsDocument = parse(docsHtml);
 const docsItems = elements(docsDocument, "a").filter((node) => attribute(node, "data-docs-item") === "");
-if (docsItems.length !== 28) failures.push(`docs index: expected 28 topics, found ${docsItems.length}`);
+if (docsItems.length !== 29) failures.push(`docs index: expected 29 topics, found ${docsItems.length}`);
 for (const required of [
-  "PLIEGORS / 0.2.0-BETA.1 / 19 CRATES",
+  "PLIEGORS / 0.3.0-BETA.1 / 21 CRATES",
   "pliego-runtime",
   "published on crates.io",
   "/capabilities.json",
   "/docs/native-runtime",
   "/docs/fullstack-beta",
+  "/docs/portable-deployment",
   "/docs/opensdk",
 ]) {
   if (!docsHtml.includes(required)) failures.push(`docs index: missing release boundary ${required}`);
@@ -305,7 +309,7 @@ for (const crate of [
 }
 
 const opensdkPages = [
-  ["/docs/opensdk", ["0.2.0-beta.1", "pliego-sdk", "public on crates.io", "Rust 1.86.0", "RFC-006", "ADR-006"]],
+  ["/docs/opensdk", ["0.3.0-beta.1", "pliego-sdk", "public on crates.io", "Rust 1.86.0", "RFC-006", "ADR-006"]],
   ["/docs/opensdk-components", ["pliego:build/transformer@0.1.0", "TypeScript", "Python", "npm run check:opensdk:multilang", "native-trusted"]],
   ["/docs/browser-framework-conformance", ["React", "Svelte", "Lit", "npm run check:opensdk:browser-frameworks", "MessageChannel"]],
   ["/docs/opensdk-tooling", ["JSON-RPC 2.0", "MCP 2025-11-25", "pliego/handshake", "10,000", "1 MiB"]],
@@ -314,7 +318,7 @@ const opensdkPages = [
 
 const nativeRuntime = await readFile(outputPath("/docs/native-runtime"), "utf8").catch(() => "");
 for (const required of [
-  "0.2.0-beta.1",
+  "0.3.0-beta.1",
   "pliego-router",
   "pliego-runtime",
   "Complete",
@@ -338,9 +342,23 @@ for (const [route, requiredTerms] of opensdkPages) {
   }
   const spanishRoute = `/es${route}`;
   const spanishHtml = await readFile(outputPath(spanishRoute), "utf8").catch(() => "");
-  if (!spanishHtml.includes("0.2.0-beta.1")) {
+  if (!spanishHtml.includes("0.3.0-beta.1")) {
     failures.push(`${spanishRoute}: missing localized OpenSDK version boundary`);
   }
+}
+
+const portableDeployment = await readFile(outputPath("/docs/portable-deployment"), "utf8").catch(() => "");
+for (const required of [
+  "PBOC v1alpha1",
+  "pliego pboc validate",
+  "--host native",
+  "--host cloudflare",
+  "--direction rolling",
+  "--direction rollback",
+  "npm run check:provider-tck",
+  "Portable databases",
+]) {
+  if (!portableDeployment.includes(required)) failures.push(`/docs/portable-deployment: missing contract ${required}`);
 }
 
 const securityPages = [

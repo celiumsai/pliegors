@@ -1,0 +1,31 @@
+{
+  "schema": "dev.pliegors.pboc/v1alpha1",
+  "framework": { "name": "pliegors", "version": "0.2.0-beta.1", "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+  "build": {
+    "applicationId": "minimal",
+    "releaseId": "minimal-r1",
+    "routeGraphSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "runtimeContractSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "artifactLedgerSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "provenance": {
+      "sbomPath": "supply/sbom.json",
+      "provenancePath": "supply/provenance.json",
+      "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "compatibility": { "epoch": 1, "sequence": 1, "stateSchema": "stateless-v1", "previousReleaseId": null, "rollbackSafe": true },
+  "capabilities": [{ "id": "http.complete", "version": 1, "required": true }],
+  "artifacts": [
+    { "path": "artifacts/native/server", "bytes": 1, "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "role": "native-executable", "mediaType": "application/octet-stream" },
+    { "path": "supply/provenance.json", "bytes": 1, "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "role": "provenance", "mediaType": "application/json" },
+    { "path": "supply/sbom.json", "bytes": 1, "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "role": "sbom", "mediaType": "application/json" }
+  ],
+  "targets": [{ "id": "native-linux-oci", "hostKind": "native-oci", "artifactPaths": ["artifacts/native/server"], "requiredFeatures": [{ "id": "http.complete", "version": 1, "required": true }], "optionalFeatures": [] }],
+  "assets": [],
+  "routes": [],
+  "functions": [],
+  "cachePolicies": [],
+  "permissions": [],
+  "secretReferences": [],
+  "telemetryHooks": []
+}

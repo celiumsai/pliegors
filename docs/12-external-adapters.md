@@ -1,6 +1,6 @@
 # External adapter contract
 
-**Status:** API v1 preview (`pliego-adapters` 0.2.0-beta.1, runtime `1.1.0`)
+**Status:** API v1 preview (`pliego-adapters` 0.3.0-beta.1, runtime `1.1.0`)
 
 PliegoRS renders useful static markup before external browser code is loaded.
 An adapter owns enhancement below one `<pliego-adapter>` root. The framework

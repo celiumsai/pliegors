@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "pliego-pboc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+description = "Provider-neutral, digest-bound deployment contract for PliegoRS."
+publish.workspace = true
+
+[dependencies]
+pliego-router = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+unicode-casefold = { workspace = true }
+unicode-normalization = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
