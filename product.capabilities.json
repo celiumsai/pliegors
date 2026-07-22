@@ -3,13 +3,13 @@
   "schema": "dev.pliegors.product-capabilities/v1",
   "framework": {
     "name": "PliegoRS",
-    "channel": "public-preview",
-    "releasedVersion": "0.0.2",
-    "workspaceVersion": "0.0.2",
-    "openSdkVersion": "0.1.0-preview.1",
+    "channel": "public-beta",
+    "releasedVersion": "0.2.0-beta.1",
+    "workspaceVersion": "0.2.0-beta.1",
+    "openSdkVersion": "0.2.0-beta.1",
     "license": "Apache-2.0",
-    "releasedCrateCount": 18,
-    "unreleasedCrates": ["pliego-data"]
+    "releasedCrateCount": 19,
+    "unreleasedCrates": []
   },
   "support": {
     "rust": {
@@ -71,12 +71,12 @@
       "id": "data-actions-cache",
       "label": "Loaders, actions, sessions, and cache",
       "domain": "data",
-      "availability": "source-preview",
+      "availability": "released",
       "stability": "preview",
       "gate": "G2",
       "summary": "Request-scoped data loading, progressive mutations, session boundaries, and explicit distributed cache policies.",
       "evidence": ["docs/rfc/RFC-010-data-actions-cache.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g2-fullstack-beta.md"],
-      "limitations": ["The G2 beta is source-only and ships development/conformance stores; no production durable session, cache, or invalidation adapter is claimed."]
+      "limitations": ["The beta ships development and conformance stores; no production durable session, cache, or invalidation provider is claimed."]
     },
     {
       "id": "deterministic-ssg",
@@ -100,7 +100,7 @@
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md", "docs/evidence/g1-async-boundary-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
         "The public preview crate exposes three bounded SSR modes and route-owned complete and streamed layouts.",
-        "The 0.0.2 CLI and tagged component preview do not include the unreleased G2 source beta."
+        "The 0.2.0-beta.1 CLI coordinates G1 and G2 as one exact prerelease package graph."
       ]
     },
     {
@@ -139,7 +139,7 @@
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-native-socket-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-opentelemetry-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
         "The crate is a public preview, not a stable production-support promise; TLS, proxy trust, and portable host adapters remain G3 work.",
-        "The 0.0.2 CLI does not wire this runtime, and tiny_http stays limited to development and static preview commands."
+        "The 0.2.0-beta.1 CLI coordinates this crate but does not yet expose a production application-server command; tiny_http stays limited to development and static preview commands."
       ]
     },
     {
@@ -162,7 +162,7 @@
       "gate": "G5",
       "summary": "Typed WebAssembly Component admission, resource budgets, capabilities, effect receipts, and conformance fixtures.",
       "evidence": ["docs/42-opensdk-foundation.md", "docs/43-opensdk-multilang-conformance.md"],
-      "limitations": ["pliego-sdk 0.1.0-preview.1 is a separate public preview and is not wired into the released 0.0.2 CLI."]
+      "limitations": ["OpenSDK 0.2.0-beta.1 remains a prerelease contract; RFC-006 and ADR-006 still govern stabilization work."]
     },
     {
       "id": "opensdk-server",

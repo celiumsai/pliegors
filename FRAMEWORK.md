@@ -184,13 +184,13 @@ distribution are not stable surfaces. The R0-R7 gates in
 over expanding those areas.
 
 The full-stack evolution is specified by RFC-008 through RFC-014. G1 native
-HTTP, dynamic SSR, and routing are public component previews. G2 loaders,
+HTTP, dynamic SSR, and routing are part of the coordinated public beta. G2 loaders,
 actions, sessions, idempotency, uploads, outbound HTTP policy, runtime cache,
-and causal invalidation are complete on `main` as an unreleased source beta.
+and causal invalidation are published in that same exact package graph.
 The included G2 stores are development/conformance adapters. Production
 durability, PBOC execution, OCI/Cloudflare host portability, and Cloudflare
-application hosting remain outside the released contract until their named
-G2-G3 publication and evidence gates close.
+application hosting remain outside the released contract until the G3
+publication and evidence gates close.
 
 ## Release gate
 

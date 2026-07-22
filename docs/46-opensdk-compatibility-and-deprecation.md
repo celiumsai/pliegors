@@ -14,7 +14,7 @@ The output conforms to `schemas/pliego.sdk-compatibility-matrix.schema.json`. It
 - `preview`: versioned and tested, but may make breaking changes in a new preview protocol.
 - `stable`: preserves the contract for the documented compatibility window.
 
-OpenSDK `0.1.0-preview.1` is preview. Process bridges for TypeScript and Python are conformance implementations, not sandboxed Component Model SDKs. Rust is the reference Component Model toolchain.
+OpenSDK `0.2.0-beta.1` is preview. Process bridges for TypeScript and Python are conformance implementations, not sandboxed Component Model SDKs. Rust is the reference Component Model toolchain.
 
 ## Deprecation contract
 

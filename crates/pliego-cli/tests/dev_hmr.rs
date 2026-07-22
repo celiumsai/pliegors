@@ -41,6 +41,7 @@ fn pliego(arguments: &[&str], directory: &Path) -> Output {
     Command::new(env!("CARGO_BIN_EXE_pliego"))
         .args(arguments)
         .current_dir(directory)
+        .env("CARGO_TARGET_DIR", test_target_directory())
         .output()
         .expect("run pliego test binary")
 }
@@ -61,6 +62,13 @@ fn temporary_directory() -> PathBuf {
     ))
 }
 
+fn test_target_directory() -> PathBuf {
+    option_env!("CARGO_TARGET_TMPDIR")
+        .and_then(|path| Path::new(path).parent())
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| framework_root().join("target"))
+}
+
 fn available_port() -> u16 {
     TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0))
         .unwrap()
@@ -77,6 +85,7 @@ fn start_dev(project: &Path, port: u16) -> DevProcess {
     let child = Command::new(env!("CARGO_BIN_EXE_pliego"))
         .args(["dev", &port.to_string()])
         .current_dir(project)
+        .env("CARGO_TARGET_DIR", test_target_directory())
         .stdout(Stdio::from(stdout_file))
         .stderr(Stdio::from(stderr_file))
         .spawn()

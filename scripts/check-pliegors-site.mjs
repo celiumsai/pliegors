@@ -190,16 +190,16 @@ for (const hook of ["data-engine-lab", "data-pipeline", "data-hero-carousel"]) {
 for (const asset of ["/media/pliegors/fold-hero.webp", "/media/pliegors/ledger-wide.webp"]) {
   if (!homeHtml.includes(asset)) failures.push(`home: missing authored brand asset ${asset}`);
 }
-for (const statement of ["R0-R7", "public preview"]) {
+for (const statement of ["R0-R7", "public beta"]) {
   if (!homeHtml.toLowerCase().includes(statement.toLowerCase())) failures.push(`home: missing current release statement ${statement}`);
 }
-if (!homeHtml.includes("PLIEGORS / 0.0.2 / PUBLIC PREVIEW")) {
-  failures.push("home: current release marker is not 0.0.2");
+if (!homeHtml.includes("PLIEGORS / 0.2.0-BETA.1 / PUBLIC BETA")) {
+  failures.push("home: current release marker is not 0.2.0-beta.1");
 }
 
 const changelogPages = [
-  ["/changelog", path.join(root, "changelog/index.html"), "The native runtime becomes installable."],
-  ["/es/changelog", path.join(root, "es/changelog/index.html"), "El runtime nativo se vuelve instalable."],
+  ["/changelog", path.join(root, "changelog/index.html"), "The package graph becomes one product."],
+  ["/es/changelog", path.join(root, "es/changelog/index.html"), "El grafo de paquetes se convierte en un producto."],
 ];
 for (const [route, file, localizedTitle] of changelogPages) {
   const html = await readFile(file, "utf8").catch(() => "");
@@ -207,11 +207,14 @@ for (const [route, file, localizedTitle] of changelogPages) {
   const entries = elements(document, "article")
     .map((node) => attribute(node, "data-change-entry"))
     .filter(Boolean);
-  if (JSON.stringify(entries) !== JSON.stringify(["preview-components-v0-1-0-preview-1", "v0-0-2", "v0-0-1"])) {
+  if (JSON.stringify(entries) !== JSON.stringify(["v0-2-0-beta-1", "preview-components-v0-1-0-preview-1", "v0-0-2", "v0-0-1"])) {
     failures.push(`${route}: changelog entries are incomplete or out of order`);
   }
   for (const required of [
     localizedTitle,
+    "0.2.0-beta.1",
+    "2026-07-22",
+    "https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1",
     "0.1.0-preview.1",
     "2026-07-21",
     "https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1",
@@ -228,9 +231,9 @@ const docsDocument = parse(docsHtml);
 const docsItems = elements(docsDocument, "a").filter((node) => attribute(node, "data-docs-item") === "");
 if (docsItems.length !== 28) failures.push(`docs index: expected 28 topics, found ${docsItems.length}`);
 for (const required of [
-  "CLI / 0.0.2 + COMPONENTS / 0.1.0-preview.1",
+  "PLIEGORS / 0.2.0-BETA.1 / 19 CRATES",
   "pliego-runtime",
-  "separately published on crates.io",
+  "published on crates.io",
   "/capabilities.json",
   "/docs/native-runtime",
   "/docs/fullstack-beta",
@@ -271,6 +274,7 @@ for (const crate of [
   "pliego-fold",
   "pliego-reactive",
   "pliego-content",
+  "pliego-data",
   "pliego-artifact",
   "pliego-ssg",
   "pliego-resume",
@@ -288,7 +292,7 @@ for (const crate of [
 }
 
 const opensdkPages = [
-  ["/docs/opensdk", ["0.1.0-preview.1", "pliego-sdk", "public on crates.io", "Rust 1.86.0", "RFC-006", "ADR-006"]],
+  ["/docs/opensdk", ["0.2.0-beta.1", "pliego-sdk", "public on crates.io", "Rust 1.86.0", "RFC-006", "ADR-006"]],
   ["/docs/opensdk-components", ["pliego:build/transformer@0.1.0", "TypeScript", "Python", "npm run check:opensdk:multilang", "native-trusted"]],
   ["/docs/browser-framework-conformance", ["React", "Svelte", "Lit", "npm run check:opensdk:browser-frameworks", "MessageChannel"]],
   ["/docs/opensdk-tooling", ["JSON-RPC 2.0", "MCP 2025-11-25", "pliego/handshake", "10,000", "1 MiB"]],
@@ -297,7 +301,7 @@ const opensdkPages = [
 
 const nativeRuntime = await readFile(outputPath("/docs/native-runtime"), "utf8").catch(() => "");
 for (const required of [
-  "0.1.0-preview.1",
+  "0.2.0-beta.1",
   "pliego-router",
   "pliego-runtime",
   "Complete",
@@ -321,7 +325,7 @@ for (const [route, requiredTerms] of opensdkPages) {
   }
   const spanishRoute = `/es${route}`;
   const spanishHtml = await readFile(outputPath(spanishRoute), "utf8").catch(() => "");
-  if (!spanishHtml.includes("0.1.0-preview.1")) {
+  if (!spanishHtml.includes("0.2.0-beta.1")) {
     failures.push(`${spanishRoute}: missing localized OpenSDK version boundary`);
   }
 }

@@ -257,6 +257,34 @@ jobs:
           CHROME_PATH: /usr/bin/google-chrome
         run: npm run check:opensdk:all
 
+      - name: Validate G2 browser journey with and without JavaScript
+        shell: bash
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: |
+          set -euo pipefail
+          cargo build -p fullstack-pliego --bin fullstack-pliego --locked
+          target/debug/fullstack-pliego >"$RUNNER_TEMP/pliego-g2.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for _ in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:4320/login >/dev/null; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/pliego-g2.log"
+              exit 1
+            fi
+            sleep 0.25
+          done
+          if test "$ready" -ne 1; then
+            cat "$RUNNER_TEMP/pliego-g2.log"
+            exit 1
+          fi
+          npm run check:g2-browser
+
       - name: Validate the official PliegoRS site
         shell: bash
         run: |

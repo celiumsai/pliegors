@@ -92,8 +92,8 @@ fn opensdk_fixture(root: &std::path::Path, plane: &str) -> PathBuf {
     }
     let manifest = serde_json::json!({
         "schema": "dev.pliegors.sdk-extension/v1",
-        "apiVersion": "0.1.0-preview.1",
-        "hostVersion": ">=0.1.0-preview.1, <0.2.0",
+        "apiVersion": "0.2.0-beta.1",
+        "hostVersion": ">=0.2.0-beta.1, <0.3.0",
         "plane": plane,
         "identity": {
             "namespace": "celiums",
@@ -257,7 +257,7 @@ fn sdk_compatibility_is_machine_readable_and_bound_to_the_public_source() {
     );
     let matrix: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(matrix["contract"], "dev.pliegors.sdk-compatibility/v1");
-    assert_eq!(matrix["protocolVersion"], "0.1.0-preview.1");
+    assert_eq!(matrix["protocolVersion"], "0.2.0-beta.1");
     assert_eq!(matrix["source"], "celiumsai/pliegors");
     assert_eq!(matrix["deprecations"], serde_json::json!([]));
 }

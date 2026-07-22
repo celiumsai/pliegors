@@ -12,7 +12,7 @@ assert.ok(['--check', '--publish'].includes(mode), 'usage: publish-crates.mjs --
 const layers = [
   [
     'pliego-artifact', 'pliego-assets', 'pliego-content', 'pliego-inspect',
-    'pliego-log', 'pliego-macros', 'pliego-reactive', 'pliego-router', 'pliego-sdk',
+    'pliego-data', 'pliego-log', 'pliego-macros', 'pliego-reactive', 'pliego-router', 'pliego-sdk',
     'pliego-starters',
   ],
   ['pliego-dom', 'pliego-fold', 'pliego-hyphae'],

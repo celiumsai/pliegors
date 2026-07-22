@@ -23,21 +23,15 @@ for (const name of unreleasedCrates) {
 }
 const crates = allCrates.filter((pkg) => !unreleasedCrates.has(pkg.name));
 const expected = [
-  'pliego-adapters', 'pliego-artifact', 'pliego-assets', 'pliego-cli', 'pliego-content', 'pliego-dom',
+  'pliego-adapters', 'pliego-artifact', 'pliego-assets', 'pliego-cli', 'pliego-content', 'pliego-data', 'pliego-dom',
   'pliego-fold', 'pliego-hyphae', 'pliego-inspect', 'pliego-log', 'pliego-macros',
   'pliego-reactive', 'pliego-resume', 'pliego-router', 'pliego-runtime', 'pliego-sdk', 'pliego-ssg',
   'pliego-starters',
 ].sort();
 assert.deepEqual(crates.map((pkg) => pkg.name), expected);
 const packagesByName = new Map(allCrates.map((pkg) => [pkg.name, pkg]));
-const previewPackages = new Set(['pliego-data', 'pliego-router', 'pliego-runtime', 'pliego-sdk']);
-
 for (const pkg of allCrates) {
-  if (previewPackages.has(pkg.name)) {
-    assert.match(pkg.version, /^0\.1\.0-preview\.\d+$/u, `${pkg.name} preview version`);
-  } else {
-    assert.equal(pkg.version, workspaceVersion, `${pkg.name} version drift`);
-  }
+  assert.equal(pkg.version, workspaceVersion, `${pkg.name} version drift`);
   assert.equal(pkg.license, 'Apache-2.0', `${pkg.name} license`);
   assert.equal(pkg.repository, 'https://github.com/celiumsai/pliegors', `${pkg.name} repository`);
   assert.equal(pkg.homepage, 'https://pliegors.dev', `${pkg.name} homepage`);
@@ -63,6 +57,19 @@ const releasePath = path.join(root, '.github/workflows/release.yml');
 const release = readFileSync(releasePath, 'utf8');
 const ci = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8');
 const codeql = readFileSync(path.join(root, '.github/workflows/codeql.yml'), 'utf8');
+const firstPartyNodePackages = [
+  'package.json',
+  'workers/pliegors-site/package.json',
+  'workers/pliegors-email/package.json',
+];
+for (const relativePath of firstPartyNodePackages) {
+  const manifest = JSON.parse(readFileSync(path.join(root, relativePath), 'utf8'));
+  assert.equal(manifest.private, true, `${relativePath} must remain private to block npm publication`);
+  assert.ok(
+    !Object.values(manifest.scripts ?? {}).some((script) => /(?:^|\s)(?:npm|pnpm|yarn)\s+publish(?:\s|$)/u.test(script)),
+    `${relativePath} must not expose a package-registry publish script`,
+  );
+}
 const checkoutAction = 'actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0';
 const setupNodeAction = 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020';
 const uploadArtifactAction = 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
@@ -71,6 +78,9 @@ for (const [workflow, source] of [['ci.yml', ci], ['release.yml', release], ['co
   assert.ok(source.includes(checkoutAction), `${workflow} checkout action is not SHA-pinned`);
   assert.ok(source.includes('persist-credentials: false'), `${workflow} persists checkout credentials`);
   assert.ok(!/actions\/checkout@v\d/.test(source), `${workflow} uses a mutable checkout tag`);
+}
+for (const [workflow, source] of [['ci.yml', ci], ['release.yml', release], ['codeql.yml', codeql]]) {
+  assert.doesNotMatch(source, /(?:npm|pnpm|yarn)\s+publish(?:\s|$)/u, `${workflow} must not publish first-party Node packages`);
 }
 for (const [workflow, source] of [['ci.yml', ci], ['release.yml', release]]) {
   assert.ok(source.includes(setupNodeAction), `${workflow} setup-node action is not SHA-pinned`);

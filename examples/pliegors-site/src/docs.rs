@@ -135,10 +135,10 @@ pub const TOPICS: &[DocTopic] = &[
         slug: "fullstack-beta",
         group_en: "Runtime",
         group_es: "Runtime",
-        title_en: "Full-stack source beta",
-        title_es: "Source beta full-stack",
-        summary_en: "Evaluate G2 typed loaders, progressive actions, sessions, cache isolation, invalidation, and receipt-driven diagnostics from one exact source revision.",
-        summary_es: "Evalúa loaders tipados G2, actions progresivas, sesiones, aislamiento de cache, invalidación y diagnósticos por recibos desde una revisión fuente exacta.",
+        title_en: "Full-stack beta",
+        title_es: "Beta full-stack",
+        summary_en: "Use the published G2 loaders, progressive actions, sessions, cache isolation, invalidation, and receipt-driven diagnostics.",
+        summary_es: "Usa loaders G2 publicados, actions progresivas, sesiones, aislamiento de cache, invalidación y diagnósticos por recibos.",
     },
     DocTopic {
         slug: "opensdk",
@@ -307,17 +307,17 @@ pub fn index(locale: Locale) -> View {
                         .child(
                             el("p")
                                 .class("utility-label")
-                                .child("CLI / 0.0.2 + COMPONENTS / 0.1.0-preview.1 + G2 / SOURCE BETA"),
+                                .child("PLIEGORS / 0.2.0-BETA.1 / 19 CRATES"),
                         )
                         .child(el("h2").id("docs-status-title").child(localized(
                             locale,
-                            "Published framework. Public components. G2 source beta.",
-                            "Framework publicado. Componentes públicos. Source beta G2.",
+                            "One coordinated public beta.",
+                            "Una beta pública coordinada.",
                         )))
                         .child(el("p").child(localized(
                             locale,
-                            "The complete CLI remains 0.0.2 on crates.io. pliego-router, pliego-runtime, and pliego-sdk are separately published on crates.io at 0.1.0-preview.1. G2 is complete only on main as an unreleased source beta and is not wired into that CLI.",
-                            "El CLI completo sigue en 0.0.2 en crates.io. pliego-router, pliego-runtime y pliego-sdk se publican por separado en crates.io como 0.1.0-preview.1. G2 está completo solo en main como source beta no liberada y no está conectado a ese CLI.",
+                            "The CLI and all eighteen library crates are published on crates.io at the exact 0.2.0-beta.1 version, including pliego-router, pliego-runtime, pliego-data, and pliego-sdk. G1, G2, and OpenSDK move as one graph; PBOC and the Cloudflare application runtime remain unreleased G3 work.",
+                            "El CLI y los dieciocho crates de librería están publicados en crates.io con la versión exacta 0.2.0-beta.1, incluyendo pliego-router, pliego-runtime, pliego-data y pliego-sdk. G1, G2 y OpenSDK avanzan como un solo grafo; PBOC y el runtime de aplicaciones Cloudflare siguen sin liberar como trabajo G3.",
                         ))),
                 )
                 .child(link_list(
@@ -325,9 +325,9 @@ pub fn index(locale: Locale) -> View {
                     &[
                         ("https://pliegors.dev/capabilities.json", "Inspect current capabilities", "Inspeccionar capacidades actuales"),
                         ("/docs/native-runtime", "Evaluate the native runtime", "Evaluar el runtime nativo"),
-                        ("/docs/fullstack-beta", "Evaluate the G2 source beta", "Evaluar el source beta G2"),
+                        ("/docs/fullstack-beta", "Use the G2 beta", "Usar la beta G2"),
                         ("/docs/opensdk", "Evaluate OpenSDK", "Evaluar OpenSDK"),
-                        ("https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1", "Open the component release", "Abrir el release de componentes"),
+                        ("https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1", "Open the coordinated beta", "Abrir la beta coordinada"),
                         ("/changelog", "Read the release boundary", "Leer el límite de release"),
                     ],
                 )),
@@ -628,7 +628,7 @@ fn getting_started(locale: Locale) -> View {
             vec![
                 paragraph(locale, "PliegoRS projects are Rust workspaces. Install a stable Rust toolchain, the wasm32-unknown-unknown target when the project has a browser client, and wasm-bindgen-cli at the exact version reported by pliego check.", "Los proyectos PliegoRS son workspaces Rust. Instala un toolchain Rust estable, el target wasm32-unknown-unknown cuando el proyecto tenga cliente de navegador y wasm-bindgen-cli en la versión exacta indicada por pliego check."),
                 definition_list(locale, &[
-                    ("Rust", "1.85.0 for released v0.0.2 artifacts; 1.86.0 for current main and OpenSDK", "1.85.0 para artefactos v0.0.2 liberados; 1.86.0 para main actual y OpenSDK"),
+                    ("Rust", "1.86.0 for the current beta, main, and OpenSDK", "1.86.0 para la beta actual, main y OpenSDK"),
                     ("Targets", "Linux x64/ARM64 for production; macOS and Windows for development", "Linux x64/ARM64 para producción; macOS y Windows para desarrollo"),
                     ("Source", "crates.io packages, GitHub Releases, and the canonical celiumsai/pliegors repository", "Paquetes de crates.io, GitHub Releases y el repositorio canónico celiumsai/pliegors"),
                 ]),
@@ -640,10 +640,10 @@ fn getting_started(locale: Locale) -> View {
             "Install the CLI",
             "Instalar el CLI",
             vec![
-                note(locale, "Current release", "Install the exact 0.0.2 CLI from crates.io. The generated project pins every released PliegoRS crate to that same exact version.", "Release actual", "Instala el CLI 0.0.2 exacto desde crates.io. El proyecto generado fija cada crate liberado de PliegoRS a esa misma versión exacta."),
-                code_block(locale, "shell", "cargo install pliego-cli --version 0.0.2 --locked\npliego version"),
+                note(locale, "Current release", "Install the exact 0.2.0-beta.1 CLI from crates.io. The generated project pins every released PliegoRS crate to that same exact version.", "Release actual", "Instala el CLI 0.2.0-beta.1 exacto desde crates.io. El proyecto generado fija cada crate liberado de PliegoRS a esa misma versión exacta."),
+                code_block(locale, "shell", "cargo install pliego-cli --version 0.2.0-beta.1 --locked\npliego version"),
                 paragraph(locale, "Release installers are downloaded to disk, verified, and then executed. PliegoRS never documents piping an unverified network response directly into a shell.", "Los instaladores de release se descargan a disco, se verifican y después se ejecutan. PliegoRS nunca documenta enviar una respuesta de red sin verificar directamente a un shell."),
-                link_list(locale, &[("https://github.com/celiumsai/pliegors/releases/tag/v0.0.2", "Download and verify the signed release bundle", "Descargar y verificar el bundle firmado"), ("https://github.com/celiumsai/pliegors/blob/main/docs/27-distribution-and-release.md", "Read the distribution contract", "Leer el contrato de distribución")]),
+                link_list(locale, &[("https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1", "Download and verify the signed release bundle", "Descargar y verificar el bundle firmado"), ("https://github.com/celiumsai/pliegors/blob/main/docs/27-distribution-and-release.md", "Read the distribution contract", "Leer el contrato de distribución")]),
             ],
         ),
         doc_section(
@@ -952,9 +952,9 @@ fn dom_lifecycle(locale: Locale) -> View {
 
 fn native_runtime(locale: Locale) -> View {
     vec![
-        doc_section(locale, "status", "Install the G1 public preview", "Instala el preview público G1", vec![
-            paragraph(locale, "pliego-router and pliego-runtime 0.1.0-preview.1 are public on crates.io and G1 is complete. Pin both exact versions: they are not wired into the released 0.0.2 CLI and the preview line may change before stability.", "pliego-router y pliego-runtime 0.1.0-preview.1 son públicos en crates.io y G1 está completo. Fija ambas versiones exactas: no están conectadas al CLI 0.0.2 liberado y la línea preview puede cambiar antes de ser estable."),
-            code_block(locale, "toml", "[dependencies]\npliego-router = \"=0.1.0-preview.1\"\npliego-runtime = \"=0.1.0-preview.1\""),
+        doc_section(locale, "status", "Install the G1 public beta", "Instala la beta pública G1", vec![
+            paragraph(locale, "pliego-router and pliego-runtime 0.2.0-beta.1 are public on crates.io and G1 is complete. Pin both exact versions with the same version as the CLI and every other PliegoRS crate.", "pliego-router y pliego-runtime 0.2.0-beta.1 son públicos en crates.io y G1 está completo. Fija ambas versiones exactas con la misma versión del CLI y de cada crate PliegoRS."),
+            code_block(locale, "toml", "[dependencies]\npliego-router = \"=0.2.0-beta.1\"\npliego-runtime = \"=0.2.0-beta.1\""),
             note(locale, "Preview boundary", "The tagged reference application binds to 127.0.0.1:4310 by default. It is reproducible evidence, not a production deployment or support promise.", "Límite del preview", "La aplicación de referencia etiquetada escucha en 127.0.0.1:4310 de forma predeterminada. Es evidencia reproducible, no un despliegue productivo ni una promesa de soporte."),
         ]),
         doc_section(locale, "ownership", "Keep transport and framework ownership explicit", "Mantén explícita la propiedad del transporte y del framework", vec![
@@ -1016,7 +1016,7 @@ fn native_runtime(locale: Locale) -> View {
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-layout-composition-foundation.md", "Layout composition evidence", "Evidencia de composición de layouts"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-opentelemetry-foundation.md", "OpenTelemetry evidence", "Evidencia de OpenTelemetry"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-transport-load-security.md", "Transport, load, and security evidence", "Evidencia de transporte, carga y seguridad"),
-                ("https://crates.io/crates/pliego-runtime/0.1.0-preview.1", "pliego-runtime on crates.io", "pliego-runtime en crates.io"),
+                ("https://crates.io/crates/pliego-runtime/0.2.0-beta.1", "pliego-runtime on crates.io", "pliego-runtime en crates.io"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/rfc/RFC-008-native-runtime.md", "RFC-008 native runtime", "RFC-008 runtime nativo"),
             ]),
         ]),
@@ -1025,10 +1025,10 @@ fn native_runtime(locale: Locale) -> View {
 
 fn fullstack_beta(locale: Locale) -> View {
     vec![
-        doc_section(locale, "status", "Evaluate one exact source revision", "Evalúa una revisión fuente exacta", vec![
-            paragraph(locale, "G2 is complete on main as an unreleased source beta. It is absent from the 0.0.2 CLI and the 0.1.0-preview.1 component release. Clone one revision and treat every pliego-* source dependency as one indivisible application contract.", "G2 está completo en main como source beta no liberada. No forma parte del CLI 0.0.2 ni del release de componentes 0.1.0-preview.1. Clona una revisión y trata todas las dependencias fuente pliego-* como un solo contrato de aplicación indivisible."),
-            code_block(locale, "shell", "git clone https://github.com/celiumsai/pliegors.git\ncd pliegors\ncargo test -p pliego-data\ncargo test -p fullstack-pliego --test two_replicas\ncargo run -p fullstack-pliego"),
-            note(locale, "Source-beta boundary", "The included stores and two-replica coordinator are development and conformance adapters. They do not claim production durability, cross-process delivery, or G3 host portability.", "Límite del source beta", "Los stores incluidos y el coordinador de dos réplicas son adapters de desarrollo y conformidad. No afirman durabilidad productiva, entrega entre procesos ni portabilidad G3 entre hosts."),
+        doc_section(locale, "status", "Install one exact beta graph", "Instala un grafo beta exacto", vec![
+            paragraph(locale, "G2 is public in the coordinated 0.2.0-beta.1 graph. Pin pliego-data, pliego-router, pliego-runtime, and every other pliego-* dependency to that exact version and treat them as one indivisible application contract.", "G2 es público en el grafo coordinado 0.2.0-beta.1. Fija pliego-data, pliego-router, pliego-runtime y cada dependencia pliego-* a esa versión exacta y trátalas como un solo contrato de aplicación indivisible."),
+            code_block(locale, "toml", "[dependencies]\npliego-data = \"=0.2.0-beta.1\"\npliego-router = \"=0.2.0-beta.1\"\npliego-runtime = \"=0.2.0-beta.1\""),
+            note(locale, "Beta boundary", "The included stores and two-replica coordinator are development and conformance adapters. They do not claim production durability, cross-process delivery, or G3 host portability.", "Límite de la beta", "Los stores incluidos y el coordinador de dos réplicas son adapters de desarrollo y conformidad. No afirman durabilidad productiva, entrega entre procesos ni portabilidad G3 entre hosts."),
         ]),
         doc_section(locale, "model", "Seal data authority before serving", "Sella la autoridad de datos antes de servir", vec![
             paragraph(locale, "pliego-data registers typed resources and capabilities before NativeRuntime seals the route, loader, action, cache, and invalidation graph. A declaration is not authority: route grants, provider capabilities, action or loader requirements, and operator policy must intersect before a lease is issued.", "pliego-data registra recursos tipados y capabilities antes de que NativeRuntime selle el grafo de rutas, loaders, actions, cache e invalidación. Una declaración no es autoridad: grants de ruta, capabilities del provider, requisitos del action o loader y política del operador deben intersectar antes de emitir un lease."),
@@ -1066,18 +1066,18 @@ fn fullstack_beta(locale: Locale) -> View {
 
 fn opensdk(locale: Locale) -> View {
     vec![
-        doc_section(locale, "status", "Install the OpenSDK public preview", "Instala el preview público de OpenSDK", vec![
-            paragraph(locale, "pliego-sdk 0.1.0-preview.1 is public on crates.io and belongs to the separate component prerelease. Its conformance suites remain in the repository, the 0.0.2 CLI does not contain this command surface, and RFC-006/RFC-007 plus ADR-006 remain pending.", "pliego-sdk 0.1.0-preview.1 es público en crates.io y pertenece al release separado de componentes. Sus suites de conformidad siguen en el repositorio, el CLI 0.0.2 no contiene esta superficie y RFC-006/RFC-007 junto con ADR-006 siguen pendientes."),
-            code_block(locale, "toml", "[dependencies]\npliego-sdk = \"=0.1.0-preview.1\""),
-            note(locale, "Toolchain boundary", "The current main branch requires Rust 1.86.0 for the Wasmtime 36.0.8 security floor. Released v0.0.2 artifacts retain their original Rust 1.85.0 evidence.", "Límite del toolchain", "El branch main actual requiere Rust 1.86.0 por el security floor de Wasmtime 36.0.8. Los artefactos v0.0.2 liberados conservan su evidencia original de Rust 1.85.0."),
+        doc_section(locale, "status", "Install the OpenSDK public beta", "Instala la beta pública de OpenSDK", vec![
+            paragraph(locale, "pliego-sdk 0.2.0-beta.1 is public on crates.io inside the coordinated framework graph. Its conformance suites remain in the repository, and RFC-006/RFC-007 plus ADR-006 remain pending before stabilization.", "pliego-sdk 0.2.0-beta.1 es público en crates.io dentro del grafo coordinado del framework. Sus suites de conformidad siguen en el repositorio y RFC-006/RFC-007 junto con ADR-006 permanecen pendientes antes de estabilizar."),
+            code_block(locale, "toml", "[dependencies]\npliego-sdk = \"=0.2.0-beta.1\""),
+            note(locale, "Toolchain boundary", "The beta and current main require Rust 1.86.0 for the Wasmtime 36.0.8 security floor.", "Límite del toolchain", "La beta y main actual requieren Rust 1.86.0 por el security floor de Wasmtime 36.0.8."),
             link_list(locale, &[
-                ("https://crates.io/crates/pliego-sdk/0.1.0-preview.1", "Open pliego-sdk on crates.io", "Abrir pliego-sdk en crates.io"),
-                ("https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1", "Read the component prerelease", "Leer el prerelease de componentes"),
+                ("https://crates.io/crates/pliego-sdk/0.2.0-beta.1", "Open pliego-sdk on crates.io", "Abrir pliego-sdk en crates.io"),
+                ("https://github.com/celiumsai/pliegors/releases/tag/v0.2.0-beta.1", "Read the coordinated beta", "Leer la beta coordinada"),
             ]),
         ]),
         doc_section(locale, "admission", "Admit exact bytes before execution", "Admite bytes exactos antes de ejecutar", vec![
             paragraph(locale, "An extension manifest declares its identity, exact entry points, OpenSDK API, compatible host range, required features, requested capabilities, and resource budgets. Admission verifies the component digest and policy before returning a ValidatedExtension typestate that a runtime can execute.", "El manifest de una extensión declara identidad, entry points exactos, API OpenSDK, rango de host compatible, features requeridos, capabilities solicitadas y presupuestos de recursos. La admisión verifica el digest del componente y la política antes de retornar el typestate ValidatedExtension que un runtime puede ejecutar."),
-            code_block(locale, "rust", "use pliego_sdk::{CapabilityPolicy, ExtensionManifest, HostContract};\nuse semver::Version;\n\nlet manifest: ExtensionManifest = serde_json::from_slice(manifest_bytes)?;\nlet host = HostContract::preview(\n    Version::parse(\"0.1.0-preview.1\")?,\n    CapabilityPolicy::deny_all(),\n);\nlet validated = host.admit(manifest, component_bytes)?;"),
+            code_block(locale, "rust", "use pliego_sdk::{CapabilityPolicy, ExtensionManifest, HostContract};\nuse semver::Version;\n\nlet manifest: ExtensionManifest = serde_json::from_slice(manifest_bytes)?;\nlet host = HostContract::preview(\n    Version::parse(\"0.2.0-beta.1\")?,\n    CapabilityPolicy::deny_all(),\n);\nlet validated = host.admit(manifest, component_bytes)?;"),
             note(locale, "A request is not authority", "Declaring a capability never creates a filesystem, network, clock, random, environment, or HTTP handle. The host policy and application-supplied executor remain the resource boundary.", "Una solicitud no es autoridad", "Declarar una capability nunca crea un handle de filesystem, red, reloj, random, environment o HTTP. La política del host y el executor suministrado por la aplicación siguen siendo el límite del recurso."),
         ]),
         doc_section(locale, "effects", "Broker effects and retain evidence", "Intermedia efectos y conserva evidencia", vec![
@@ -1105,7 +1105,7 @@ fn opensdk_components(locale: Locale) -> View {
     vec![
         doc_section(locale, "component", "Typed Wasm Component execution", "Ejecución tipada de Wasm Components", vec![
             paragraph(locale, "The reference sandbox compiles and admits a Rust WebAssembly Component against pliego:build/transformer@0.1.0. The host instantiates it without ambient WASI, invokes the typed export, and emits a schema-valid build transform receipt over framed input and output digests.", "El sandbox de referencia compila y admite un WebAssembly Component Rust contra pliego:build/transformer@0.1.0. El host lo instancia sin WASI ambiental, invoca el export tipado y emite un recibo de transformación válido contra schema sobre digests enmarcados de entrada y salida."),
-            note(locale, "Preview protocol", "This conformance surface belongs to OpenSDK 0.1.0-preview.1 on main and is not part of the published PliegoRS v0.0.2 packages.", "Protocolo preview", "Esta superficie de conformidad pertenece a OpenSDK 0.1.0-preview.1 en main y no forma parte de los paquetes PliegoRS v0.0.2 publicados."),
+            note(locale, "Beta protocol", "This conformance surface belongs to OpenSDK 0.2.0-beta.1 and remains a prerelease contract.", "Protocolo beta", "Esta superficie de conformidad pertenece a OpenSDK 0.2.0-beta.1 y sigue siendo un contrato prerelease."),
             code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk test \\\n  fixtures/opensdk/rust-component/pliego-extension.json \\\n  --input fixtures/opensdk/transform-input.json \\\n  --format json"),
         ]),
         doc_section(locale, "languages", "One contract, independent implementations", "Un contrato, implementaciones independientes", vec![
@@ -1134,7 +1134,7 @@ fn browser_framework_conformance(locale: Locale) -> View {
     vec![
         doc_section(locale, "native", "Keep framework runtimes native", "Mantén nativos los runtimes", vec![
             paragraph(locale, "React, Svelte, and Lit keep their normal browser packages and APIs. PliegoRS does not reimplement their renderers. Each fixture is exposed through a Custom Element and admitted through adapter API v1, leaving the real integration point visible to developers.", "React, Svelte y Lit conservan sus paquetes y APIs normales del navegador. PliegoRS no reimplementa sus renderers. Cada fixture se expone mediante un Custom Element y se admite mediante adapter API v1, dejando visible para el desarrollador el punto real de integración."),
-            note(locale, "Preview protocol", "These fixtures exercise OpenSDK 0.1.0-preview.1 from main; they are conformance evidence rather than a released browser framework SDK.", "Protocolo preview", "Estos fixtures ejercitan OpenSDK 0.1.0-preview.1 desde main; son evidencia de conformidad, no un SDK de frameworks web liberado."),
+            note(locale, "Beta protocol", "These fixtures exercise OpenSDK 0.2.0-beta.1; they are conformance evidence rather than a standalone browser-framework package.", "Protocolo beta", "Estos fixtures ejercitan OpenSDK 0.2.0-beta.1; son evidencia de conformidad, no un paquete independiente para frameworks web."),
             note(locale, "Conformance, not a new abstraction", "The wrappers are examples and test inputs. They do not create another component model over React, Svelte, or Lit.", "Conformidad, no una abstracción nueva", "Los wrappers son ejemplos y entradas de prueba. No crean otro modelo de componentes sobre React, Svelte o Lit."),
         ]),
         doc_section(locale, "descriptor", "Match the admitted descriptor", "Coincide con el descriptor admitido", vec![
@@ -1166,14 +1166,14 @@ fn opensdk_tooling(locale: Locale) -> View {
         doc_section(locale, "protocol", "One bounded tooling plane", "Un plano de tooling limitado", vec![
             paragraph(locale, "The OpenSDK tooling host uses newline-delimited JSON-RPC 2.0 over standard input and output. Editors negotiate through pliego/handshake; the reference MCP adapter exposes the same capability handshake after completing the MCP 2025-11-25 initialization lifecycle.", "El host de tooling OpenSDK usa JSON-RPC 2.0 delimitado por líneas sobre entrada y salida estándar. Los editores negocian mediante pliego/handshake; el adapter MCP de referencia expone el mismo handshake de capabilities después de completar el lifecycle de inicialización MCP 2025-11-25."),
             definition_list(locale, &[
-                ("OpenSDK", "0.1.0-preview.1", "0.1.0-preview.1"),
+                ("OpenSDK", "0.2.0-beta.1", "0.2.0-beta.1"),
                 ("JSON-RPC", "2.0 over bounded newline-delimited messages", "2.0 sobre mensajes delimitados por líneas y limitados"),
                 ("MCP", "2025-11-25 reference client surface", "Superficie del cliente de referencia 2025-11-25"),
             ]),
         ]),
         doc_section(locale, "editor", "Negotiate before diagnostics", "Negocia antes de diagnósticos", vec![
             code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk tooling-host \\\n  --protocol pliego \\\n  --feature diagnostic-links"),
-            paragraph(locale, "The native handshake must include protocolVersion 0.1.0-preview.1. Missing or incompatible versions fail before any diagnostic or project method becomes available.", "El handshake nativo debe incluir protocolVersion 0.1.0-preview.1. Las versiones ausentes o incompatibles fallan antes de que esté disponible cualquier método de diagnóstico o proyecto."),
+            paragraph(locale, "The native handshake must include protocolVersion 0.2.0-beta.1. Missing or incompatible versions fail before any diagnostic or project method becomes available.", "El handshake nativo debe incluir protocolVersion 0.2.0-beta.1. Las versiones ausentes o incompatibles fallan antes de que esté disponible cualquier método de diagnóstico o proyecto."),
         ]),
         doc_section(locale, "mcp", "MCP is a client, not a privilege", "MCP es un cliente, no un privilegio", vec![
             code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk tooling-host \\\n  --protocol mcp \\\n  --feature diagnostic-links\nnpm run check:opensdk:tooling"),
@@ -1198,7 +1198,7 @@ fn opensdk_compatibility(locale: Locale) -> View {
                 ("preview", "Versioned and tested, with breaking changes allowed in a new preview protocol", "Versionado y probado, con cambios incompatibles permitidos en un nuevo protocolo preview"),
                 ("stable", "Preserves the contract for the documented compatibility window", "Preserva el contrato durante la ventana de compatibilidad documentada"),
             ]),
-            note(locale, "Current tier", "OpenSDK 0.1.0-preview.1 is preview. Rust is the reference Component Model toolchain; TypeScript and Python are process-bridge conformance implementations.", "Nivel actual", "OpenSDK 0.1.0-preview.1 es preview. Rust es el toolchain Component Model de referencia; TypeScript y Python son implementaciones de conformidad mediante bridges de proceso."),
+            note(locale, "Current tier", "OpenSDK 0.2.0-beta.1 is preview. Rust is the reference Component Model toolchain; TypeScript and Python are process-bridge conformance implementations.", "Nivel actual", "OpenSDK 0.2.0-beta.1 es preview. Rust es el toolchain Component Model de referencia; TypeScript y Python son implementaciones de conformidad mediante bridges de proceso."),
         ]),
         doc_section(locale, "deprecation", "Require an executable migration path", "Exige una ruta de migración ejecutable", vec![
             steps(locale, &[
@@ -1394,7 +1394,7 @@ fn build_and_deploy(locale: Locale) -> View {
         ]),
         doc_section(locale, "releases", "Release selection", "Selección de releases", vec![
             paragraph(locale, "GitHub Releases is the canonical distribution channel. Production targets are Linux x86_64 and ARM64; macOS and Windows artifacts support development. Versioned archives, sidecars, SHA256SUMS, and the signed release manifest must agree.", "GitHub Releases es el canal canónico de distribución. Los targets de producción son Linux x86_64 y ARM64; los artefactos macOS y Windows soportan desarrollo. Archives versionados, sidecars, SHA256SUMS y el manifest firmado deben coincidir."),
-            code_block(locale, "shell", "# Run only after downloading the installer to disk\n./install.sh --version 0.0.2\n\n# Explicit mutable-channel opt-in\n./install.sh --channel latest"),
+            code_block(locale, "shell", "# Run only after downloading the installer to disk\n./install.sh --version 0.2.0-beta.1\n\n# Explicit mutable-channel opt-in\n./install.sh --channel latest"),
         ]),
         doc_section(locale, "deploy", "Deploy the static output", "Despliega la salida estática", vec![
             paragraph(locale, "Deploy the contents of target/site to any origin that preserves paths, MIME types, immutable asset caching, the authored 404 document, and clean-route fallback. The framework does not require a PliegoRS application server.", "Despliega el contenido de target/site en cualquier origen que preserve rutas, MIME types, cache inmutable de assets, el documento 404 con autoría y fallback de rutas limpias. El framework no requiere un servidor de aplicación PliegoRS."),
@@ -1414,10 +1414,10 @@ fn crate_reference(locale: Locale) -> View {
                 ("pliego-artifact / pliego-ssg / pliego-inspect", "Portable output, documents, routes, receipts, graphs, staged publication, and verification", "Salida portable, documentos, rutas, recibos, grafos, publicación por staging y verificación"),
                 ("pliego-adapters / pliego-hyphae", "External browser lifecycle and verified durable sync boundaries", "Lifecycle externo del navegador y límites de sync durable verificado"),
                 ("pliego-starters / pliego-cli", "Maintained first-use projects and the complete command surface", "Proyectos mantenidos de primer uso y superficie completa de comandos"),
-                ("pliego-router / pliego-runtime (0.1.0-preview.1)", "Public G1 preview: sealed routes, streamed layouts, bounded HTTP/1.1 and HTTP/2, OTel, failures, receipts, and three SSR modes", "Preview público G1: rutas selladas, layouts streamed, HTTP/1.1 y HTTP/2 limitados, OTel, fallos, recibos y tres modos SSR"),
-                ("pliego-sdk (0.1.0-preview.1)", "Public OpenSDK preview: manifests, capability admission, Component Model runtime, effect receipts, compatibility, and tooling protocols", "Preview público OpenSDK: manifests, admisión de capabilities, runtime Component Model, recibos de efectos, compatibilidad y protocolos de tooling"),
+                ("pliego-router / pliego-runtime (0.2.0-beta.1)", "Public G1 beta: sealed routes, streamed layouts, bounded HTTP/1.1 and HTTP/2, OTel, failures, receipts, and three SSR modes", "Beta pública G1: rutas selladas, layouts streamed, HTTP/1.1 y HTTP/2 limitados, OTel, fallos, recibos y tres modos SSR"),
+                ("pliego-data / pliego-sdk (0.2.0-beta.1)", "Public G2 and OpenSDK beta: data authority, manifests, capability admission, Component Model runtime, effects, compatibility, and tooling", "Beta pública G2 y OpenSDK: autoridad de datos, manifests, admisión de capabilities, runtime Component Model, efectos, compatibilidad y tooling"),
             ]),
-            note(locale, "Registry boundary", "Eighteen of nineteen workspace crates are public. Fifteen remain on the 0.0.2 CLI line; router, runtime, and SDK use a separate exact 0.1.0-preview.1 component line. pliego-data is an unreleased G2 source beta.", "Límite del registry", "Dieciocho de diecinueve crates del workspace son públicos. Quince siguen en la línea del CLI 0.0.2; router, runtime y SDK usan una línea separada exacta 0.1.0-preview.1. pliego-data es un source beta G2 no liberado."),
+            note(locale, "Registry boundary", "All nineteen workspace crates are public at exactly 0.2.0-beta.1. First-party Node packages remain private repository tooling and are not published to the npm registry.", "Límite del registry", "Los diecinueve crates del workspace son públicos exactamente en 0.2.0-beta.1. Los paquetes Node propios siguen como tooling privado del repositorio y no se publican en el registry npm."),
         ]),
         doc_section(locale, "symbols", "Core public entry points", "Entradas públicas principales", vec![
             definition_list(locale, &[
@@ -1430,7 +1430,7 @@ fn crate_reference(locale: Locale) -> View {
                 ("pliego_adapters::{AdapterIsland, AdapterPolicy}", "Declare external browser modules and their admission policy", "Declara módulos externos del navegador y su política de admisión"),
                 ("pliego_hyphae::{ReceiptVerifier, VerifiedAppendResponse, VerifiedPullPage}", "Cross the durable authority boundary through verified typestate", "Cruza el límite de autoridad durable mediante typestate verificado"),
                 ("pliego_runtime::{NativeRuntimeBuilder, TransportLimits, LayoutStreamDocument}", "Build against the exact public G1 preview with bounded transport and route-owned streams", "Construye con el preview público G1 exacto, transporte limitado y streams controlados por rutas"),
-                ("pliego_data::{DataContext, LoaderPolicy, ActionPolicy, SessionManager, CachePolicy}", "Evaluate the unreleased G2 source beta for typed full-stack data contracts", "Evalúa el source beta G2 no liberado para contratos full-stack tipados de datos"),
+                ("pliego_data::{DataContext, LoaderPolicy, ActionPolicy, SessionManager, CachePolicy}", "Build against the public G2 beta for typed full-stack data contracts", "Construye con la beta pública G2 para contratos full-stack tipados de datos"),
                 ("pliego_sdk::{ExtensionManifest, HostContract, CapabilityPolicy}", "Build against the exact public OpenSDK admission preview", "Construye con el preview público exacto de admisión OpenSDK"),
             ]),
         ]),
@@ -1439,9 +1439,9 @@ fn crate_reference(locale: Locale) -> View {
             paragraph(locale, "The repository Rustdoc is the symbol-level reference for an exact revision. This guide explains product contracts and crate ownership; it does not replace signatures, trait bounds, feature flags, or per-item safety notes emitted from the source.", "El Rustdoc del repositorio es la referencia a nivel de símbolos para una revisión exacta. Esta guía explica contratos de producto y propiedad de crates; no reemplaza firmas, trait bounds, feature flags ni notas de seguridad por item emitidas desde la fuente."),
         ]),
         doc_section(locale, "stability", "Respect the pre-1.0 boundary", "Respeta el límite pre-1.0", vec![
-            paragraph(locale, "PliegoRS 0.0.2 is public pre-1.0 software. Crate names identify stable ownership boundaries, but public signatures may change between minor releases. Pin one exact released version across every pliego-* dependency and never mix framework versions inside one application graph.", "PliegoRS 0.0.2 es software público pre-1.0. Los nombres de crates identifican límites estables de propiedad, pero las firmas públicas pueden cambiar entre releases menores. Fija una versión liberada exacta en todas las dependencias pliego-* y nunca mezcles versiones del framework dentro del grafo de una aplicación."),
-            note(locale, "Published support contract", "The compatibility matrix and changelog define supported toolchains, targets, features, deprecations, and upgrade paths for each release. Linux x64 and ARM64 are the production targets for 0.0.2.", "Contrato de soporte publicado", "La matriz de compatibilidad y el changelog definen toolchains, targets, features, deprecaciones y rutas de upgrade para cada release. Linux x64 y ARM64 son los targets de producción para 0.0.2."),
-            note(locale, "G1 and OpenSDK use a separate preview line", "The router, runtime, and OpenSDK 0.1.0-preview.1 may change on another preview line. G2 is complete only as an unreleased source beta on main; neither G2 nor G3 extends the 0.0.2 CLI compatibility promise.", "G1 y OpenSDK usan una línea preview separada", "El router, runtime y OpenSDK 0.1.0-preview.1 pueden cambiar en otra línea preview. G2 está completo solo como source beta no liberada en main; ni G2 ni G3 amplían la promesa de compatibilidad del CLI 0.0.2."),
+            paragraph(locale, "PliegoRS 0.2.0-beta.1 is public pre-1.0 software. Crate names identify stable ownership boundaries, but public signatures may change between prereleases or minor releases. Pin one exact released version across every pliego-* dependency and never mix framework versions inside one application graph.", "PliegoRS 0.2.0-beta.1 es software público pre-1.0. Los nombres de crates identifican límites estables de propiedad, pero las firmas públicas pueden cambiar entre prereleases o releases menores. Fija una versión liberada exacta en todas las dependencias pliego-* y nunca mezcles versiones del framework dentro del grafo de una aplicación."),
+            note(locale, "Published support contract", "The compatibility matrix and changelog define supported toolchains, targets, features, deprecations, and upgrade paths for each release. Linux x64 and ARM64 are the production targets for 0.2.0-beta.1.", "Contrato de soporte publicado", "La matriz de compatibilidad y el changelog definen toolchains, targets, features, deprecaciones y rutas de upgrade para cada release. Linux x64 y ARM64 son los targets de producción para 0.2.0-beta.1."),
+            note(locale, "One coordinated beta line", "G1, G2, and OpenSDK share 0.2.0-beta.1. PBOC and the Cloudflare application runtime remain explicitly unreleased G3 surfaces.", "Una línea beta coordinada", "G1, G2 y OpenSDK comparten 0.2.0-beta.1. PBOC y el runtime de aplicaciones Cloudflare siguen como superficies G3 explícitamente no liberadas."),
         ]),
         doc_section(locale, "boundaries", "Read the normative boundaries", "Lee los límites normativos", vec![
             link_list(locale, &[
@@ -1751,7 +1751,7 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("failure", "Limits and failure", "Límites y fallos"),
         ],
         "fullstack-beta" => vec![
-            ("status", "Source-beta status", "Estado del source beta"),
+            ("status", "Public beta status", "Estado de la beta pública"),
             ("model", "Data authority", "Autoridad de datos"),
             ("progressive", "Progressive actions", "Actions progresivas"),
             ("sessions-cache", "Sessions and cache", "Sesiones y cache"),

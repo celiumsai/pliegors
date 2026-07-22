@@ -22,7 +22,7 @@
   ],
   "properties": {
     "schema": { "const": "dev.pliegors.sdk-extension/v1" },
-    "apiVersion": { "const": "0.1.0-preview.1" },
+    "apiVersion": { "const": "0.2.0-beta.1" },
     "hostVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
     "plane": { "enum": ["build", "server", "browser", "tooling"] },
     "identity": {

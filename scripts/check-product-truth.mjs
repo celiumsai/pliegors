@@ -86,7 +86,7 @@ const requiredSurfaces = new Map([
   ['fullstack-routing', ['released', 'preview', 'G1']],
   ['opensdk-browser-tooling', ['released', 'preview', 'G5']],
   ['opensdk-build', ['released', 'preview', 'G5']],
-  ['data-actions-cache', ['source-preview', 'preview', 'G2']],
+  ['data-actions-cache', ['released', 'preview', 'G2']],
   ['pboc', ['not-released', 'none', 'G3']],
   ['cloudflare-runtime', ['not-released', 'none', 'G3']],
   ['opensdk-server', ['not-released', 'none', 'G5']],
@@ -114,11 +114,11 @@ for (const [name, content] of publicTruth) {
 }
 
 for (const [name, content, required] of [
-  ['README.md', readme, ['product.capabilities.json', '0.0.2', '0.1.0-preview.1', 'Rust `1.86`']],
+  ['README.md', readme, ['product.capabilities.json', '0.2.0-beta.1', 'Rust `1.86`']],
   ['FRAMEWORK.md', framework, ['product.capabilities.json', 'deterministic static sites', 'Streaming SSR']],
   ['docs/34-product-constitution.md', constitution, ['product.capabilities.json', 'Linux x64 and ARM64', 'Chromium']],
-  ['website pages', sitePages, ['0.0.2 is public on crates.io', 'R0-R7 and P8 evidence']],
-  ['website docs', siteDocs, ['/capabilities.json', 'OpenSDK 0.1.0-preview.1', 'Rust 1.86']],
+  ['website pages', sitePages, ['0.2.0-beta.1 is public on crates.io', 'R0-R7, P8, G1, and G2 evidence']],
+  ['website docs', siteDocs, ['/capabilities.json', 'OpenSDK 0.2.0-beta.1', 'Rust 1.86']],
 ]) {
   for (const token of required) assert.ok(content.includes(token), `${name} lacks product-truth token: ${token}`);
 }

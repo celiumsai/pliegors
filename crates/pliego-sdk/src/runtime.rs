@@ -652,7 +652,7 @@ mod tests {
         ExtensionManifest {
             schema: OPENSDK_MANIFEST_SCHEMA.to_owned(),
             api_version: OPENSDK_API_VERSION.to_owned(),
-            host_version: ">=0.1.0-preview.1, <0.2.0".to_owned(),
+            host_version: ">=0.2.0-beta.1, <0.3.0".to_owned(),
             plane: Plane::Build,
             identity: ExtensionIdentity {
                 namespace: "pliego".to_owned(),

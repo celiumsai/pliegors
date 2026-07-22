@@ -46,7 +46,7 @@ The manifest records three distinct versions:
 - `releasedVersion`: the latest complete CLI/distribution release;
 - `workspaceVersion`: the version currently shared by released workspace
   packages on `main`; and
-- `openSdkVersion`: the separately versioned public-preview OpenSDK protocol line.
+- `openSdkVersion`: the OpenSDK protocol version coordinated with the current package graph.
 
 The product-truth checker compares those values with `Cargo.toml`,
 `package.json`, `rust-toolchain.toml`, the released crate set, the README,
@@ -56,24 +56,21 @@ constitution, framework contract, and official site source.
 
 Target roles are explicit:
 
-- Linux x64 and ARM64 are production release targets for `0.0.2`.
+- Linux x64 and ARM64 are production release targets for `0.2.0-beta.1`.
 - macOS x64/ARM64 and Windows x64 are development release targets.
 - Chromium is the release-blocking browser lifecycle target.
 - Firefox and Safari are compatibility candidates until the same corpus runs
   in CI or committed physical-device evidence.
 
-The released CLI archives are not evidence that a full-stack application
-runtime is wired into the CLI for those targets. G1 native runtime crates are a
-separate public preview; the Cloudflare application runtime remains
-`not-released` until G3 closes.
+The released CLI archives are not evidence that a production application-server
+command is wired for those targets. G1 native runtime crates and G2 data
+contracts share the coordinated beta; the Cloudflare application runtime
+remains `not-released` until G3 closes.
 
 G2 data, action, session, upload, outbound HTTP, and runtime-cache contracts are
-`source-preview` on `main`. `pliego-data` is listed in `unreleasedCrates`, and
-the current `v0.0.2` plus component prerelease do not contain that source beta.
-The crate-publication gate propagates this boundary: the modified runtime and
-CLI are deferred until the G2 dependency chain receives coordinated new
-versions, even when older packages with the same pre-G2 versions exist in the
-registry.
+`released` at preview stability in `0.2.0-beta.1`. `pliego-data` and every other
+framework crate share the same exact version. This availability does not
+promote the included providers to production durability services.
 The in-memory stores and two-replica coordinator are conformance adapters, not
 production distributed-service evidence. See
 [`evidence/g2-fullstack-beta.md`](evidence/g2-fullstack-beta.md).

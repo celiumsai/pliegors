@@ -5,7 +5,7 @@
 **Parent:** [RFC-010](RFC-010-data-actions-cache.md)
 **Created:** 2026-07-21
 
-**Implementation:** Complete on `main` for the G2 source beta; see
+**Implementation:** Complete and published in `0.2.0-beta.1`; see
 [G2 evidence](../evidence/g2-fullstack-beta.md).
 
 ## Decision

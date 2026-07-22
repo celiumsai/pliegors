@@ -1,12 +1,11 @@
 # OpenSDK foundation
 
 **Stability:** experimental preview
-**Protocol:** `0.1.0-preview.1`
+**Protocol:** `0.2.0-beta.1`
 **RFC:** [RFC-006](rfc/RFC-006-opensdk-planes-and-capabilities.md)
 
 **MSRV:** Rust `1.86.0`. This is the minimum supported Wasmtime `36.0.8`
-security floor for the OpenSDK host; older PliegoRS `0.0.2` artifacts retain
-their original Rust `1.85.0` evidence.
+security floor for the OpenSDK host.
 
 OpenSDK is the public extension boundary of PliegoRS. The Rust crate, WIT
 packages, JSON schemas, browser lifecycle, and tooling protocol describe the
@@ -33,7 +32,7 @@ use semver::Version;
 
 let manifest: ExtensionManifest = serde_json::from_slice(manifest_bytes)?;
 let host = HostContract::preview(
-    Version::parse("0.1.0-preview.1")?,
+    Version::parse("0.2.0-beta.1")?,
     CapabilityPolicy::deny_all(),
 );
 let validated = host.admit(manifest, component_bytes)?;

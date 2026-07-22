@@ -5,7 +5,7 @@
 **Target gate:** G2  
 **Created:** 2026-07-19
 
-**Implementation:** Complete on `main` as an unreleased source beta; see
+**Implementation:** Complete and published in `0.2.0-beta.1`; see
 [G2 evidence](../evidence/g2-fullstack-beta.md). Draft status is the governance
 state, not an implementation-status claim.
 

@@ -489,7 +489,7 @@ mod tests {
         matrix.deprecations.push(Deprecation {
             id: "build/legacy-transform".to_owned(),
             state: DeprecationState::Deprecated,
-            since: "0.1.0-preview.1".to_owned(),
+            since: "0.2.0-beta.1".to_owned(),
             earliest_removal: None,
             replacement: None,
         });
