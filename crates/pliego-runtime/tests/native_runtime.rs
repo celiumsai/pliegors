@@ -1615,6 +1615,86 @@ async fn ordered_server_render_streams_siblings_and_binds_the_receipt() {
 }
 
 #[tokio::test]
+async fn streamed_layout_is_bound_to_route_ownership_and_request_cleanup() {
+    use pliego_runtime::{
+        LayoutStreamDocument, OrderedRenderOptions, OrderedViewChunk,
+        render_layout_ordered_document,
+    };
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    let graph = RouteGraphBuilder::new()
+        .scope(RouteScopeSpec::new("app-layout", RouteScopeKind::Layout).unwrap())
+        .route(
+            route("layout-stream", RouteMethod::get(), "/layout-stream")
+                .scope("app-layout")
+                .unwrap(),
+        )
+        .seal()
+        .unwrap();
+    let sink = InMemoryReceiptSink::default();
+    let cleaned = Arc::new(AtomicBool::new(false));
+    let runtime = NativeRuntimeBuilder::new(graph, "layout-stream-test")
+        .unwrap()
+        .handler("layout-stream", {
+            let cleaned = cleaned.clone();
+            move |context: pliego_runtime::RequestContext, _request| {
+                let cleaned = cleaned.clone();
+                async move {
+                    context
+                        .scope()
+                        .register_cleanup(move |_| {
+                            cleaned.store(true, Ordering::Release);
+                            Ok(())
+                        })
+                        .unwrap();
+                    let document = LayoutStreamDocument::new(context.route())
+                        .layout(
+                            LayoutLayer::new("app-layout")
+                                .unwrap()
+                                .wrap(el("main").class("app")),
+                        )
+                        .unwrap()
+                        .title("Streamed layout");
+                    let chunks = futures_util::stream::iter([
+                        OrderedViewChunk::new(|| el("h1").child("First").into_view()),
+                        OrderedViewChunk::new(|| el("p").child("Second").into_view()),
+                    ]);
+                    render_layout_ordered_document(
+                        &document,
+                        chunks,
+                        OrderedRenderOptions::default(),
+                    )
+                }
+            }
+        })
+        .receipt_sink(sink.clone())
+        .build()
+        .unwrap();
+
+    let response = runtime
+        .router()
+        .oneshot(
+            Request::builder()
+                .uri("/layout-stream")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = to_bytes(response.into_body(), 4096).await.unwrap();
+    assert!(
+        std::str::from_utf8(&body)
+            .unwrap()
+            .contains("<main class=\"app\"><h1>First</h1><p>Second</p></main>")
+    );
+    assert!(cleaned.load(Ordering::Acquire));
+    let receipts = sink.receipts();
+    assert_eq!(receipts.len(), 1);
+    assert_eq!(receipts[0].render_mode, Some(RenderMode::Layout));
+    assert_eq!(receipts[0].route_layouts, ["app-layout"]);
+}
+
+#[tokio::test]
 async fn boundary_server_render_resolves_in_order_and_binds_the_receipt() {
     use pliego_dom::{IntoView, el};
     use pliego_runtime::{

@@ -2,7 +2,8 @@
 
 **Gate:** G1 Native runtime and dynamic rendering
 
-**State:** HTTP/1.1 loopback conformance slice; gate remains open
+**State:** Historical HTTP/1.1 slice; superseded by
+[transport, load, and security evidence](g1-transport-load-security.md)
 
 **Toolchain:** Rust 1.86.0 under Debian WSL2
 
@@ -48,7 +49,7 @@ test result: ok. 2 passed; 0 failed; 0 ignored
 
 ## Evidence boundary
 
-This slice does not establish TLS, HTTP/2, proxy-header trust, public-network
-behavior, slowloris resistance, slow-reader behavior, or fixed-load latency
-and memory bounds. It does not close G1 or promote `native-http-runtime` from
-`not-released`.
+This historical slice did not establish TLS, HTTP/2, proxy-header trust,
+slow-peer behavior, or fixed-load memory bounds. The later G1 transport
+evidence establishes HTTP/2, slow-peer, overload, shutdown, and bounded Linux
+load behavior. TLS and proxy identity remain later host-adapter ownership.

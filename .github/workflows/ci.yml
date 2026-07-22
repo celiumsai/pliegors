@@ -120,6 +120,9 @@ jobs:
       - name: Check canonical product capabilities
         run: npm run check:product-truth
 
+      - name: Check scoped ASVS ownership map
+        run: npm run check:security-map
+
       - name: Check maintained fuzz contract
         run: npm run check:fuzz
 
