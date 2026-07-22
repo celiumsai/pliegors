@@ -8,6 +8,9 @@
 
 **Toolchain:** Rust 1.86.0 under Debian WSL2
 
+This is a historical foundation snapshot. It did not close G1 by itself; the
+later transport/load/security evidence and public component prerelease did.
+
 ## Implemented slice
 
 The unreleased `pliego-router` crate now provides:
@@ -67,7 +70,7 @@ rejection, Unicode normalization, cleanup, and receipts.
 
 ## Gate still open
 
-This evidence does **not** close G1 and does not promote either crate or its
+At the recorded revision, this evidence did **not** close G1 or promote either crate or its
 capabilities to a released state. The following acceptance work remains:
 
 - PliegoRS complete, ordered, and boundary server rendering;

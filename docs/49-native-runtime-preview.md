@@ -1,11 +1,11 @@
-# Native runtime preview source
+# Native runtime public preview
 
-**Status:** G1 closure candidate; unreleased source work
+**Status:** G1 complete; public component preview
 
 The workspace contains `pliego-router` and `pliego-runtime` at
-`0.1.0-preview.1`. They are implementation work for G1, are not published on
-crates.io, are not wired to the released CLI, and do not change the public
-capability status in `product.capabilities.json`.
+`0.1.0-preview.1`. Both are published on crates.io and tracked by the
+[`0.1.0-preview.1` component prerelease](https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1).
+They are not wired to the released `0.0.2` CLI and remain preview APIs.
 
 ## Ownership boundary
 

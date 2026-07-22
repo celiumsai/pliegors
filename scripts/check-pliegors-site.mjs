@@ -197,8 +197,8 @@ if (!homeHtml.includes("PLIEGORS / 0.0.2 / PUBLIC PREVIEW")) {
 }
 
 const changelogPages = [
-  ["/changelog", path.join(root, "changelog/index.html"), "The native runtime becomes executable."],
-  ["/es/changelog", path.join(root, "es/changelog/index.html"), "El runtime nativo se vuelve ejecutable."],
+  ["/changelog", path.join(root, "changelog/index.html"), "The native runtime becomes installable."],
+  ["/es/changelog", path.join(root, "es/changelog/index.html"), "El runtime nativo se vuelve instalable."],
 ];
 for (const [route, file, localizedTitle] of changelogPages) {
   const html = await readFile(file, "utf8").catch(() => "");
@@ -206,15 +206,17 @@ for (const [route, file, localizedTitle] of changelogPages) {
   const entries = elements(document, "article")
     .map((node) => attribute(node, "data-change-entry"))
     .filter(Boolean);
-  if (JSON.stringify(entries) !== JSON.stringify(["unreleased", "v0-0-2", "v0-0-1"])) {
+  if (JSON.stringify(entries) !== JSON.stringify(["preview-components-v0-1-0-preview-1", "v0-0-2", "v0-0-1"])) {
     failures.push(`${route}: changelog entries are incomplete or out of order`);
   }
   for (const required of [
     localizedTitle,
+    "0.1.0-preview.1",
+    "2026-07-21",
+    "https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1",
     "0.0.2",
     "2026-07-18",
     "https://github.com/celiumsai/pliegors/releases/tag/v0.0.2",
-    "https://github.com/celiumsai/pliegors/blob/main/CHANGELOG.md",
   ]) {
     if (!html.includes(required)) failures.push(`${route}: missing current changelog contract ${required}`);
   }
@@ -225,9 +227,9 @@ const docsDocument = parse(docsHtml);
 const docsItems = elements(docsDocument, "a").filter((node) => attribute(node, "data-docs-item") === "");
 if (docsItems.length !== 27) failures.push(`docs index: expected 27 topics, found ${docsItems.length}`);
 for (const required of [
-  "RELEASE / 0.0.2 + G1 / PREVIEW",
+  "CLI / 0.0.2 + COMPONENTS / 0.1.0-preview.1",
   "pliego-runtime",
-  "not on crates.io",
+  "separately published on crates.io",
   "/capabilities.json",
   "/docs/native-runtime",
   "/docs/opensdk",
@@ -284,7 +286,7 @@ for (const crate of [
 }
 
 const opensdkPages = [
-  ["/docs/opensdk", ["0.1.0-preview.1", "pliego-sdk is not published on crates.io", "Rust 1.86.0", "RFC-006", "ADR-006"]],
+  ["/docs/opensdk", ["0.1.0-preview.1", "pliego-sdk", "public on crates.io", "Rust 1.86.0", "RFC-006", "ADR-006"]],
   ["/docs/opensdk-components", ["pliego:build/transformer@0.1.0", "TypeScript", "Python", "npm run check:opensdk:multilang", "native-trusted"]],
   ["/docs/browser-framework-conformance", ["React", "Svelte", "Lit", "npm run check:opensdk:browser-frameworks", "MessageChannel"]],
   ["/docs/opensdk-tooling", ["JSON-RPC 2.0", "MCP 2025-11-25", "pliego/handshake", "10,000", "1 MiB"]],
@@ -299,10 +301,14 @@ for (const required of [
   "Complete",
   "Ordered",
   "Boundary",
+  "TransportLimits",
+  "HTTP/2",
+  "LayoutStreamDocument",
   "data-pliego-boundary",
   "PLG-REN-210",
+  "PLG-RUN-110",
   "PliegoCSS 0.1.0-rc.2",
-  "not-released",
+  "public on crates.io",
 ]) {
   if (!nativeRuntime.includes(required)) failures.push(`/docs/native-runtime: missing contract ${required}`);
 }

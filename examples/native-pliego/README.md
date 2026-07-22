@@ -1,6 +1,7 @@
 # Native PliegoRS reference application
 
-This unreleased G1 application exercises `pliego-router`, `pliego-runtime`,
+This G1 reference application exercises the public-preview `pliego-router` and
+`pliego-runtime` crates,
 `pliego-dom`, complete SSR, ordered sibling streaming, bounded asynchronous
 boundary SSR, assets, health, and graceful shutdown in one native process. Its sealed graph also declares a
 response-policy middleware and a safe root error boundary.
@@ -22,6 +23,7 @@ The default address is `127.0.0.1:4310`. A custom loopback address may be set
 with `PLIEGO_ADDR`. Binding a non-loopback address is rejected unless
 `PLIEGO_EXPOSE=1` is also present.
 
-This application is gate evidence, not a released starter. It does not yet
-prove HTTP/2, TLS, OpenTelemetry,
-multipart/decompression policy, fixed-load behavior, or production deployment.
+This application is gate evidence, not a released starter. The wider runtime
+corpus proves HTTP/2, operator-enabled OpenTelemetry, fail-closed multipart and
+decompression policy, and fixed-load behavior. TLS, proxy trust, G3 host
+portability, and production deployment remain outside this example.

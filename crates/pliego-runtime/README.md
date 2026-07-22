@@ -1,6 +1,6 @@
 # pliego-runtime
 
-`pliego-runtime` is the unreleased G1 native runtime for PliegoRS. It owns
+`pliego-runtime` is the public G1 native-runtime preview for PliegoRS. It owns
 bounded request admission, request scope, cancellation, deadline propagation,
 concurrency admission, LIFO cleanup, response commitment, streamed-body
 ownership, panic isolation, graceful-shutdown draining, diagnostics, and
@@ -64,9 +64,9 @@ inbound `tracestate` and baggage are discarded so provider state remains
 local. Custom HTTP methods require an explicit bounded allowlist entry.
 Receipts retain only a coarse duration bucket.
 
-The crate is `0.1.0-preview.1` source work. It is not published on crates.io and
-does not promote the `native-http-runtime` or `dynamic-ssr` capabilities in
-`product.capabilities.json`. See
+The crate is published on crates.io as `0.1.0-preview.1`. Its API may change on
+another preview line, it is not wired into the `0.0.2` CLI, and publication is
+not a stable production-support promise. See
 [`RFC-008`](../../docs/rfc/RFC-008-native-runtime.md).
 
 The conformance corpus includes raw TCP HTTP/1.1 and HTTP/2, multiplexed

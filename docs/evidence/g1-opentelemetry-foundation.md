@@ -8,9 +8,13 @@
 
 **Toolchain:** Rust and Cargo 1.86.0 on Windows x86-64 and Debian/WSL2 x86-64
 
+This is a historical foundation snapshot. G1 was later completed and promoted
+through the [`0.1.0-preview.1` transport evidence](g1-transport-load-security.md)
+and public component prerelease.
+
 ## Contract under test
 
-The unreleased native runtime remains silent by default. Calling
+At this base revision, the then-unreleased native runtime remained silent by default. Calling
 `NativeRuntimeBuilder::open_telemetry` captures global OpenTelemetry providers
 that the operator configured before runtime construction. PliegoRS does not
 select an exporter, collector, endpoint, credentials, processor, sampling

@@ -43,10 +43,10 @@ not an implementation or release claim.
 
 The manifest records three distinct versions:
 
-- `releasedVersion`: the latest installable GitHub/crates.io release;
+- `releasedVersion`: the latest complete CLI/distribution release;
 - `workspaceVersion`: the version currently shared by released workspace
   packages on `main`; and
-- `openSdkVersion`: the separate unreleased OpenSDK protocol line.
+- `openSdkVersion`: the separately versioned public-preview OpenSDK protocol line.
 
 The product-truth checker compares those values with `Cargo.toml`,
 `package.json`, `rust-toolchain.toml`, the released crate set, the README,
@@ -63,8 +63,9 @@ Target roles are explicit:
   in CI or committed physical-device evidence.
 
 The released CLI archives are not evidence that a full-stack application
-runtime exists for those targets. Native and Cloudflare application runtimes
-remain `not-released` until G1 and G3 close.
+runtime is wired into the CLI for those targets. G1 native runtime crates are a
+separate public preview; the Cloudflare application runtime remains
+`not-released` until G3 closes.
 
 ## Evidence rules
 
