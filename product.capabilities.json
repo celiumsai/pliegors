@@ -139,7 +139,7 @@
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-native-socket-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md"],
       "limitations": [
         "The unreleased source is a lifecycle foundation, not a production-conformant server release.",
-        "Streamed-layout semantics, OpenTelemetry, load evidence, and the threat-model corpus remain incomplete; tiny_http remains limited to development and static preview commands."
+        "Streamed-layout semantics, structured logs, load evidence, and the remaining threat-model corpus remain incomplete; tiny_http remains limited to development and static preview commands."
       ]
     },
     {
@@ -208,8 +208,11 @@
       "stability": "none",
       "gate": "G1",
       "summary": "OpenTelemetry HTTP spans, metrics, structured logs, runtime diagnostics, and bounded support evidence.",
-      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md"],
-      "limitations": ["Build and browser evidence do not constitute request-time server observability."]
+      "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-opentelemetry-foundation.md"],
+      "limitations": [
+        "Source preview emits operator-enabled OTel server spans and three HTTP metrics with a bounded privacy profile; it installs no exporter and emits nothing by default.",
+        "Structured runtime logs, HTTP/2 and load correlation, broader threat-model evidence, and a released production host remain incomplete."
+      ]
     },
     {
       "id": "rust-wasm-ui",

@@ -15,9 +15,9 @@ not depend on Axum or a deployment provider.
 
 `pliego-runtime` owns request admission, scope lifecycle, deadlines,
 cancellation, cleanup, response commitment, response-body accounting,
-diagnostics, receipts, layout-owned complete documents, and
-complete/ordered/boundary server-rendering modes. Axum, Hyper, Tower, and Tokio
-retain HTTP transport, service, and executor ownership.
+diagnostics, receipts, operator-enabled telemetry, layout-owned complete
+documents, and complete/ordered/boundary server-rendering modes. Axum, Hyper,
+Tower, and Tokio retain HTTP transport, service, and executor ownership.
 
 ## Complete rendering
 
@@ -106,6 +106,59 @@ is bounded by the same metadata, depth, node, and byte limits and records
 This first contract composes complete documents. Ordered and asynchronous
 boundary modes do not yet accept layout frames, and layouts do not yet own
 loaders or request cleanup.
+
+## Operator-enabled OpenTelemetry
+
+The runtime emits no request telemetry by default. An operator first configures
+the global OpenTelemetry tracer and meter providers, then opts the runtime in:
+
+```rust
+use pliego_runtime::{
+    HttpScheme, NativeRuntimeBuilder, OpenTelemetryConfig, RemoteTracePolicy,
+};
+
+let telemetry = OpenTelemetryConfig::new(HttpScheme::Https)
+    .known_method("PROPFIND")?
+    .remote_trace_policy(RemoteTracePolicy::AcceptW3c);
+
+let runtime = NativeRuntimeBuilder::new(graph, "production-a")?
+    .open_telemetry(telemetry)
+    // handlers, middleware, and boundaries
+    .build()?;
+```
+
+The required `HttpScheme` is trusted operator configuration, never inferred
+from an attacker-controlled `Host` or forwarding header. PliegoRS captures the
+operator's global providers when
+`open_telemetry` runs. It never installs an exporter, endpoint, credential,
+batch processor, or collector. A `SERVER` span begins before admission and
+ends only when the response body completes, fails, or disconnects. This keeps
+stream errors and last-byte duration inside the same request lifecycle.
+
+The stable signal surface is:
+
+- `http.server.request.duration` in seconds;
+- `http.server.active_requests` in requests, with identical increment and
+  decrement attributes;
+- `http.server.response.body.size` in bytes; and
+- the server span named from the admitted method and sealed route template.
+
+Attributes are restricted to known/explicitly allowlisted methods, the trusted
+scheme, protocol version, sealed `http.route`, status, response size, route ID,
+render mode, runtime outcome, the receipt contract, and a finite framework
+diagnostic-code allowlist. Unknown methods and application diagnostic codes
+become `_OTHER`.
+Concrete paths, query strings, server addresses, request headers, cookies,
+bodies, user identifiers, request IDs, deployment IDs, and diagnostic messages
+never enter the default signal. The privacy profile therefore deliberately
+omits `url.path` from the otherwise stable HTTP server span convention rather
+than mislabeling a route template as a concrete path.
+
+Inbound `traceparent` is ignored by default. Explicit `AcceptW3c` admits only a
+valid parent parsed by the W3C propagator. Inbound `tracestate`, baggage, and
+other propagation formats are discarded so a peer cannot inject provider
+state into exported telemetry. Runtime receipts stay exporter-independent and
+record a coarse duration bucket rather than precise wall time.
 
 ## Ordered rendering
 
@@ -213,6 +266,7 @@ boundary through the host-owned body.
 - declared and streamed request-body bytes;
 - response bytes;
 - diagnostics and application cleanup callbacks;
+- 64 exact known telemetry methods with 32-byte method identities;
 - concurrent admitted requests;
 - ordered render chunks and document metadata;
 - asynchronous boundary count, in-flight work, timeout, and identities;
@@ -246,6 +300,8 @@ The source implementation currently demonstrates:
   outward error recovery, and scope identity in receipts;
 - route-bound complete-document composition with exactly one structural child
   slot per layout, deterministic head merging, and layout identity in receipts;
+- operator-enabled OpenTelemetry spans and HTTP metrics across the complete
+  body lifecycle, with W3C propagation opt-in and bounded redaction/cardinality;
 - exactly-once bounded receipts; and
 - pre-commit complete-render failures with stable `PLG-REN-*` diagnostics.
 
@@ -274,7 +330,7 @@ both successful and authored 404 responses.
 The following remain gate work:
 
 - layout composition for streamed modes plus layout-owned loaders and cleanup;
-- OpenTelemetry with redaction and cardinality tests;
+- structured runtime logs and exporter-specific operational guidance;
 - multipart and decompression policies;
 - real socket HTTP/2 conformance; and
 - fixed-load latency, RSS, disconnect, slow-peer, overload, and shutdown

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::telemetry::OpenTelemetryRequest;
 use crate::{RenderMode, RequestLimits};
 use pliego_router::RouteMatch;
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,7 @@ use std::fmt::{Display, Formatter};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 
 type Cleanup = Box<dyn FnOnce(Option<CancelReason>) -> Result<(), String> + Send + 'static>;
@@ -49,6 +50,17 @@ pub enum RequestOutcome {
     Rejected,
     Cancelled,
     Failed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RequestDurationBucket {
+    Under10Milliseconds,
+    Under50Milliseconds,
+    Under250Milliseconds,
+    Under1Second,
+    Under5Seconds,
+    AtLeast5Seconds,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -204,6 +216,7 @@ pub struct RuntimeReceipt {
     pub cancel_reason: Option<CancelReason>,
     pub response_status: Option<u16>,
     pub response_bytes: u64,
+    pub duration_bucket: RequestDurationBucket,
     pub render_mode: Option<RenderMode>,
     pub middleware: Vec<String>,
     pub error_boundary: Option<String>,
@@ -214,6 +227,7 @@ struct ScopeInner {
     identity: RequestIdentity,
     limit_policy_sha256: String,
     limits: RequestLimits,
+    started: Instant,
     deadline: Instant,
     state: Mutex<RequestState>,
     outcome: Mutex<RequestOutcome>,
@@ -233,6 +247,7 @@ struct ScopeInner {
     response_bytes: AtomicU64,
     receipt_recorded: AtomicBool,
     sink: Arc<dyn RuntimeReceiptSink>,
+    telemetry: Option<Arc<OpenTelemetryRequest>>,
 }
 
 #[derive(Clone)]
@@ -245,13 +260,16 @@ impl RequestScope {
         identity: RequestIdentity,
         limits: RequestLimits,
         sink: Arc<dyn RuntimeReceiptSink>,
+        telemetry: Option<Arc<OpenTelemetryRequest>>,
     ) -> Self {
-        let deadline = Instant::now() + limits.deadline();
+        let started = Instant::now();
+        let deadline = started + limits.deadline();
         let scope = Self {
             inner: Arc::new(ScopeInner {
                 identity,
                 limit_policy_sha256: limits.digest(),
                 limits,
+                started,
                 deadline,
                 state: Mutex::new(RequestState::Accepted),
                 outcome: Mutex::new(RequestOutcome::Pending),
@@ -271,6 +289,7 @@ impl RequestScope {
                 response_bytes: AtomicU64::new(0),
                 receipt_recorded: AtomicBool::new(false),
                 sink,
+                telemetry,
             }),
         };
         scope.spawn_deadline();
@@ -371,6 +390,9 @@ impl RequestScope {
         *lock(&self.inner.route_id) = Some(route.route_id().to_owned());
         *lock(&self.inner.route_scopes) = route.scope_ids().to_vec();
         *lock(&self.inner.route_layouts) = route.layout_ids().to_vec();
+        if let Some(telemetry) = &self.inner.telemetry {
+            let _ = catch_unwind(AssertUnwindSafe(|| telemetry.set_route(route)));
+        }
     }
 
     pub(crate) fn commit_response(&self, status: u16) -> Result<(), ScopeError> {
@@ -516,6 +538,7 @@ impl RequestScope {
             cancel_reason: self.cancel_reason(),
             response_status: *lock(&self.inner.response_status),
             response_bytes: self.inner.response_bytes.load(Ordering::Acquire),
+            duration_bucket: duration_bucket(self.inner.started.elapsed()),
             render_mode: *lock(&self.inner.render_mode),
             middleware: lock(&self.inner.middleware).clone(),
             error_boundary: lock(&self.inner.error_boundary).clone(),
@@ -538,8 +561,28 @@ impl RequestScope {
 
     fn record_receipt_once(&self) {
         if !self.inner.receipt_recorded.swap(true, Ordering::AcqRel) {
-            self.inner.sink.record(self.receipt());
+            let receipt = self.receipt();
+            if let Some(telemetry) = &self.inner.telemetry {
+                let _ = catch_unwind(AssertUnwindSafe(|| telemetry.finish(&receipt)));
+            }
+            self.inner.sink.record(receipt);
         }
+    }
+}
+
+fn duration_bucket(duration: Duration) -> RequestDurationBucket {
+    if duration < Duration::from_millis(10) {
+        RequestDurationBucket::Under10Milliseconds
+    } else if duration < Duration::from_millis(50) {
+        RequestDurationBucket::Under50Milliseconds
+    } else if duration < Duration::from_millis(250) {
+        RequestDurationBucket::Under250Milliseconds
+    } else if duration < Duration::from_secs(1) {
+        RequestDurationBucket::Under1Second
+    } else if duration < Duration::from_secs(5) {
+        RequestDurationBucket::Under5Seconds
+    } else {
+        RequestDurationBucket::AtLeast5Seconds
     }
 }
 
@@ -656,7 +699,52 @@ mod tests {
             RequestIdentity::new("request-1", "deployment-1").unwrap(),
             limits,
             sink,
+            None,
         )
+    }
+
+    #[test]
+    fn receipt_duration_buckets_are_stable_and_coarse() {
+        assert_eq!(
+            duration_bucket(Duration::from_millis(9)),
+            RequestDurationBucket::Under10Milliseconds
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_millis(10)),
+            RequestDurationBucket::Under50Milliseconds
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_millis(49)),
+            RequestDurationBucket::Under50Milliseconds
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_millis(50)),
+            RequestDurationBucket::Under250Milliseconds
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_millis(249)),
+            RequestDurationBucket::Under250Milliseconds
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_millis(250)),
+            RequestDurationBucket::Under1Second
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_millis(999)),
+            RequestDurationBucket::Under1Second
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_secs(1)),
+            RequestDurationBucket::Under5Seconds
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_millis(4_999)),
+            RequestDurationBucket::Under5Seconds
+        );
+        assert_eq!(
+            duration_bucket(Duration::from_secs(5)),
+            RequestDurationBucket::AtLeast5Seconds
+        );
     }
 
     #[tokio::test]

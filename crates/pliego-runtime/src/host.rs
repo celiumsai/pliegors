@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::telemetry::OpenTelemetryRuntime;
 use crate::{
-    CancelReason, ErrorBoundaryContext, LimitError, MiddlewareNext, PreRouteContext, PreRouteNext,
-    PublicError, PublicErrorClass, RequestContext, RequestIdentity, RequestLimits, RequestScope,
-    RequestState, RuntimeDiagnostic, RuntimeErrorBoundary, RuntimeMiddleware,
-    RuntimePreRouteMiddleware, RuntimeReceipt, RuntimeReceiptSink, ScopeError,
+    CancelReason, ErrorBoundaryContext, LimitError, MiddlewareNext, OpenTelemetryConfig,
+    PreRouteContext, PreRouteNext, PublicError, PublicErrorClass, RequestContext, RequestIdentity,
+    RequestLimits, RequestScope, RequestState, RuntimeDiagnostic, RuntimeErrorBoundary,
+    RuntimeMiddleware, RuntimePreRouteMiddleware, RuntimeReceipt, RuntimeReceiptSink, ScopeError,
 };
 use axum::Router;
 use axum::body::{Body, Bytes};
@@ -101,6 +102,7 @@ pub struct NativeRuntimeBuilder {
     duplicate_pre_route_middleware: BTreeSet<String>,
     duplicate_error_boundaries: BTreeSet<String>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
+    telemetry: Option<Arc<OpenTelemetryRuntime>>,
 }
 
 impl NativeRuntimeBuilder {
@@ -122,6 +124,7 @@ impl NativeRuntimeBuilder {
             duplicate_pre_route_middleware: BTreeSet::new(),
             duplicate_error_boundaries: BTreeSet::new(),
             receipt_sink: Arc::new(|_: RuntimeReceipt| {}),
+            telemetry: None,
         })
     }
 
@@ -232,6 +235,12 @@ impl NativeRuntimeBuilder {
         self
     }
 
+    /// Enable OpenTelemetry through the operator's configured global providers.
+    pub fn open_telemetry(mut self, config: OpenTelemetryConfig) -> Self {
+        self.telemetry = Some(Arc::new(OpenTelemetryRuntime::from_global(config)));
+        self
+    }
+
     pub fn build(self) -> Result<NativeRuntime, RuntimeBuildError> {
         self.limits.validate()?;
         if let Some(id) = self.duplicate_middleware.iter().next() {
@@ -321,6 +330,7 @@ impl NativeRuntimeBuilder {
                 pre_route_middleware: self.pre_route_middleware,
                 error_boundaries: self.error_boundaries,
                 receipt_sink: self.receipt_sink,
+                telemetry: self.telemetry,
                 request_sequence: AtomicU64::new(0),
                 registry,
             }),
@@ -358,6 +368,7 @@ struct RuntimeState {
     pre_route_middleware: BTreeMap<String, PreRouteMiddlewareRegistration>,
     error_boundaries: BTreeMap<String, Arc<dyn RuntimeErrorBoundary>>,
     receipt_sink: Arc<dyn RuntimeReceiptSink>,
+    telemetry: Option<Arc<OpenTelemetryRuntime>>,
     request_sequence: AtomicU64,
     registry: Arc<RequestRegistry>,
 }
@@ -487,13 +498,24 @@ async fn dispatch(
     State(state): State<Arc<RuntimeState>>,
     request: Request<Body>,
 ) -> Response<Body> {
+    let telemetry = state.telemetry.as_ref().and_then(|runtime| {
+        catch_unwind(AssertUnwindSafe(|| runtime.start(&request)))
+            .map(Arc::new)
+            .map_err(|_| warn!("PliegoRS OpenTelemetry request start panicked"))
+            .ok()
+    });
     let sequence = state.request_sequence.fetch_add(1, Ordering::AcqRel);
     let identity = RequestIdentity::new(
         format!("{}-{sequence:016x}", state.deployment_id),
         state.deployment_id.clone(),
     )
     .expect("deployment identity was validated by the builder");
-    let scope = RequestScope::open(identity, state.limits.clone(), state.receipt_sink.clone());
+    let scope = RequestScope::open(
+        identity,
+        state.limits.clone(),
+        state.receipt_sink.clone(),
+        telemetry,
+    );
     match state.registry.admit(&scope) {
         Ok(()) => {}
         Err(AdmissionError::Draining) => {
