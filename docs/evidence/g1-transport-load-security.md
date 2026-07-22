@@ -1,7 +1,7 @@
 # G1 transport, load, and security evidence
 
 **Gate:** G1 Native runtime and dynamic rendering
-**State:** Closure candidate; public preview promotion requires protected merge and registry verification
+**State:** Accepted for the public `0.1.0-preview.1` component release
 **Toolchain:** Rust 1.86.0 under Debian WSL2 and Windows 11
 
 ## Transport contract

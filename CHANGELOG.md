@@ -36,7 +36,7 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   enters from outermost scope to route and unwinds in reverse, while error
   boundaries resolve route-first without duplicate registration.
 
-- Add the unreleased G1 native runtime foundation with a sealed dynamic route
+- Add the G1 native runtime foundation with a sealed dynamic route
   graph, bounded complete, ordered, and boundary SSR, raw HTTP/1.1 lifecycle evidence,
   pre-route and route middleware, exact capability admission and effect mediation, safe authored
   error boundaries, receipts, cancellation, and a launchable reference app.
@@ -56,7 +56,7 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   dependency-update branches with maintainer-batched, short-lived updates;
   dependency alerts and security scanners remain active.
 - Rewrite the repository README around the published `v0.0.2` and P8 evidence,
-  distinguish the unreleased OpenSDK preview from crates.io artifacts, and add
+  distinguish separately versioned component previews from the CLI, and add
   current release-trust, documentation, platform, and branch-policy guidance.
 
 ### Security
@@ -70,6 +70,32 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   now pass at high severity.
 - Prevent the OpenSDK browser conformance server from exposing internal
   exception details in HTTP 500 responses.
+
+## Preview components 0.1.0-preview.1 - 2026-07-21
+
+This [component prerelease](https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1)
+does not replace the complete `v0.0.2` CLI release.
+
+### Published
+
+- Publish [`pliego-router`](https://crates.io/crates/pliego-router/0.1.0-preview.1),
+  [`pliego-runtime`](https://crates.io/crates/pliego-runtime/0.1.0-preview.1),
+  and [`pliego-sdk`](https://crates.io/crates/pliego-sdk/0.1.0-preview.1) as
+  exact `0.1.0-preview.1` crates reconstructed from the tagged source.
+- Promote G1 native routing, HTTP/1.1 and HTTP/2, complete/ordered/boundary SSR,
+  complete and streamed layouts, bounded completion signals, and the scoped
+  security corpus to public-preview capability status.
+- Publish the OpenSDK build/browser/tooling foundation as a preview crate while
+  retaining Draft RFC-006/RFC-007, Proposed ADR-006, and an unreleased server
+  extension plane.
+
+### Verification
+
+- Protected CI, CodeQL for Rust/JavaScript/Actions, six fuzz targets, Chromium
+  lifecycle tests, Rustdoc, OpenSDK conformance, and site validation passed on
+  the tagged revision.
+- crates.io independently resolved `pliego-router` while reconstructing and
+  compiling the `pliego-runtime` package before publication.
 
 ## 0.0.2 - 2026-07-18
 

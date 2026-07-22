@@ -41,12 +41,12 @@ published on 2026-07-18. Fifteen framework crates are available on crates.io at
 are deliberate, while incompatible changes may still arrive in a new minor
 version with a changelog entry and migration guidance.
 
-`main` also contains the unreleased G1 router, native runtime, and OpenSDK
-`0.1.0-preview.1` implementations. They are executable and covered by
-conformance suites, but their three crates are not yet published on crates.io.
-RFC-006 and RFC-007 remain Draft, and ADR-006 remains Proposed; the previews
-must not be presented as stable or accepted APIs. The current `main` MSRV is
-Rust `1.86`.
+The separate [G1 and OpenSDK component prerelease](https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1)
+publishes `pliego-router`, `pliego-runtime`, and `pliego-sdk` at
+`0.1.0-preview.1`. Their conformance suites passed on the tagged source, but
+they are not wired into the `0.0.2` CLI. RFC-006 and RFC-007 remain Draft, and
+ADR-006 remains Proposed; the previews must not be presented as stable or
+accepted APIs. The current `main` MSRV is Rust `1.86`.
 
 [`product.capabilities.json`](product.capabilities.json) is the canonical,
 machine-readable inventory of what is released, available only from source,
@@ -61,8 +61,8 @@ the official site.
 | PliegoRS `v0.0.2` | Current signed public release | [Release](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) and [changelog](CHANGELOG.md) |
 | R0-R7 framework hardening | Complete; preserved as regression gates | [Hardening roadmap](docs/28-hardening-roadmap.md) |
 | P8 trust and adoption | Complete for `v0.0.2` | [P8 contract](docs/35-p8-trust-and-adoption-contract.md) and [signed release evidence](https://github.com/celiumsai/pliegors/releases/tag/v0.0.2) |
-| G1 native runtime and dynamic rendering | Closure candidate on `main`; registry promotion pending | [Native runtime preview](docs/49-native-runtime-preview.md) and [transport/load/security evidence](docs/evidence/g1-transport-load-security.md) |
-| OpenSDK `0.1.0-preview.1` | Implemented on `main`; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
+| G1 native runtime and dynamic rendering | Public component preview; G1 complete | [Component release](https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1), [runtime contract](docs/49-native-runtime-preview.md), and [transport/load/security evidence](docs/evidence/g1-transport-load-security.md) |
+| OpenSDK `0.1.0-preview.1` | Public preview crate; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
 | Hyphae integration | Optional verified protocol boundary | [Verified sync guide](docs/29-hyphae-verified-sync-guide.md); no production gateway claim |
 | PliegoCSS `0.1.0-rc.2` | Optional experimental build-time companion | [Integration evidence](docs/evidence/pliegocss-optional-integration.md); never a runtime or starter requirement |
 
@@ -99,7 +99,7 @@ the official site.
 - an experimental OpenSDK preview with typed Wasm Component admission,
   resource budgets, effect receipts, Rust/TypeScript/Python conformance,
   React/Svelte/Lit fixtures, and JSON-RPC/MCP tooling contracts;
-- a G1 native-runtime closure candidate with a sealed dynamic router, bounded
+- a public G1 native-runtime preview with a sealed dynamic router, bounded
   HTTP/1.1 and HTTP/2 transport, complete/ordered/async-boundary SSR,
   route-owned complete and streamed layouts, structured completion events,
   operator-enabled OpenTelemetry, real-socket adversarial cases, and fixed-load
@@ -121,8 +121,9 @@ telemetry. See the [execution backlog](docs/19-product-execution-backlog.md),
 [R7 evidence](docs/evidence/r7-external-flagship.md). Production Hyphae
 operation remains a separate system boundary.
 
-G1 is now a source closure candidate: the unreleased native router and runtime
-cover bounded connection and request lifecycles, HTTP/1.1 and HTTP/2,
+G1 is complete and available as a separately versioned component preview. The
+native router and runtime cover bounded connection and request lifecycles,
+HTTP/1.1 and HTTP/2,
 inherited middleware, authored errors, and complete, ordered, and
 asynchronous-boundary SSR. Complete and streamed documents bind structural
 layouts and head metadata to the sealed route ownership chain. Slow peers,
@@ -131,14 +132,14 @@ and fixed-load RSS are exercised on real Linux sockets. Operators can attach
 their global OpenTelemetry providers and tracing subscriber; the runtime does
 not select exporters, storage, retention, or inbound trace trust.
 OpenSDK continues as the provider-neutral extension boundary required by that
-runtime; neither source preview is permission to call its API stable.
+runtime; public preview publication is not permission to call either API stable.
 
 ## Packages
 
-The fifteen release packages below are published at `0.0.2`. The G1 router and
-runtime plus `pliego-sdk` are unreleased repository previews at
-`0.1.0-preview.1`; they are listed separately so the registry boundary stays
-explicit.
+All eighteen workspace crates are public. The fifteen packages below remain on
+the `0.0.2` CLI release line. The G1 router/runtime and `pliego-sdk` use the
+separate `0.1.0-preview.1` component line, so applications must pin exact
+versions and must not infer CLI integration.
 
 | Package | Responsibility |
 | --- | --- |
@@ -158,11 +159,11 @@ explicit.
 | `pliego-starters` | Maintained embedded starter projects |
 | `pliego-cli` | Project creation, build, dev server, preview, and inspection |
 
-| Unreleased package | Responsibility | Status |
+| Preview package | Responsibility | Status |
 | --- | --- | --- |
-| `pliego-router` | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | `0.1.0-preview.1` on `main`; not on crates.io |
-| `pliego-runtime` | Bounded HTTP/1.1 and HTTP/2 lifecycle, route-owned complete/streamed layouts, structured events, operator-enabled OTel, and three SSR modes | `0.1.0-preview.1` on `main`; not on crates.io |
-| `pliego-sdk` | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | `0.1.0-preview.1` on `main`; not on crates.io |
+| [`pliego-router`](https://crates.io/crates/pliego-router/0.1.0-preview.1) | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | Public `0.1.0-preview.1` |
+| [`pliego-runtime`](https://crates.io/crates/pliego-runtime/0.1.0-preview.1) | Bounded HTTP/1.1 and HTTP/2 lifecycle, route-owned complete/streamed layouts, structured events, operator-enabled OTel, and three SSR modes | Public `0.1.0-preview.1` |
+| [`pliego-sdk`](https://crates.io/crates/pliego-sdk/0.1.0-preview.1) | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | Public `0.1.0-preview.1` |
 
 ## Install
 
@@ -174,6 +175,15 @@ pliego new my-site
 cd my-site
 pliego check
 pliego dev
+```
+
+Pin the separately versioned server and OpenSDK previews explicitly:
+
+```toml
+[dependencies]
+pliego-router = "=0.1.0-preview.1"
+pliego-runtime = "=0.1.0-preview.1"
+pliego-sdk = "=0.1.0-preview.1"
 ```
 
 Diagnose an environment, create a redacted local reproduction archive, and

@@ -48,9 +48,10 @@ contract.
 - DOM ownership, retained keyed reconciliation, strict SSR adoption, and
   adapter cancellation are complete under the R4 lifecycle contract. Partial
   or streaming SSR adoption is not implemented.
-- The current production proof is static generation plus Rust/WASM; streaming
-  SSR and server functions are not implemented.
-- Registry publication is not implemented. The maintained Cloudflare static
+- The current production proof remains static generation plus Rust/WASM. G1
+  native HTTP and streaming SSR are public component previews, not a production
+  deployment or support claim.
+- Hosted extension registry and discovery are not implemented. The maintained Cloudflare static
   deployment package supports separate protected-preview and public delivery
   profiles, but deployment and repository visibility remain deliberate release
   operations outside the framework API.

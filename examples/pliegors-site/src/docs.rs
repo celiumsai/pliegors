@@ -128,8 +128,8 @@ pub const TOPICS: &[DocTopic] = &[
         group_es: "Runtime",
         title_en: "Native runtime preview",
         title_es: "Preview del runtime nativo",
-        summary_en: "Evaluate the unreleased sealed router, route-owned layouts, operator-enabled OpenTelemetry, bounded request lifecycle, and three SSR modes from main.",
-        summary_es: "Evalúa desde main el router sellado, layouts controlados por rutas, OpenTelemetry habilitado por el operador, lifecycle limitado de requests y tres modos SSR aún no liberados.",
+        summary_en: "Install the public G1 router and runtime preview, then evaluate HTTP/2, route-owned layouts, bounded lifecycle, and three SSR modes.",
+        summary_es: "Instala el preview público del router y runtime G1, y evalúa HTTP/2, layouts controlados por rutas, lifecycle limitado y tres modos SSR.",
     },
     DocTopic {
         slug: "opensdk",
@@ -137,8 +137,8 @@ pub const TOPICS: &[DocTopic] = &[
         group_es: "OpenSDK",
         title_en: "OpenSDK preview",
         title_es: "Preview de OpenSDK",
-        summary_en: "Evaluate the unreleased extension boundary from main, understand admission, capabilities, effects, and its governance status.",
-        summary_es: "Evalúa desde main el límite de extensiones aún no liberado y entiende admisión, capabilities, efectos y su estado de gobernanza.",
+        summary_en: "Install the public OpenSDK preview and understand admission, capabilities, effects, conformance, and its pending governance.",
+        summary_es: "Instala el preview público de OpenSDK y entiende admisión, capabilities, efectos, conformidad y su gobernanza pendiente.",
     },
     DocTopic {
         slug: "opensdk-components",
@@ -298,17 +298,17 @@ pub fn index(locale: Locale) -> View {
                         .child(
                             el("p")
                                 .class("utility-label")
-                                .child("RELEASE / 0.0.2 + G1 / PREVIEW"),
+                                .child("CLI / 0.0.2 + COMPONENTS / 0.1.0-preview.1"),
                         )
                         .child(el("h2").id("docs-status-title").child(localized(
                             locale,
-                            "Published framework. Unreleased server and extension boundaries.",
-                            "Framework publicado. Límites de servidor y extensiones aún no liberados.",
+                            "Published framework. Public server and extension previews.",
+                            "Framework publicado. Previews públicos de servidor y extensiones.",
                         )))
                         .child(el("p").child(localized(
                             locale,
-                            "The fifteen 0.0.2 crates are the current installable release. pliego-router, pliego-runtime, and pliego-sdk 0.1.0-preview.1 are executable on main with Rust 1.86, but are not on crates.io and remain outside the released API.",
-                            "Los quince crates 0.0.2 forman el release instalable actual. pliego-router, pliego-runtime y pliego-sdk 0.1.0-preview.1 son ejecutables en main con Rust 1.86, pero no están en crates.io y permanecen fuera de la API liberada.",
+                            "The complete CLI remains 0.0.2. pliego-router, pliego-runtime, and pliego-sdk are separately published on crates.io at 0.1.0-preview.1 with Rust 1.86; they are preview APIs and are not wired into that CLI.",
+                            "El CLI completo sigue en 0.0.2. pliego-router, pliego-runtime y pliego-sdk se publican por separado en crates.io como 0.1.0-preview.1 con Rust 1.86; son APIs preview y no están conectadas a ese CLI.",
                         ))),
                 )
                 .child(link_list(
@@ -317,6 +317,7 @@ pub fn index(locale: Locale) -> View {
                         ("https://pliegors.dev/capabilities.json", "Inspect current capabilities", "Inspeccionar capacidades actuales"),
                         ("/docs/native-runtime", "Evaluate the native runtime", "Evaluar el runtime nativo"),
                         ("/docs/opensdk", "Evaluate OpenSDK", "Evaluar OpenSDK"),
+                        ("https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1", "Open the component release", "Abrir el release de componentes"),
                         ("/changelog", "Read the release boundary", "Leer el límite de release"),
                     ],
                 )),
@@ -940,18 +941,28 @@ fn dom_lifecycle(locale: Locale) -> View {
 
 fn native_runtime(locale: Locale) -> View {
     vec![
-        doc_section(locale, "status", "Evaluate G1 from main", "Evalúa G1 desde main", vec![
-            paragraph(locale, "pliego-router and pliego-runtime 0.1.0-preview.1 are executable source work for G1. They are not published on crates.io, are not wired into the released 0.0.2 CLI, and do not promote the native HTTP or dynamic SSR capabilities from not-released.", "pliego-router y pliego-runtime 0.1.0-preview.1 son trabajo fuente ejecutable para G1. No están publicados en crates.io, no están conectados al CLI 0.0.2 liberado y no promueven las capacidades de HTTP nativo o SSR dinámico desde not-released."),
-            code_block(locale, "shell", "git clone https://github.com/celiumsai/pliegors.git\ncd pliegors\ncargo test -p pliego-runtime -p native-pliego --locked\ncargo run -p native-pliego"),
-            note(locale, "Preview boundary", "The reference application binds to 127.0.0.1:4310 by default. It is reproducible evidence, not a production server release or support promise.", "Límite del preview", "La aplicación de referencia escucha en 127.0.0.1:4310 de forma predeterminada. Es evidencia reproducible, no un release de servidor productivo ni una promesa de soporte."),
+        doc_section(locale, "status", "Install the G1 public preview", "Instala el preview público G1", vec![
+            paragraph(locale, "pliego-router and pliego-runtime 0.1.0-preview.1 are public on crates.io and G1 is complete. Pin both exact versions: they are not wired into the released 0.0.2 CLI and the preview line may change before stability.", "pliego-router y pliego-runtime 0.1.0-preview.1 son públicos en crates.io y G1 está completo. Fija ambas versiones exactas: no están conectadas al CLI 0.0.2 liberado y la línea preview puede cambiar antes de ser estable."),
+            code_block(locale, "toml", "[dependencies]\npliego-router = \"=0.1.0-preview.1\"\npliego-runtime = \"=0.1.0-preview.1\""),
+            note(locale, "Preview boundary", "The tagged reference application binds to 127.0.0.1:4310 by default. It is reproducible evidence, not a production deployment or support promise.", "Límite del preview", "La aplicación de referencia etiquetada escucha en 127.0.0.1:4310 de forma predeterminada. Es evidencia reproducible, no un despliegue productivo ni una promesa de soporte."),
         ]),
         doc_section(locale, "ownership", "Keep transport and framework ownership explicit", "Mantén explícita la propiedad del transporte y del framework", vec![
-            paragraph(locale, "The portable router seals route grammar, parameters, group and layout scopes, middleware capabilities, error-boundary identity, collisions, and a deterministic graph digest. The runtime owns admission, deadlines, cancellation, cleanup, response commitment, byte accounting, diagnostics, and receipts.", "El router portable sella gramática de rutas, parámetros, scopes de group y layout, capabilities de middleware, identidad de error boundaries, colisiones y un digest determinista del grafo. El runtime controla admisión, deadlines, cancelación, cleanup, commitment de respuesta, conteo de bytes, diagnósticos y recibos."),
+            paragraph(locale, "The portable router seals route grammar, parameters, group and layout scopes, middleware capabilities, error-boundary identity, collisions, and a deterministic graph digest. The runtime owns connection and request admission, deadlines, cancellation, cleanup, response commitment, byte accounting, diagnostics, receipts, and bounded completion signals.", "El router portable sella gramática de rutas, parámetros, scopes de group y layout, capabilities de middleware, identidad de error boundaries, colisiones y un digest determinista del grafo. El runtime controla admisión de conexiones y requests, deadlines, cancelación, cleanup, commitment, conteo de bytes, diagnósticos, recibos y señales de finalización limitadas."),
             definition_list(locale, &[
-                ("Axum / Hyper", "HTTP types, transport, and body framing", "Tipos HTTP, transporte y framing del body"),
-                ("Tower", "Admission, load control, timeout, and middleware interoperability", "Admisión, control de carga, timeout e interoperabilidad de middleware"),
-                ("Tokio", "Executor, timers, cancellation wakeups, and graceful shutdown", "Executor, timers, wakeups de cancelación y cierre ordenado"),
-                ("PliegoRS", "Sealed application semantics, limits, failure rules, and evidence", "Semántica sellada de aplicación, límites, reglas de fallo y evidencia"),
+                ("Hyper", "The single HTTP/1.1 and HTTP/2 parser and protocol framing owner", "Único propietario del parser y framing de protocolo HTTP/1.1 y HTTP/2"),
+                ("Axum / Tower", "HTTP service composition and explicit interoperability", "Composición del servicio HTTP e interoperabilidad explícita"),
+                ("Tokio", "Socket execution, timers, cancellation wakeups, and task scheduling", "Ejecución de sockets, timers, wakeups de cancelación y scheduling de tareas"),
+                ("PliegoRS", "Bounded connection policy, sealed application semantics, failure rules, cleanup, and evidence", "Política limitada de conexiones, semántica sellada de aplicación, reglas de fallo, cleanup y evidencia"),
+            ]),
+        ]),
+        doc_section(locale, "transport", "Bound the network before application code", "Limita la red antes del código de aplicación", vec![
+            paragraph(locale, "TransportLimits caps active TCP connections, the absolute HTTP/1 head deadline, read and write inactivity, HTTP/2 peer streams, flow-control windows, and per-stream send buffers. RequestLimits applies header and body budgets to both protocol versions. Every policy has a deterministic digest.", "TransportLimits limita conexiones TCP activas, el deadline absoluto del head HTTP/1, inactividad de lectura y escritura, streams HTTP/2 del peer, ventanas de flow control y buffers de envío por stream. RequestLimits aplica presupuestos de headers y body a ambas versiones. Cada política tiene un digest determinista."),
+            code_block(locale, "rust", "use pliego_runtime::{NativeRuntimeBuilder, TransportLimits};\n\nlet transport = TransportLimits {\n    max_connections: 512,\n    http2_max_concurrent_streams: 64,\n    ..TransportLimits::default()\n};\nlet runtime = NativeRuntimeBuilder::new(graph, \"edge-a\")?\n    .transport_limits(transport)?\n    .build()?;"),
+            definition_list(locale, &[
+                ("Overload", "Excess connections close before parsing; excess requests receive a bounded 503", "Las conexiones excedentes cierran antes del parseo; los requests excedentes reciben un 503 limitado"),
+                ("Slow peers", "Absolute head and read/write inactivity deadlines release sockets deterministically", "Deadlines absolutos del head y de inactividad de lectura/escritura liberan sockets de forma determinista"),
+                ("Body formats", "PLG-RUN-110 rejects conflicting framing with 400; encoded or multipart bodies are 415 until G2 owns decoded and part budgets", "PLG-RUN-110 rechaza framing conflictivo con 400; bodies encoded o multipart responden 415 hasta que G2 controle presupuestos decodificados y de partes"),
+                ("Shutdown", "New work stops, request scopes cancel, connections drain, and remaining tasks abort only after the deadline", "El trabajo nuevo se detiene, los scopes se cancelan, las conexiones drenan y las tareas restantes abortan solo tras el deadline"),
             ]),
         ]),
         doc_section(locale, "rendering", "Choose one explicit SSR mode", "Elige un modo SSR explícito", vec![
@@ -966,9 +977,10 @@ fn native_runtime(locale: Locale) -> View {
                 ("Ownership", "Missing, duplicate, or foreign layouts fail before response commitment", "Layouts ausentes, duplicados o ajenos fallan antes del commitment de la respuesta"),
                 ("Child frame", "Typed operations preserve exactly one private child by construction", "Las operaciones tipadas preservan exactamente un hijo privado por construcción"),
                 ("Head", "Inner and page scalar fields win; assets retain stable order and exact duplicates emit once", "Los campos escalares internos y de página prevalecen; los assets conservan orden estable y duplicados exactos se emiten una vez"),
+                ("Streams", "LayoutStreamDocument validates one internal slot and shares one shell-plus-content byte budget", "LayoutStreamDocument valida un slot interno y comparte un presupuesto de bytes para shell y contenido"),
                 ("Receipt", "renderMode layout records both routeScopes and routeLayouts", "renderMode layout registra routeScopes y routeLayouts"),
             ]),
-            note(locale, "Complete-mode boundary", "Layout composition currently owns complete responses. Ordered and async-boundary rendering do not yet accept layout frames, loaders, or layout cleanup.", "Límite del modo complete", "La composición de layouts controla actualmente respuestas complete. El render ordered y async-boundary todavía no acepta frames, loaders ni cleanup de layouts."),
+            note(locale, "Data boundary", "Complete, ordered, and async-boundary responses accept route-owned layouts. Layout loaders and resource handles begin in G2; request cancellation and LIFO cleanup already cover the streamed body lifecycle.", "Límite de datos", "Las respuestas complete, ordered y async-boundary aceptan layouts controlados por rutas. Los loaders y handles de recursos de layout comienzan en G2; la cancelación y cleanup LIFO del request ya cubren el lifecycle del body streamed."),
         ]),
         doc_section(locale, "runtime-otel", "Attach operator-owned OpenTelemetry", "Conecta OpenTelemetry controlado por el operador", vec![
             paragraph(locale, "The runtime emits no request telemetry until the operator configures global OpenTelemetry providers and calls open_telemetry. PliegoRS installs no exporter, endpoint, credential, or collector. Enabled SERVER spans remain open through the last response-body frame, and three standard HTTP metrics cover duration, active requests, and response size.", "El runtime no emite telemetría de requests hasta que el operador configura providers globales de OpenTelemetry y llama open_telemetry. PliegoRS no instala exporter, endpoint, credencial ni collector. Los spans SERVER habilitados permanecen abiertos hasta el último frame del body, y tres métricas HTTP estándar cubren duración, requests activos y tamaño de respuesta."),
@@ -981,6 +993,7 @@ fn native_runtime(locale: Locale) -> View {
                 ("Receipt", "Exporter-independent coarse duration bucket", "Bucket de duración aproximado e independiente del exporter"),
             ]),
             note(locale, "Privacy profile", "Concrete paths, query, addresses, headers, cookies, bodies, user/request/deployment IDs, and diagnostic messages are excluded. W3C traceparent acceptance is explicit; inbound tracestate, baggage, and other propagation formats are discarded. The profile deliberately omits url.path instead of placing the route template under the wrong semantic key.", "Perfil de privacidad", "Se excluyen paths concretos, query, direcciones, headers, cookies, bodies, IDs de usuario/request/deployment y mensajes diagnósticos. La aceptación W3C de traceparent es explícita; tracestate, baggage y otros formatos de propagación entrantes se descartan. El perfil omite url.path deliberadamente en vez de colocar el template de ruta bajo una clave semántica incorrecta."),
+            paragraph(locale, "Independently of OpenTelemetry, every terminal request emits one pliegors::request tracing event with a sealed route ID, outcome, status, response bytes, coarse duration bucket, render mode, and bounded diagnostic code. It excludes request values and leaves subscriber, storage, retention, and alert policy to the operator.", "Independientemente de OpenTelemetry, cada request terminal emite un evento tracing pliegors::request con ID de ruta sellado, outcome, status, bytes de respuesta, bucket aproximado de duración, modo de render y código diagnóstico limitado. Excluye valores del request y deja subscriber, storage, retención y alertas al operador."),
         ]),
         doc_section(locale, "failure", "Bound the work and preserve committed semantics", "Limita el trabajo y preserva la semántica ya comprometida", vec![
             paragraph(locale, "Boundary identities are validated and unique before commitment. Defaults allow 32 declarations, four in flight, and five seconds per future; hard ceilings are 256, 32, and 60 seconds. Shell, anchors, and resolved views share one output budget, while every view retains depth and node limits.", "Las identidades de boundary se validan y son únicas antes del commitment. Los valores predeterminados permiten 32 declaraciones, cuatro en vuelo y cinco segundos por future; los techos son 256, 32 y 60 segundos. Shell, anchors y vistas resueltas comparten un presupuesto de salida, mientras cada vista conserva límites de profundidad y nodos."),
@@ -991,6 +1004,8 @@ fn native_runtime(locale: Locale) -> View {
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-async-boundary-foundation.md", "Asynchronous boundary evidence", "Evidencia de boundaries asíncronos"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-layout-composition-foundation.md", "Layout composition evidence", "Evidencia de composición de layouts"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-opentelemetry-foundation.md", "OpenTelemetry evidence", "Evidencia de OpenTelemetry"),
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-transport-load-security.md", "Transport, load, and security evidence", "Evidencia de transporte, carga y seguridad"),
+                ("https://crates.io/crates/pliego-runtime/0.1.0-preview.1", "pliego-runtime on crates.io", "pliego-runtime en crates.io"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/rfc/RFC-008-native-runtime.md", "RFC-008 native runtime", "RFC-008 runtime nativo"),
             ]),
         ]),
@@ -999,10 +1014,14 @@ fn native_runtime(locale: Locale) -> View {
 
 fn opensdk(locale: Locale) -> View {
     vec![
-        doc_section(locale, "status", "Evaluate the preview from main", "Evalúa el preview desde main", vec![
-            paragraph(locale, "OpenSDK 0.1.0-preview.1 landed after PliegoRS v0.0.2. Its implementation and conformance suites are available in the repository, but pliego-sdk is not published on crates.io and the 0.0.2 CLI does not contain this command surface.", "OpenSDK 0.1.0-preview.1 llegó después de PliegoRS v0.0.2. Su implementación y suites de conformidad están disponibles en el repositorio, pero pliego-sdk no está publicado en crates.io y el CLI 0.0.2 no contiene esta superficie de comandos."),
-            code_block(locale, "shell", "git clone https://github.com/celiumsai/pliegors.git\ncd pliegors\ncargo run -p pliego-cli --locked -- sdk compatibility\nnpm ci\nnpm run check:opensdk:all"),
+        doc_section(locale, "status", "Install the OpenSDK public preview", "Instala el preview público de OpenSDK", vec![
+            paragraph(locale, "pliego-sdk 0.1.0-preview.1 is public on crates.io and belongs to the separate component prerelease. Its conformance suites remain in the repository, the 0.0.2 CLI does not contain this command surface, and RFC-006/RFC-007 plus ADR-006 remain pending.", "pliego-sdk 0.1.0-preview.1 es público en crates.io y pertenece al release separado de componentes. Sus suites de conformidad siguen en el repositorio, el CLI 0.0.2 no contiene esta superficie y RFC-006/RFC-007 junto con ADR-006 siguen pendientes."),
+            code_block(locale, "toml", "[dependencies]\npliego-sdk = \"=0.1.0-preview.1\""),
             note(locale, "Toolchain boundary", "The current main branch requires Rust 1.86.0 for the Wasmtime 36.0.8 security floor. Released v0.0.2 artifacts retain their original Rust 1.85.0 evidence.", "Límite del toolchain", "El branch main actual requiere Rust 1.86.0 por el security floor de Wasmtime 36.0.8. Los artefactos v0.0.2 liberados conservan su evidencia original de Rust 1.85.0."),
+            link_list(locale, &[
+                ("https://crates.io/crates/pliego-sdk/0.1.0-preview.1", "Open pliego-sdk on crates.io", "Abrir pliego-sdk en crates.io"),
+                ("https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1", "Read the component prerelease", "Leer el prerelease de componentes"),
+            ]),
         ]),
         doc_section(locale, "admission", "Admit exact bytes before execution", "Admite bytes exactos antes de ejecutar", vec![
             paragraph(locale, "An extension manifest declares its identity, exact entry points, OpenSDK API, compatible host range, required features, requested capabilities, and resource budgets. Admission verifies the component digest and policy before returning a ValidatedExtension typestate that a runtime can execute.", "El manifest de una extensión declara identidad, entry points exactos, API OpenSDK, rango de host compatible, features requeridos, capabilities solicitadas y presupuestos de recursos. La admisión verifica el digest del componente y la política antes de retornar el typestate ValidatedExtension que un runtime puede ejecutar."),
@@ -1343,10 +1362,10 @@ fn crate_reference(locale: Locale) -> View {
                 ("pliego-artifact / pliego-ssg / pliego-inspect", "Portable output, documents, routes, receipts, graphs, staged publication, and verification", "Salida portable, documentos, rutas, recibos, grafos, publicación por staging y verificación"),
                 ("pliego-adapters / pliego-hyphae", "External browser lifecycle and verified durable sync boundaries", "Lifecycle externo del navegador y límites de sync durable verificado"),
                 ("pliego-starters / pliego-cli", "Maintained first-use projects and the complete command surface", "Proyectos mantenidos de primer uso y superficie completa de comandos"),
-                ("pliego-router / pliego-runtime (unreleased)", "G1 sealed routes, route-owned layouts, bounded HTTP lifecycle, operator-enabled OTel, failures, receipts, and three SSR modes", "Rutas selladas G1, layouts controlados por rutas, lifecycle HTTP limitado, OTel habilitado por el operador, fallos, recibos y tres modos SSR"),
-                ("pliego-sdk (unreleased)", "OpenSDK preview manifests, capability admission, Component Model runtime, effect receipts, compatibility, and tooling protocols", "Manifests preview de OpenSDK, admisión de capabilities, runtime Component Model, recibos de efectos, compatibilidad y protocolos de tooling"),
+                ("pliego-router / pliego-runtime (0.1.0-preview.1)", "Public G1 preview: sealed routes, streamed layouts, bounded HTTP/1.1 and HTTP/2, OTel, failures, receipts, and three SSR modes", "Preview público G1: rutas selladas, layouts streamed, HTTP/1.1 y HTTP/2 limitados, OTel, fallos, recibos y tres modos SSR"),
+                ("pliego-sdk (0.1.0-preview.1)", "Public OpenSDK preview: manifests, capability admission, Component Model runtime, effect receipts, compatibility, and tooling protocols", "Preview público OpenSDK: manifests, admisión de capabilities, runtime Component Model, recibos de efectos, compatibilidad y protocolos de tooling"),
             ]),
-            note(locale, "Registry boundary", "The fifteen PliegoRS 0.0.2 packages are published on crates.io. pliego-router, pliego-runtime, and pliego-sdk 0.1.0-preview.1 exist only on main and must be evaluated from a source checkout.", "Límite del registry", "Los quince paquetes PliegoRS 0.0.2 están publicados en crates.io. pliego-router, pliego-runtime y pliego-sdk 0.1.0-preview.1 existen únicamente en main y deben evaluarse desde un checkout de fuentes."),
+            note(locale, "Registry boundary", "All eighteen workspace crates are public. Fifteen remain on the 0.0.2 CLI line; router, runtime, and SDK use a separate exact 0.1.0-preview.1 component line and are not CLI-integrated.", "Límite del registry", "Los dieciocho crates del workspace son públicos. Quince siguen en la línea del CLI 0.0.2; router, runtime y SDK usan una línea separada exacta 0.1.0-preview.1 y no están integrados al CLI."),
         ]),
         doc_section(locale, "symbols", "Core public entry points", "Entradas públicas principales", vec![
             definition_list(locale, &[
@@ -1358,8 +1377,8 @@ fn crate_reference(locale: Locale) -> View {
                 ("pliego_artifact::BuildContext", "Capture exact source identity for verified publication", "Captura identidad exacta de fuentes para publicación verificada"),
                 ("pliego_adapters::{AdapterIsland, AdapterPolicy}", "Declare external browser modules and their admission policy", "Declara módulos externos del navegador y su política de admisión"),
                 ("pliego_hyphae::{ReceiptVerifier, VerifiedAppendResponse, VerifiedPullPage}", "Cross the durable authority boundary through verified typestate", "Cruza el límite de autoridad durable mediante typestate verificado"),
-                ("pliego_runtime::{NativeRuntimeBuilder, OpenTelemetryConfig, LayoutDocument}", "Evaluate operator-enabled OTel, route-owned documents, and the unreleased G1 lifecycle from main", "Evalúa OTel habilitado por el operador, documentos controlados por rutas y el lifecycle G1 aún no liberado"),
-                ("pliego_sdk::{ExtensionManifest, HostContract, CapabilityPolicy}", "Evaluate the unreleased OpenSDK admission boundary from main", "Evalúa desde main el límite de admisión OpenSDK aún no liberado"),
+                ("pliego_runtime::{NativeRuntimeBuilder, TransportLimits, LayoutStreamDocument}", "Build against the exact public G1 preview with bounded transport and route-owned streams", "Construye con el preview público G1 exacto, transporte limitado y streams controlados por rutas"),
+                ("pliego_sdk::{ExtensionManifest, HostContract, CapabilityPolicy}", "Build against the exact public OpenSDK admission preview", "Construye con el preview público exacto de admisión OpenSDK"),
             ]),
         ]),
         doc_section(locale, "rustdoc", "Generate exact-version Rustdoc", "Genera Rustdoc de versión exacta", vec![
@@ -1369,7 +1388,7 @@ fn crate_reference(locale: Locale) -> View {
         doc_section(locale, "stability", "Respect the pre-1.0 boundary", "Respeta el límite pre-1.0", vec![
             paragraph(locale, "PliegoRS 0.0.2 is public pre-1.0 software. Crate names identify stable ownership boundaries, but public signatures may change between minor releases. Pin one exact released version across every pliego-* dependency and never mix framework versions inside one application graph.", "PliegoRS 0.0.2 es software público pre-1.0. Los nombres de crates identifican límites estables de propiedad, pero las firmas públicas pueden cambiar entre releases menores. Fija una versión liberada exacta en todas las dependencias pliego-* y nunca mezcles versiones del framework dentro del grafo de una aplicación."),
             note(locale, "Published support contract", "The compatibility matrix and changelog define supported toolchains, targets, features, deprecations, and upgrade paths for each release. Linux x64 and ARM64 are the production targets for 0.0.2.", "Contrato de soporte publicado", "La matriz de compatibilidad y el changelog definen toolchains, targets, features, deprecaciones y rutas de upgrade para cada release. Linux x64 y ARM64 son los targets de producción para 0.0.2."),
-            note(locale, "G1 and OpenSDK use a separate preview line", "The router, runtime, and OpenSDK 0.1.0-preview.1 may change in another preview protocol. Their implementation does not extend the stability promise of the fifteen published 0.0.2 crates.", "G1 y OpenSDK usan una línea preview separada", "El router, runtime y OpenSDK 0.1.0-preview.1 pueden cambiar en otro protocolo preview. Su implementación no amplía la promesa de estabilidad de los quince crates 0.0.2 publicados."),
+            note(locale, "G1 and OpenSDK use a separate preview line", "The router, runtime, and OpenSDK 0.1.0-preview.1 may change on another preview line. Their publication does not extend the 0.0.2 CLI compatibility promise or imply G2/G3 completion.", "G1 y OpenSDK usan una línea preview separada", "El router, runtime y OpenSDK 0.1.0-preview.1 pueden cambiar en otra línea preview. Su publicación no amplía la promesa de compatibilidad del CLI 0.0.2 ni implica completar G2/G3."),
         ]),
         doc_section(locale, "boundaries", "Read the normative boundaries", "Lee los límites normativos", vec![
             link_list(locale, &[

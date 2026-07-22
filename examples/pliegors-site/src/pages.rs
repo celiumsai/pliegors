@@ -953,27 +953,27 @@ pub fn changelog(locale: Locale) -> View {
             )
             .child(change_entry(
                 locale,
-                "unreleased",
-                "UNRELEASED",
-                "MAIN",
-                None,
-                l(locale, "Experimental preview", "Preview experimental"),
-                l(locale, "The native runtime becomes executable.", "El runtime nativo se vuelve ejecutable."),
+                "preview-components-v0-1-0-preview-1",
+                "0.1.0-preview.1",
+                "2026-07-21",
+                Some("2026-07-21"),
+                l(locale, "Component prerelease", "Prerelease de componentes"),
+                l(locale, "The native runtime becomes installable.", "El runtime nativo se vuelve instalable."),
                 l(
                     locale,
-                    "G1 now has a sealed router, route-owned complete-document layouts, operator-enabled OpenTelemetry, a bounded native lifecycle, and three SSR modes alongside the OpenSDK preview. All remain source work for evaluation, not released APIs.",
-                    "G1 ya tiene un router sellado, layouts de documento complete controlados por rutas, OpenTelemetry habilitado por el operador, lifecycle nativo limitado y tres modos SSR junto al preview de OpenSDK. Todos siguen siendo trabajo fuente para evaluación, no APIs liberadas.",
+                    "pliego-router, pliego-runtime, and pliego-sdk are public at 0.1.0-preview.1. G1 is complete, while the complete CLI remains 0.0.2 and G2/G3 stay open.",
+                    "pliego-router, pliego-runtime y pliego-sdk son públicos en 0.1.0-preview.1. G1 está completo, mientras el CLI completo sigue en 0.0.2 y G2/G3 permanecen abiertos.",
                 ),
                 &[
-                    l(locale, "Complete, ordered, and bounded async-boundary SSR with stable receipts and post-commit failure semantics.", "SSR complete, ordered y async-boundary limitado con recibos estables y semántica de fallo post-commit."),
-                    l(locale, "Complete documents compose sealed root-to-leaf layouts through one typed child frame, with deterministic head merging and receipt identity.", "Los documentos complete componen layouts sellados de raíz a hoja mediante un frame hijo tipado, con merge determinista del head e identidad en recibos."),
-                    l(locale, "Operator-enabled OTel spans cover the full response body; HTTP metrics, W3C opt-in, redaction, finite error mapping, and coarse receipt timing are tested with in-memory exporters.", "Los spans OTel habilitados por el operador cubren todo el body de respuesta; métricas HTTP, opt-in W3C, redacción, mapeo finito de errores y tiempo aproximado en recibos se prueban con exporters in-memory."),
-                    l(locale, "Pre-route plus inherited group, layout, and route middleware with exact capability admission and authored error recovery.", "Middleware pre-route y heredado de group, layout y route con admisión exacta de capabilities y recuperación de errores con autoría."),
-                    l(locale, "OpenSDK remains an unreleased preview; PliegoCSS 0.1.0-rc.2 is an optional external companion, never a framework requirement.", "OpenSDK sigue como preview aún no liberado; PliegoCSS 0.1.0-rc.2 es un companion externo opcional, nunca un requisito del framework."),
+                    l(locale, "Bounded HTTP/1.1 and HTTP/2 transport with connection admission, slow-peer deadlines, graceful drain, and overload behavior.", "Transporte HTTP/1.1 y HTTP/2 limitado con admisión de conexiones, deadlines para peers lentos, drain ordenado y comportamiento de sobrecarga."),
+                    l(locale, "Complete, ordered, and async-boundary SSR with route-owned complete and streamed layouts under one output budget.", "SSR complete, ordered y async-boundary con layouts complete y streamed controlados por rutas bajo un único presupuesto de salida."),
+                    l(locale, "Structured completion events and operator-enabled OTel exclude request values and isolate operator callback panics.", "Eventos estructurados de finalización y OTel habilitado por el operador excluyen valores del request y aíslan panics de callbacks del operador."),
+                    l(locale, "The ASVS 5.0 ownership map, real-socket adversarial corpus, fixed-load RSS harness, CodeQL, fuzzing, Chromium, and package reconstruction passed.", "El mapa de ownership ASVS 5.0, corpus adversarial de sockets reales, harness RSS de carga fija, CodeQL, fuzzing, Chromium y reconstrucción de paquetes aprobaron."),
+                    l(locale, "OpenSDK build/browser/tooling is public preview; its server plane and governance decisions remain pending.", "OpenSDK build/browser/tooling es preview público; su plano de servidor y decisiones de gobernanza siguen pendientes."),
                 ],
                 Some((
-                    "https://github.com/celiumsai/pliegors/blob/main/CHANGELOG.md",
-                    l(locale, "Inspect the source record", "Inspeccionar el registro fuente"),
+                    "https://github.com/celiumsai/pliegors/releases/tag/preview-components-v0.1.0-preview.1",
+                    l(locale, "Open the component release", "Abrir el release de componentes"),
                 )),
             ))
             .child(change_entry(

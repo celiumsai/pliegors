@@ -22,6 +22,7 @@ const layers = [
 const ordered = layers.flat();
 const metadata = JSON.parse(run('cargo', ['metadata', '--no-deps', '--format-version', '1']));
 const packages = new Map(metadata.packages.map((pkg) => [pkg.name, pkg]));
+const targetDirectory = metadata.target_directory;
 const version = packages.get('pliego-cli')?.version;
 assert.match(version ?? '', /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u, 'invalid workspace version');
 assert.deepEqual(
@@ -51,19 +52,29 @@ for (const name of ordered) {
 if (mode === '--check') {
   let checked = 0;
   let deferred = 0;
+  const registryAvailability = new Map();
   for (const name of ordered) {
     const pkg = packages.get(name);
     const internalDependencies = pkg.dependencies
       .filter((item) => item.name.startsWith('pliego-'))
       .map((item) => item.name);
-    if (internalDependencies.length > 0) {
+    const unavailableDependencies = [];
+    for (const dependency of internalDependencies) {
+      const dependencyVersion = packages.get(dependency).version;
+      const key = `${dependency}@${dependencyVersion}`;
+      if (!registryAvailability.has(key)) {
+        registryAvailability.set(key, await registryVersion(dependency, dependencyVersion));
+      }
+      if (registryAvailability.get(key) !== 'ours') unavailableDependencies.push(key);
+    }
+    if (unavailableDependencies.length > 0) {
       deferred += 1;
-      console.log(`defer ${name}: first-party dependencies are not indexed yet`);
+      console.log(`defer ${name}: not indexed: ${unavailableDependencies.join(', ')}`);
       continue;
     }
     if (name === 'pliego-sdk') assertPackagedOpenSdkWit();
     runLive('cargo', ['package', '--locked', '--allow-dirty', '--no-verify', '-p', name]);
-    const archive = path.join(root, 'target', 'package', `${name}-${pkg.version}.crate`);
+    const archive = path.join(targetDirectory, 'package', `${name}-${pkg.version}.crate`);
     const bytes = statSync(archive).size;
     assert.ok(bytes <= 10_000_000, `${name} package exceeds the crates.io 10 MB limit`);
     console.log(`package ${name} ${pkg.version}: ${bytes} bytes`);
