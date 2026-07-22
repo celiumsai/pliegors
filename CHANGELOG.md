@@ -9,6 +9,10 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Added
 
+- Add operator-enabled OpenTelemetry server spans and HTTP metrics across the
+  full response-body lifecycle, with default-new traces, opt-in W3C parent
+  acceptance, bounded method/route/error cardinality, secret-redaction
+  evidence, and coarse timing buckets in runtime receipts.
 - Add route-owned complete-document layout composition with typed single-child
   frames, deterministic head merging, exact asset deduplication,
   pre-commit ownership failures, and layout identities in runtime receipts.

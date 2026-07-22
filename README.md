@@ -118,6 +118,9 @@ The current critical path is G1: the unreleased native router and runtime now
 cover bounded request lifecycles, inherited middleware, authored errors, and
 complete, ordered, and asynchronous-boundary SSR. Complete documents can bind
 structural layouts and head metadata to the sealed route ownership chain.
+Operators can explicitly attach their global OpenTelemetry providers for
+request spans and HTTP metrics; the default runtime still emits nothing and
+does not accept inbound trace parents.
 OpenSDK continues as the provider-neutral extension boundary required by that
 runtime; neither source preview is permission to call its API stable.
 
@@ -149,7 +152,7 @@ explicit.
 | Unreleased package | Responsibility | Status |
 | --- | --- | --- |
 | `pliego-router` | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | `0.1.0-preview.1` on `main`; not on crates.io |
-| `pliego-runtime` | Bounded native HTTP lifecycle, route-owned layouts, and complete, ordered, and async-boundary SSR | `0.1.0-preview.1` on `main`; not on crates.io |
+| `pliego-runtime` | Bounded native HTTP lifecycle, route-owned layouts, operator-enabled OTel, and three SSR modes | `0.1.0-preview.1` on `main`; not on crates.io |
 | `pliego-sdk` | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | `0.1.0-preview.1` on `main`; not on crates.io |
 
 ## Install

@@ -38,6 +38,21 @@ route ownership order, leaf/page scalars win, asset order stays stable, and
 exact duplicate assets are emitted once. Groups never masquerade as layouts,
 and receipts record both the complete scope chain and layout-only identity.
 
+`NativeRuntimeBuilder::open_telemetry` binds the runtime to global
+OpenTelemetry providers configured by the operator. PliegoRS does not install
+an exporter or collector, and the builder remains uninstrumented by default.
+Enabled runtimes emit a `SERVER` span from request admission through the last
+response-body frame plus `http.server.request.duration`,
+`http.server.active_requests`, and `http.server.response.body.size`. Method,
+operator-trusted `HttpScheme`, protocol, sealed route template, status, render
+mode, bounded framework error type, and receipt contract are allowlisted.
+Concrete paths, query strings, headers, cookies, bodies, user IDs, request IDs,
+diagnostic messages, and deployment IDs are excluded. Valid W3C `traceparent`
+values are ignored by default and require `RemoteTracePolicy::AcceptW3c`;
+inbound `tracestate` and baggage are discarded so provider state remains
+local. Custom HTTP methods require an explicit bounded allowlist entry.
+Receipts retain only a coarse duration bucket.
+
 The crate is `0.1.0-preview.1` source work. It is not published on crates.io and
 does not promote the `native-http-runtime` or `dynamic-ssr` capabilities in
 `product.capabilities.json`. See
@@ -49,5 +64,6 @@ slow-peer, and fixed-load evidence remain open gate work.
 
 This foundation is intentionally incomplete. It does not yet expose
 layout composition for streamed modes, layout loaders or cleanup,
-OpenTelemetry, multipart/decompression policies, or a production `pliego
-serve` command.
+structured runtime logs, multipart/decompression policies, or a production
+`pliego serve` command. HTTP/2, load, and broader security evidence still gate
+the production-observability claim.

@@ -13,6 +13,7 @@ mod limits;
 mod middleware;
 mod render;
 mod scope;
+mod telemetry;
 
 pub use error::{
     ErrorBoundaryContext, ErrorBoundaryFuture, PublicError, PublicErrorClass, RuntimeErrorBoundary,
@@ -31,10 +32,11 @@ pub use render::{
     render_layout_document, render_ordered_document,
 };
 pub use scope::{
-    CancelReason, InMemoryReceiptSink, PreRouteContext, RequestContext, RequestIdentity,
-    RequestOutcome, RequestScope, RequestState, RuntimeDiagnostic, RuntimeReceipt,
+    CancelReason, InMemoryReceiptSink, PreRouteContext, RequestContext, RequestDurationBucket,
+    RequestIdentity, RequestOutcome, RequestScope, RequestState, RuntimeDiagnostic, RuntimeReceipt,
     RuntimeReceiptSink, ScopeError,
 };
+pub use telemetry::{HttpScheme, OpenTelemetryConfig, OpenTelemetryConfigError, RemoteTracePolicy};
 
 pub use axum::body::Body;
 pub use http::{Request, Response, StatusCode};
