@@ -43,6 +43,17 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 - Add the OpenSDK `0.1.0-preview.1` contracts, conformance CLI, typed Wasmtime
   Component host, effect broker, multilang/browser/tooling fixtures, and
   compatibility matrix.
+- Add the unreleased G2 `pliego-data` source beta with capability-scoped typed
+  resources and loaders, progressive actions, truthful commit/cancellation
+  state, principal-bound idempotency, server-side sessions, CSRF, opaque
+  secrets, outbound HTTP admission, explicit runtime cache domains, and causal
+  invalidation.
+- Add an executable no-JavaScript full-stack reference application whose two
+  native runtime instances share versioned session and idempotency contracts,
+  isolate private cache entries, acknowledge read-your-writes invalidation,
+  and emit redacted application-contract-bound receipts.
+- Add `pliego why request`, `pliego why cache`, and `pliego inspect action`
+  diagnostics over bounded versioned receipt and runtime-contract documents.
 
 ### Changed
 
@@ -70,6 +81,13 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   now pass at high severity.
 - Prevent the OpenSDK browser conformance server from exposing internal
   exception details in HTTP 500 responses.
+- Add a machine-checked OWASP ASVS 5.0.0 G2 ownership map plus adversarial
+  coverage for session fixation/rotation/revocation, CSRF, form and multipart
+  bounds, SSRF policy, mass assignment, idempotent replay, cache partitioning,
+  invalidation targets, and receipt redaction.
+- Remove the vulnerable transitive `cookie -> time 0.3.44` chain reported by
+  `RUSTSEC-2026-0009`; use a bounded session-cookie parser/serializer that
+  preserves the Rust 1.86 MSRV and is covered by fail-closed runtime tests.
 
 ## Preview components 0.1.0-preview.1 - 2026-07-21
 

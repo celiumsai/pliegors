@@ -86,7 +86,7 @@ const requiredSurfaces = new Map([
   ['fullstack-routing', ['released', 'preview', 'G1']],
   ['opensdk-browser-tooling', ['released', 'preview', 'G5']],
   ['opensdk-build', ['released', 'preview', 'G5']],
-  ['data-actions-cache', ['not-released', 'none', 'G2']],
+  ['data-actions-cache', ['source-preview', 'preview', 'G2']],
   ['pboc', ['not-released', 'none', 'G3']],
   ['cloudflare-runtime', ['not-released', 'none', 'G3']],
   ['opensdk-server', ['not-released', 'none', 'G5']],

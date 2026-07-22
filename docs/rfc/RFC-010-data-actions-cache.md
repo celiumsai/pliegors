@@ -5,6 +5,30 @@
 **Target gate:** G2  
 **Created:** 2026-07-19
 
+**Implementation:** Complete on `main` as an unreleased source beta; see
+[G2 evidence](../evidence/g2-fullstack-beta.md). Draft status is the governance
+state, not an implementation-status claim.
+
+## Subcontracts
+
+G2 is split into four reviewable contracts. This RFC remains the umbrella and
+acceptance authority; the subcontracts own the exact preview API semantics:
+
+- [RFC-011](RFC-011-request-resources-and-loaders.md): request context,
+  resources, leases, and typed loaders;
+- [RFC-012](RFC-012-progressive-actions.md): progressive forms, actions,
+  idempotency, commit, and bounded uploads;
+- [RFC-013](RFC-013-sessions-and-secrets.md): sessions, cookies, rotation, and
+  opaque secret handles; and
+- [RFC-014](RFC-014-runtime-cache-and-invalidation.md): public/private runtime
+  cache, Vary, receipts, and coordinated invalidation.
+
+The public ownership boundary is `pliego-data`. It contains provider-neutral
+contracts and in-memory reference implementations. `pliego-runtime` binds
+those contracts to request admission, route identity, cancellation, deadlines,
+diagnostics, and response commitment. Provider clients and authentication
+products remain integrations rather than core dependencies.
+
 ## Summary
 
 PliegoRS will add request-scoped loaders, progressively enhanced actions,

@@ -13,9 +13,15 @@ const metadata = JSON.parse(execFileSync('cargo', [
 const workspaceVersion = metadata.packages.find((pkg) => pkg.name === 'pliego-cli')?.version;
 assert.ok(workspaceVersion, 'pliego-cli package is missing');
 
-const crates = metadata.packages
+const product = JSON.parse(readFileSync(path.join(root, 'product.capabilities.json'), 'utf8'));
+const unreleasedCrates = new Set(product.framework.unreleasedCrates);
+const allCrates = metadata.packages
   .filter((pkg) => pkg.manifest_path.replaceAll('\\', '/').includes('/crates/'))
   .sort((left, right) => left.name.localeCompare(right.name));
+for (const name of unreleasedCrates) {
+  assert.ok(allCrates.some((pkg) => pkg.name === name), `unknown unreleased crate: ${name}`);
+}
+const crates = allCrates.filter((pkg) => !unreleasedCrates.has(pkg.name));
 const expected = [
   'pliego-adapters', 'pliego-artifact', 'pliego-assets', 'pliego-cli', 'pliego-content', 'pliego-dom',
   'pliego-fold', 'pliego-hyphae', 'pliego-inspect', 'pliego-log', 'pliego-macros',
@@ -23,10 +29,10 @@ const expected = [
   'pliego-starters',
 ].sort();
 assert.deepEqual(crates.map((pkg) => pkg.name), expected);
-const packagesByName = new Map(crates.map((pkg) => [pkg.name, pkg]));
-const previewPackages = new Set(['pliego-router', 'pliego-runtime', 'pliego-sdk']);
+const packagesByName = new Map(allCrates.map((pkg) => [pkg.name, pkg]));
+const previewPackages = new Set(['pliego-data', 'pliego-router', 'pliego-runtime', 'pliego-sdk']);
 
-for (const pkg of crates) {
+for (const pkg of allCrates) {
   if (previewPackages.has(pkg.name)) {
     assert.match(pkg.version, /^0\.1\.0-preview\.\d+$/u, `${pkg.name} preview version`);
   } else {

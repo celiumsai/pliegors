@@ -9,7 +9,7 @@
     "openSdkVersion": "0.1.0-preview.1",
     "license": "Apache-2.0",
     "releasedCrateCount": 18,
-    "unreleasedCrates": []
+    "unreleasedCrates": ["pliego-data"]
   },
   "support": {
     "rust": {
@@ -71,12 +71,12 @@
       "id": "data-actions-cache",
       "label": "Loaders, actions, sessions, and cache",
       "domain": "data",
-      "availability": "not-released",
-      "stability": "none",
+      "availability": "source-preview",
+      "stability": "preview",
       "gate": "G2",
       "summary": "Request-scoped data loading, progressive mutations, session boundaries, and explicit distributed cache policies.",
-      "evidence": ["docs/rfc/RFC-010-data-actions-cache.md", "docs/48-fullstack-threat-model.md"],
-      "limitations": ["PliegoRS currently provides no production server actions, sessions, ISR, or multi-instance invalidation contract."]
+      "evidence": ["docs/rfc/RFC-010-data-actions-cache.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g2-fullstack-beta.md"],
+      "limitations": ["The G2 beta is source-only and ships development/conformance stores; no production durable session, cache, or invalidation adapter is claimed."]
     },
     {
       "id": "deterministic-ssg",
@@ -100,7 +100,7 @@
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md", "docs/evidence/g1-async-boundary-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
         "The public preview crate exposes three bounded SSR modes and route-owned complete and streamed layouts.",
-        "The 0.0.2 CLI does not wire this API; G2 loaders, actions, sessions, cache, multipart, and decompression remain unavailable."
+        "The 0.0.2 CLI and tagged component preview do not include the unreleased G2 source beta."
       ]
     },
     {

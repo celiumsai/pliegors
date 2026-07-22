@@ -26,9 +26,14 @@ hyper-util = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 pliego-router = { workspace = true }
+pliego-data = { workspace = true }
 pliego-dom = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_urlencoded = { workspace = true }
+flate2 = { workspace = true }
+multer = { workspace = true }
+tempfile = { workspace = true }
 sha2 = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

@@ -1,6 +1,6 @@
 # PliegoRS execution backlog
 
-**Updated:** 2026-07-19
+**Updated:** 2026-07-22
 **Objective:** preserve R0-R7 and P8 as regression gates while PliegoRS executes
 the G0-G7 full-stack evolution program. OpenSDK remains a bounded preview and
 advances only where the runtime requires a public extension contract.
@@ -36,7 +36,7 @@ API status, or release of the preview crate.
 | --- | --- | --- |
 | G0 Product truth | Complete | [Accepted G0 evidence](evidence/g0-product-truth.md) covers the canonical manifest, public-surface consistency checker, runtime/route/data RFCs, threat model, Linux site build, and external release/registry snapshot. |
 | G1 Native runtime and dynamic rendering | Complete | [Runtime](evidence/g1-native-runtime-foundation.md), [native-socket](evidence/g1-native-socket-foundation.md), [complete-render](evidence/g1-complete-render-foundation.md), [ordered-render](evidence/g1-ordered-render-foundation.md), [async-boundary](evidence/g1-async-boundary-foundation.md), [layout-composition](evidence/g1-layout-composition-foundation.md), [OpenTelemetry](evidence/g1-opentelemetry-foundation.md), [middleware/error](evidence/g1-middleware-error-foundation.md), [dynamic-reference](evidence/g1-dynamic-reference-foundation.md), and [transport/load/security](evidence/g1-transport-load-security.md) cover the sealed route graph, bounded lifecycle, real TCP HTTP/1.1 and HTTP/2, three SSR modes, route-owned complete and streamed layouts, structured logs and OTel, slow peers, fixed-load RSS, parser/body policy, capability mediation, authored errors, and the reference application. Protected CI, crates.io reconstruction, and the component prerelease completed the public-preview promotion. |
-| G2 Data, actions, and cache | Not started | Progressive authenticated mutation across two instances with idempotency, cancellation, cache isolation, and bounded invalidation lag. |
+| G2 Data, actions, and cache | Complete on `main`; source beta unreleased | [G2 evidence](evidence/g2-fullstack-beta.md) covers progressive authenticated mutation across two native instances, typed resources/loaders, idempotency, truthful cancellation and commit state, sessions, bounded uploads, SSRF policy, cache isolation, coordinated invalidation, diagnostics, and the ASVS ownership map. Production provider adapters and G3 portability remain outside this gate. |
 | G3 Portable deployment | Not started | The same sealed build and conformance corpus pass native/OCI and Cloudflare hosts. |
 | G4 Adoption | Not started | An unaffiliated team completes a greenfield application and partial migration using public resources only. |
 | G5 OpenSDK ecosystem | Preview foundation only | Reviewed server plane, package lock/resolution, generated SDKs, registry/discovery, and independent non-Rust extension. |

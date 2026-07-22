@@ -183,10 +183,14 @@ distribution are not stable surfaces. The R0-R7 gates in
 [`docs/28-hardening-roadmap.md`](docs/28-hardening-roadmap.md) take precedence
 over expanding those areas.
 
-The full-stack evolution is specified, but not released, by RFC-008 through
-RFC-010. Native HTTP serving, dynamic SSR, full-stack routing, loaders, actions,
-sessions, distributed cache, PBOC execution, and Cloudflare application hosting
-remain `not-released` until their named G1-G3 evidence gates close.
+The full-stack evolution is specified by RFC-008 through RFC-014. G1 native
+HTTP, dynamic SSR, and routing are public component previews. G2 loaders,
+actions, sessions, idempotency, uploads, outbound HTTP policy, runtime cache,
+and causal invalidation are complete on `main` as an unreleased source beta.
+The included G2 stores are development/conformance adapters. Production
+durability, PBOC execution, OCI/Cloudflare host portability, and Cloudflare
+application hosting remain outside the released contract until their named
+G2-G3 publication and evidence gates close.
 
 ## Release gate
 

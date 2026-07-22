@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod development;
+mod runtime_diagnostics;
 mod sdk;
 mod telemetry;
 mod trust;
@@ -557,6 +558,43 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
             )
         });
     }
+    if command == "why" {
+        let diagnostic_arguments = arguments.clone().collect::<Vec<_>>();
+        if diagnostic_arguments
+            .first()
+            .is_some_and(|kind| kind != "artifact")
+        {
+            let output = runtime_diagnostics::why(&diagnostic_arguments).map_err(|error| {
+                CliFailure::new(
+                    if error.is_usage() {
+                        FailureKind::Usage
+                    } else {
+                        FailureKind::Artifact
+                    },
+                    error.to_string(),
+                )
+            })?;
+            println!("{output}");
+            return Ok(());
+        }
+    }
+    if command == "inspect" {
+        let diagnostic_arguments = arguments.clone().collect::<Vec<_>>();
+        if !diagnostic_arguments.is_empty() {
+            let output = runtime_diagnostics::inspect(&diagnostic_arguments).map_err(|error| {
+                CliFailure::new(
+                    if error.is_usage() {
+                        FailureKind::Usage
+                    } else {
+                        FailureKind::Artifact
+                    },
+                    error.to_string(),
+                )
+            })?;
+            println!("{output}");
+            return Ok(());
+        }
+    }
 
     if !matches!(
         command.as_str(),
@@ -611,6 +649,9 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 }
 
 fn print_help() {
+    println!(
+        "FULL-STACK DIAGNOSTICS:\n  pliego inspect action <id> [--contract <runtime-contract.json>]\n  pliego why request <runtime-receipt.json>\n  pliego why cache <cache-receipt-or-invalidation.json>\n"
+    );
     println!(
         "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego telemetry <status|enable|preview|export|disable> [options]\n  pliego sdk <check|test> <manifest> [--input <transform.json>] [--grant <capability>] [--feature <id>] [--format <human|json>]\n  pliego sdk compatibility [--format <human|json>]\n  pliego sdk tooling-host --protocol <pliego|mcp> [--feature <id>]\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport, SDK admission, upgrade checks, and voluntary telemetry exports are local and never upload project data.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );

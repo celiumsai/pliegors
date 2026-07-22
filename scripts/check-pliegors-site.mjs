@@ -23,6 +23,7 @@ const routes = [
   "/docs/browser-runtime",
   "/docs/dom-lifecycle",
   "/docs/native-runtime",
+  "/docs/fullstack-beta",
   "/docs/opensdk",
   "/docs/opensdk-components",
   "/docs/browser-framework-conformance",
@@ -225,13 +226,14 @@ for (const [route, file, localizedTitle] of changelogPages) {
 const docsHtml = await readFile(path.join(root, "docs/index.html"), "utf8").catch(() => "");
 const docsDocument = parse(docsHtml);
 const docsItems = elements(docsDocument, "a").filter((node) => attribute(node, "data-docs-item") === "");
-if (docsItems.length !== 27) failures.push(`docs index: expected 27 topics, found ${docsItems.length}`);
+if (docsItems.length !== 28) failures.push(`docs index: expected 28 topics, found ${docsItems.length}`);
 for (const required of [
   "CLI / 0.0.2 + COMPONENTS / 0.1.0-preview.1",
   "pliego-runtime",
   "separately published on crates.io",
   "/capabilities.json",
   "/docs/native-runtime",
+  "/docs/fullstack-beta",
   "/docs/opensdk",
 ]) {
   if (!docsHtml.includes(required)) failures.push(`docs index: missing release boundary ${required}`);

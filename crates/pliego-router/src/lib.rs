@@ -22,6 +22,10 @@ pub const MAX_ROUTE_ID_BYTES: usize = 64;
 pub const MAX_PARAMETER_NAME_BYTES: usize = 63;
 pub const MAX_ROUTE_MIDDLEWARE: usize = 32;
 pub const MAX_ERROR_BOUNDARIES: usize = 16;
+pub const MAX_ROUTE_LOADERS: usize = 32;
+pub const MAX_ROUTE_ACTIONS: usize = 16;
+pub const MAX_ROUTE_RESOURCES: usize = 32;
+pub const MAX_RESOURCE_CAPABILITIES: usize = 32;
 pub const MAX_SCOPE_DEPTH: usize = 16;
 pub const DEFAULT_MAX_SCOPES: usize = 1_024;
 pub const DEFAULT_MAX_ROUTES: usize = 4_096;
@@ -462,6 +466,44 @@ pub enum RouteScopeKind {
     Layout,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RouteResourceSpec {
+    id: String,
+    capabilities: BTreeSet<String>,
+}
+
+impl RouteResourceSpec {
+    pub fn new(id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_data_id(&id).map_err(|_| RouteError::InvalidResourceId(id.clone()))?;
+        Ok(Self {
+            id,
+            capabilities: BTreeSet::new(),
+        })
+    }
+
+    pub fn requiring(mut self, capability: impl Into<String>) -> Result<Self, RouteError> {
+        let capability = capability.into();
+        validate_data_id(&capability)
+            .map_err(|_| RouteError::InvalidResourceCapability(capability.clone()))?;
+        if self.capabilities.len() >= MAX_RESOURCE_CAPABILITIES {
+            return Err(RouteError::TooManyResourceCapabilities(
+                MAX_RESOURCE_CAPABILITIES,
+            ));
+        }
+        self.capabilities.insert(capability);
+        Ok(self)
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn capabilities(&self) -> &BTreeSet<String> {
+        &self.capabilities
+    }
+}
+
 impl RouteScopeKind {
     fn as_str(self) -> &'static str {
         match self {
@@ -478,6 +520,8 @@ pub struct RouteScopeSpec {
     parent: Option<String>,
     middleware: Vec<String>,
     error_boundaries: Vec<String>,
+    loaders: Vec<String>,
+    resources: Vec<RouteResourceSpec>,
 }
 
 impl RouteScopeSpec {
@@ -490,6 +534,8 @@ impl RouteScopeSpec {
             parent: None,
             middleware: Vec::new(),
             error_boundaries: Vec::new(),
+            loaders: Vec::new(),
+            resources: Vec::new(),
         })
     }
 
@@ -526,6 +572,34 @@ impl RouteScopeSpec {
         Ok(self)
     }
 
+    pub fn loader(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_data_id(&id).map_err(|_| RouteError::InvalidLoaderId(id.clone()))?;
+        if self.loaders.len() >= MAX_ROUTE_LOADERS {
+            return Err(RouteError::TooManyLoaders(MAX_ROUTE_LOADERS));
+        }
+        if self.loaders.contains(&id) {
+            return Err(RouteError::DuplicateLoader(id));
+        }
+        self.loaders.push(id);
+        Ok(self)
+    }
+
+    pub fn resource(mut self, resource: RouteResourceSpec) -> Result<Self, RouteError> {
+        if self.resources.len() >= MAX_ROUTE_RESOURCES {
+            return Err(RouteError::TooManyResources(MAX_ROUTE_RESOURCES));
+        }
+        if self
+            .resources
+            .iter()
+            .any(|current| current.id == resource.id)
+        {
+            return Err(RouteError::DuplicateResource(resource.id));
+        }
+        self.resources.push(resource);
+        Ok(self)
+    }
+
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -545,6 +619,14 @@ impl RouteScopeSpec {
     pub fn error_boundary_ids(&self) -> &[String] {
         &self.error_boundaries
     }
+
+    pub fn loader_ids(&self) -> &[String] {
+        &self.loaders
+    }
+
+    pub fn resources(&self) -> &[RouteResourceSpec] {
+        &self.resources
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -555,6 +637,10 @@ pub struct RouteSpec {
     scope: Option<String>,
     middleware: Vec<String>,
     error_boundaries: Vec<String>,
+    loaders: Vec<String>,
+    actions: Vec<String>,
+    cache_policy: Option<String>,
+    resources: Vec<RouteResourceSpec>,
 }
 
 impl RouteSpec {
@@ -572,6 +658,10 @@ impl RouteSpec {
             scope: None,
             middleware: Vec::new(),
             error_boundaries: Vec::new(),
+            loaders: Vec::new(),
+            actions: Vec::new(),
+            cache_policy: None,
+            resources: Vec::new(),
         })
     }
 
@@ -608,6 +698,54 @@ impl RouteSpec {
         Ok(self)
     }
 
+    pub fn loader(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_data_id(&id).map_err(|_| RouteError::InvalidLoaderId(id.clone()))?;
+        if self.loaders.len() >= MAX_ROUTE_LOADERS {
+            return Err(RouteError::TooManyLoaders(MAX_ROUTE_LOADERS));
+        }
+        if self.loaders.contains(&id) {
+            return Err(RouteError::DuplicateLoader(id));
+        }
+        self.loaders.push(id);
+        Ok(self)
+    }
+
+    pub fn action(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_data_id(&id).map_err(|_| RouteError::InvalidActionId(id.clone()))?;
+        if self.actions.len() >= MAX_ROUTE_ACTIONS {
+            return Err(RouteError::TooManyActions(MAX_ROUTE_ACTIONS));
+        }
+        if self.actions.contains(&id) {
+            return Err(RouteError::DuplicateAction(id));
+        }
+        self.actions.push(id);
+        Ok(self)
+    }
+
+    pub fn cache_policy(mut self, id: impl Into<String>) -> Result<Self, RouteError> {
+        let id = id.into();
+        validate_data_id(&id).map_err(|_| RouteError::InvalidCachePolicyId(id.clone()))?;
+        self.cache_policy = Some(id);
+        Ok(self)
+    }
+
+    pub fn resource(mut self, resource: RouteResourceSpec) -> Result<Self, RouteError> {
+        if self.resources.len() >= MAX_ROUTE_RESOURCES {
+            return Err(RouteError::TooManyResources(MAX_ROUTE_RESOURCES));
+        }
+        if self
+            .resources
+            .iter()
+            .any(|current| current.id == resource.id)
+        {
+            return Err(RouteError::DuplicateResource(resource.id));
+        }
+        self.resources.push(resource);
+        Ok(self)
+    }
+
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -630,6 +768,22 @@ impl RouteSpec {
 
     pub fn error_boundary_ids(&self) -> &[String] {
         &self.error_boundaries
+    }
+
+    pub fn loader_ids(&self) -> &[String] {
+        &self.loaders
+    }
+
+    pub fn action_ids(&self) -> &[String] {
+        &self.actions
+    }
+
+    pub fn cache_policy_id(&self) -> Option<&str> {
+        self.cache_policy.as_deref()
+    }
+
+    pub fn resources(&self) -> &[RouteResourceSpec] {
+        &self.resources
     }
 }
 
@@ -663,6 +817,24 @@ fn validate_route_id(id: &str) -> Result<(), RouteError> {
         || id.contains("--")
     {
         return Err(RouteError::InvalidRouteId(id.to_owned()));
+    }
+    Ok(())
+}
+
+fn validate_data_id(id: &str) -> Result<(), ()> {
+    if id.is_empty() || id.len() > 96 {
+        return Err(());
+    }
+    let mut bytes = id.bytes();
+    let Some(first) = bytes.next() else {
+        return Err(());
+    };
+    if !first.is_ascii_lowercase()
+        || !bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        || id.ends_with('-')
+        || id.contains("--")
+    {
+        return Err(());
     }
     Ok(())
 }
@@ -806,6 +978,16 @@ impl RouteGraphBuilder {
             {
                 return Err(RouteError::DuplicateInheritedMiddleware(id.clone()));
             }
+            if resolved.loaders.len() + route.loaders.len() > MAX_ROUTE_LOADERS {
+                return Err(RouteError::TooManyLoaders(MAX_ROUTE_LOADERS));
+            }
+            if let Some(id) = route
+                .loaders
+                .iter()
+                .find(|id| resolved.loaders.contains(*id))
+            {
+                return Err(RouteError::DuplicateInheritedLoader(id.clone()));
+            }
             if self.error_boundaries.len()
                 + resolved.error_boundaries.len()
                 + route.error_boundaries.len()
@@ -933,6 +1115,8 @@ struct ResolvedScopeChain {
     layouts: Vec<String>,
     middleware: Vec<String>,
     error_boundaries: Vec<String>,
+    loaders: Vec<String>,
+    resources: BTreeMap<String, BTreeSet<String>>,
 }
 
 fn resolve_scope_chain(
@@ -968,6 +1152,7 @@ fn resolve_scope_chain(
     let mut resolved = ResolvedScopeChain::default();
     let mut middleware = BTreeSet::new();
     let mut boundaries = BTreeSet::new();
+    let mut loaders = BTreeSet::new();
     for scope in chain {
         resolved.ids.push(scope.id.clone());
         if scope.kind == RouteScopeKind::Layout {
@@ -984,6 +1169,19 @@ fn resolve_scope_chain(
                 return Err(RouteError::DuplicateInheritedErrorBoundary(id.clone()));
             }
             resolved.error_boundaries.push(id.clone());
+        }
+        for id in &scope.loaders {
+            if !loaders.insert(id.clone()) {
+                return Err(RouteError::DuplicateInheritedLoader(id.clone()));
+            }
+            resolved.loaders.push(id.clone());
+        }
+        for resource in &scope.resources {
+            resolved
+                .resources
+                .entry(resource.id.clone())
+                .or_default()
+                .extend(resource.capabilities.iter().cloned());
         }
     }
     Ok(resolved)
@@ -1013,7 +1211,7 @@ fn graph_digest(
     error_boundaries: &[String],
 ) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"pliego-route-graph-v5\0");
+    digest.update(b"pliego-route-graph-v6\0");
     digest_sequence(&mut digest, b"pre-route-middleware", pre_route_middleware);
     digest_sequence(&mut digest, b"root-error-boundaries", error_boundaries);
     for (id, capabilities) in middleware_capabilities {
@@ -1040,6 +1238,8 @@ fn graph_digest(
             b"scope-error-boundaries",
             &scope.error_boundaries,
         );
+        digest_sequence(&mut digest, b"scope-loaders", &scope.loaders);
+        digest_resources(&mut digest, b"scope-resources", &scope.resources);
     }
     for route in routes {
         for value in [
@@ -1058,8 +1258,27 @@ fn graph_digest(
             b"route-error-boundaries",
             &route.error_boundaries,
         );
+        digest_sequence(&mut digest, b"route-loaders", &route.loaders);
+        digest_sequence(&mut digest, b"route-actions", &route.actions);
+        let cache_policy = route.cache_policy.iter().cloned().collect::<Vec<_>>();
+        digest_sequence(&mut digest, b"route-cache-policy", &cache_policy);
+        digest_resources(&mut digest, b"route-resources", &route.resources);
     }
     encode_hex(&digest.finalize())
+}
+
+fn digest_resources(digest: &mut Sha256, label: &[u8], resources: &[RouteResourceSpec]) {
+    digest.update((label.len() as u64).to_be_bytes());
+    digest.update(label);
+    digest.update((resources.len() as u64).to_be_bytes());
+    let mut resources = resources.iter().collect::<Vec<_>>();
+    resources.sort_by(|left, right| left.id.cmp(&right.id));
+    for resource in resources {
+        digest.update((resource.id.len() as u64).to_be_bytes());
+        digest.update(resource.id.as_bytes());
+        let capabilities = resource.capabilities.iter().cloned().collect::<Vec<_>>();
+        digest_sequence(digest, b"resource-capabilities", &capabilities);
+    }
 }
 
 fn digest_sequence(digest: &mut Sha256, label: &[u8], values: &[String]) {
@@ -1132,6 +1351,34 @@ impl RouteGraph {
         &self.error_boundaries
     }
 
+    pub fn route_resource_requirements(
+        &self,
+        route_id: &str,
+    ) -> Option<BTreeMap<String, BTreeSet<String>>> {
+        let route = self.routes.iter().find(|route| route.id == route_id)?;
+        let mut resources = self.resolved_scopes.get(route_id)?.resources.clone();
+        for resource in &route.resources {
+            resources
+                .entry(resource.id.clone())
+                .or_default()
+                .extend(resource.capabilities.iter().cloned());
+        }
+        Some(resources)
+    }
+
+    pub fn route_loader_ids(&self, route_id: &str) -> Option<Vec<String>> {
+        let route = self.routes.iter().find(|route| route.id == route_id)?;
+        let inherited = self.resolved_scopes.get(route_id)?;
+        Some(
+            inherited
+                .loaders
+                .iter()
+                .chain(route.loaders.iter())
+                .cloned()
+                .collect(),
+        )
+    }
+
     pub fn resolve(&self, method: &RouteMethod, path: &str) -> Result<RouteMatch, ResolveError> {
         validate_request_path(path)?;
         let normalized: String = path.nfc().collect();
@@ -1154,6 +1401,19 @@ impl RouteGraph {
                     .chain(route.error_boundaries.iter())
                     .cloned()
                     .collect();
+                let loaders = inherited
+                    .loaders
+                    .iter()
+                    .chain(route.loaders.iter())
+                    .cloned()
+                    .collect();
+                let mut resources = inherited.resources.clone();
+                for resource in &route.resources {
+                    resources
+                        .entry(resource.id.clone())
+                        .or_default()
+                        .extend(resource.capabilities.iter().cloned());
+                }
                 return Ok(RouteMatch {
                     route_id: route.id.clone(),
                     method: route.method.clone(),
@@ -1163,6 +1423,10 @@ impl RouteGraph {
                     layouts: inherited.layouts.clone(),
                     middleware,
                     error_boundaries,
+                    loaders,
+                    actions: route.actions.clone(),
+                    cache_policy: route.cache_policy.clone(),
+                    resources,
                 });
             }
         }
@@ -1218,6 +1482,10 @@ pub struct RouteMatch {
     layouts: Vec<String>,
     middleware: Vec<String>,
     error_boundaries: Vec<String>,
+    loaders: Vec<String>,
+    actions: Vec<String>,
+    cache_policy: Option<String>,
+    resources: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl RouteMatch {
@@ -1255,6 +1523,22 @@ impl RouteMatch {
 
     pub fn error_boundary_ids(&self) -> &[String] {
         &self.error_boundaries
+    }
+
+    pub fn loader_ids(&self) -> &[String] {
+        &self.loaders
+    }
+
+    pub fn action_ids(&self) -> &[String] {
+        &self.actions
+    }
+
+    pub fn cache_policy_id(&self) -> Option<&str> {
+        self.cache_policy.as_deref()
+    }
+
+    pub fn resource_requirements(&self) -> &BTreeMap<String, BTreeSet<String>> {
+        &self.resources
     }
 }
 
@@ -1332,6 +1616,19 @@ pub enum RouteError {
     },
     DuplicateInheritedMiddleware(String),
     DuplicateInheritedErrorBoundary(String),
+    InvalidLoaderId(String),
+    DuplicateLoader(String),
+    DuplicateInheritedLoader(String),
+    TooManyLoaders(usize),
+    InvalidActionId(String),
+    DuplicateAction(String),
+    TooManyActions(usize),
+    InvalidCachePolicyId(String),
+    InvalidResourceId(String),
+    DuplicateResource(String),
+    TooManyResources(usize),
+    InvalidResourceCapability(String),
+    TooManyResourceCapabilities(usize),
     InvalidErrorBoundaryId(String),
     DuplicateErrorBoundary(String),
     TooManyErrorBoundaries(usize),
@@ -1376,6 +1673,19 @@ impl RouteError {
             Self::InvalidErrorBoundaryId(_)
             | Self::DuplicateErrorBoundary(_)
             | Self::TooManyErrorBoundaries(_) => "PLG-RTE-012",
+            Self::InvalidLoaderId(_)
+            | Self::DuplicateLoader(_)
+            | Self::DuplicateInheritedLoader(_)
+            | Self::TooManyLoaders(_) => "PLG-RTE-015",
+            Self::InvalidActionId(_) | Self::DuplicateAction(_) | Self::TooManyActions(_) => {
+                "PLG-RTE-016"
+            }
+            Self::InvalidCachePolicyId(_) => "PLG-RTE-017",
+            Self::InvalidResourceId(_)
+            | Self::DuplicateResource(_)
+            | Self::TooManyResources(_)
+            | Self::InvalidResourceCapability(_)
+            | Self::TooManyResourceCapabilities(_) => "PLG-RTE-018",
         }
     }
 }
@@ -1455,6 +1765,38 @@ impl Display for RouteError {
                 formatter,
                 "error boundary {value} appears more than once in one inherited route chain"
             ),
+            Self::InvalidLoaderId(value) => write!(formatter, "invalid loader ID {value:?}"),
+            Self::DuplicateLoader(value) => write!(formatter, "duplicate loader ID: {value}"),
+            Self::DuplicateInheritedLoader(value) => write!(
+                formatter,
+                "loader {value} appears more than once in one inherited route chain"
+            ),
+            Self::TooManyLoaders(maximum) => {
+                write!(formatter, "route exceeds {maximum} loader entries")
+            }
+            Self::InvalidActionId(value) => write!(formatter, "invalid action ID {value:?}"),
+            Self::DuplicateAction(value) => write!(formatter, "duplicate action ID: {value}"),
+            Self::TooManyActions(maximum) => {
+                write!(formatter, "route exceeds {maximum} action entries")
+            }
+            Self::InvalidCachePolicyId(value) => {
+                write!(formatter, "invalid cache policy ID {value:?}")
+            }
+            Self::InvalidResourceId(value) => {
+                write!(formatter, "invalid resource ID {value:?}")
+            }
+            Self::DuplicateResource(value) => {
+                write!(formatter, "duplicate resource ID: {value}")
+            }
+            Self::TooManyResources(maximum) => {
+                write!(formatter, "route exceeds {maximum} resource entries")
+            }
+            Self::InvalidResourceCapability(value) => {
+                write!(formatter, "invalid resource capability {value:?}")
+            }
+            Self::TooManyResourceCapabilities(maximum) => {
+                write!(formatter, "resource exceeds {maximum} capability entries")
+            }
             Self::InvalidErrorBoundaryId(value) => {
                 write!(formatter, "invalid error boundary ID {value:?}")
             }
@@ -1775,6 +2117,122 @@ mod tests {
                 .unwrap()
                 .allows(MiddlewareCapability::Reject)
         );
+    }
+
+    #[test]
+    fn data_requirements_are_inherited_merged_and_digest_bound() {
+        let layout = RouteScopeSpec::new("account-layout", RouteScopeKind::Layout)
+            .unwrap()
+            .loader("identity-loader")
+            .unwrap()
+            .resource(
+                RouteResourceSpec::new("accounts")
+                    .unwrap()
+                    .requiring("read")
+                    .unwrap(),
+            )
+            .unwrap();
+        let account = route("account", RouteMethod::get(), "/account")
+            .scope("account-layout")
+            .unwrap()
+            .loader("account-loader")
+            .unwrap()
+            .action("rename-account")
+            .unwrap()
+            .cache_policy("account-private")
+            .unwrap()
+            .resource(
+                RouteResourceSpec::new("accounts")
+                    .unwrap()
+                    .requiring("write")
+                    .unwrap(),
+            )
+            .unwrap();
+        let graph = RouteGraphBuilder::new()
+            .scope(layout)
+            .route(account)
+            .seal()
+            .unwrap();
+        let matched = graph.resolve(&RouteMethod::get(), "/account").unwrap();
+        assert_eq!(
+            matched.loader_ids(),
+            &["identity-loader".to_owned(), "account-loader".to_owned()]
+        );
+        assert_eq!(matched.action_ids(), &["rename-account".to_owned()]);
+        assert_eq!(matched.cache_policy_id(), Some("account-private"));
+        assert_eq!(
+            matched.resource_requirements().get("accounts").unwrap(),
+            &BTreeSet::from(["read".to_owned(), "write".to_owned()])
+        );
+
+        let changed = RouteGraphBuilder::new()
+            .scope(
+                RouteScopeSpec::new("account-layout", RouteScopeKind::Layout)
+                    .unwrap()
+                    .loader("identity-loader")
+                    .unwrap()
+                    .resource(
+                        RouteResourceSpec::new("accounts")
+                            .unwrap()
+                            .requiring("read")
+                            .unwrap(),
+                    )
+                    .unwrap(),
+            )
+            .route(
+                route("account", RouteMethod::get(), "/account")
+                    .scope("account-layout")
+                    .unwrap()
+                    .loader("account-loader-v2")
+                    .unwrap()
+                    .action("rename-account")
+                    .unwrap()
+                    .cache_policy("account-private")
+                    .unwrap()
+                    .resource(
+                        RouteResourceSpec::new("accounts")
+                            .unwrap()
+                            .requiring("write")
+                            .unwrap(),
+                    )
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap();
+        assert_ne!(graph.digest(), changed.digest());
+    }
+
+    #[test]
+    fn resource_authorship_order_does_not_change_the_graph_digest() {
+        let alpha = RouteResourceSpec::new("alpha")
+            .unwrap()
+            .requiring("read")
+            .unwrap();
+        let beta = RouteResourceSpec::new("beta")
+            .unwrap()
+            .requiring("write")
+            .unwrap();
+        let first = RouteGraphBuilder::new()
+            .route(
+                route("home", RouteMethod::get(), "/")
+                    .resource(alpha.clone())
+                    .unwrap()
+                    .resource(beta.clone())
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap();
+        let second = RouteGraphBuilder::new()
+            .route(
+                route("home", RouteMethod::get(), "/")
+                    .resource(beta)
+                    .unwrap()
+                    .resource(alpha)
+                    .unwrap(),
+            )
+            .seal()
+            .unwrap();
+        assert_eq!(first.digest(), second.digest());
     }
 
     #[test]
