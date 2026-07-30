@@ -64,7 +64,7 @@ the official site.
 | G1 native runtime and dynamic rendering | Public beta; G1 complete | [Runtime contract](docs/49-native-runtime-preview.md) and [transport/load/security evidence](docs/evidence/g1-transport-load-security.md) |
 | G2 data, actions, sessions, and cache | Public beta; G2 complete | [G2 evidence](docs/evidence/g2-fullstack-beta.md), [umbrella RFC](docs/rfc/RFC-010-data-actions-cache.md), and [ASVS ownership map](security/asvs-v5.0.0-g2.json) |
 | G3 PBOC and portable deployment | Public beta; G3 complete | [Portable deployment guide](docs/50-pboc-portable-deployment.md), [provider evidence](docs/evidence/g3-pboc-provider-conformance.md), and [ASVS ownership map](security/asvs-v5.0.0-g3.json) |
-| G4 incremental engineering | Public engineering preview; external adoption gate remains open | [Engineering contract](docs/51-g4-engineering-readiness.md); does not claim external adoption |
+| G4 incremental engineering | Public engineering preview; external adoption gate remains open | [Engineering contract](docs/51-g4-engineering-readiness.md) and [accepted evidence](docs/evidence/g4-engineering-readiness.md); does not claim external adoption |
 | OpenSDK `0.4.0-beta.1` | Public beta crate; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
 | Hyphae integration | Optional verified protocol boundary | [Verified sync guide](docs/29-hyphae-verified-sync-guide.md); no production gateway claim |
 | PliegoCSS `0.1.0-rc.2` | Optional experimental build-time companion | [Integration evidence](docs/evidence/pliegocss-optional-integration.md); never a runtime or starter requirement |
@@ -379,6 +379,7 @@ using the native Windows CLI for normal project development.
 - [Security and trust center](https://pliegors.dev/security/)
 - [Current execution backlog](docs/19-product-execution-backlog.md)
 - [G4 engineering readiness](docs/51-g4-engineering-readiness.md)
+- [G4 accepted engineering evidence](docs/evidence/g4-engineering-readiness.md)
 - [Founding specification](docs/00-pliegors-spec.md)
 - [PliegoRS and Hyphae target protocol](docs/01-hyphae-protocol.md)
 - [Hyphae verified sync guide](docs/29-hyphae-verified-sync-guide.md)

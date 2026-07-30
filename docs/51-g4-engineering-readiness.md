@@ -1,6 +1,6 @@
 # G4 engineering readiness
 
-**Status:** In progress
+**Status:** Engineering prerequisite accepted for `0.4.0-beta.1`; G4 Adoption open
 **Scope:** Internal prerequisite for G4 Adoption
 
 The public execution backlog defines G4 as an external adoption gate. PliegoRS
@@ -99,10 +99,17 @@ An accepted report additionally requires `--accept`, at least five independent
 samples, and a clean exact Git revision. The release CLI is built outside every
 timed region; each cold sample receives its own empty Cargo target.
 
+The accepted `0.4.0-beta.1` engineering run is bound to revision
+`5e655a06f70b825fd69e6bbf74c85c825e6cb38a`. Read the
+[bounded evidence](evidence/g4-engineering-readiness.md) and
+[raw report](evidence/g4-engineering-readiness.json) for the five sample
+vectors, percentiles, environment, artifact counts, receipt transitions, and
+limitations.
+
 ## Exit boundary
 
-Engineering readiness is complete only when the implementation, negative
-tests, measurement harness, accepted evidence, public documentation, starter,
-site, capability manifest, and changelog agree. G4 Adoption remains open until
-an unaffiliated team completes its public-resource-only greenfield application
-and partial migration.
+Engineering readiness is complete for `0.4.0-beta.1`: the implementation,
+negative tests, measurement harness, accepted evidence, public documentation,
+starter, site, capability manifest, and changelog agree. G4 Adoption remains
+open until an unaffiliated team completes its public-resource-only greenfield
+application and partial migration.

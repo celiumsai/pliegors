@@ -191,8 +191,8 @@ or one exact coordinated registry version.
 Authenticated Hyphae infrastructure, durable outbox/replay persistence,
 production key distribution, distributed build caching, deployment automation,
 and a stable 1.0 API are not current surfaces. Lazy route reuse and resumable
-asset work status are G4 source-preview contracts; external adoption evidence
-is still open. The R0-R7 gates in
+asset work status are released G4 preview contracts in `0.4.0-beta.1`;
+external adoption evidence is still open. The R0-R7 gates in
 [`docs/28-hardening-roadmap.md`](docs/28-hardening-roadmap.md) take precedence
 over expanding those areas.
 
