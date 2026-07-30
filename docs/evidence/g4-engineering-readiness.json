@@ -1,0 +1,735 @@
+{
+  "contract": "pliegors-g4-incremental-measurement/1",
+  "revision": "5e655a06f70b825fd69e6bbf74c85c825e6cb38a",
+  "cleanRevision": true,
+  "accepted": true,
+  "platform": {
+    "os": "linux",
+    "architecture": "x64",
+    "release": "6.18.33.1-microsoft-standard-WSL2",
+    "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+    "logicalCpus": 16,
+    "totalMemoryBytes": 16502128640
+  },
+  "toolchain": {
+    "rustc": "rustc 1.86.0 (05f9846f8 2025-03-31)",
+    "cargo": "cargo 1.86.0 (adf9b6ad1 2025-02-28)",
+    "node": "v24.16.0",
+    "releaseCliBytes": 10433392,
+    "releaseCliSha256": "707d3e48db6828f3374c0f846fb10ee6048efe56e44d57aa419f9c8363ef59af"
+  },
+  "method": {
+    "samples": 5,
+    "independentProjects": true,
+    "releaseCliBuiltOutsideTimedRegion": true,
+    "freshCargoTargetPerColdSample": true,
+    "peakRss": "10 ms procfs samples summed across the command process tree",
+    "percentiles": "nearest-rank",
+    "scenarios": [
+      "cold build from an empty per-sample Cargo target",
+      "verified warm no-op",
+      "src/domain.rs-only change",
+      "assets/site.css-only change",
+      "malformed private build-record rejection and verified no-op recovery"
+    ]
+  },
+  "summaries": {
+    "cold": {
+      "durationMs": {
+        "raw": [
+          7224.414769,
+          7311.975522,
+          7481.075817,
+          7730.262243,
+          8986.758771
+        ],
+        "p50": 7481.075817,
+        "p95": 8986.758771
+      },
+      "peakRssKiB": {
+        "raw": [
+          59516,
+          61392,
+          51644,
+          57100,
+          73200
+        ],
+        "p50": 59516,
+        "p95": 73200
+      }
+    },
+    "noOp": {
+      "durationMs": {
+        "raw": [
+          194.599545,
+          195.729013,
+          232.94225,
+          201.829837,
+          239.111323
+        ],
+        "p50": 201.829837,
+        "p95": 239.111323
+      },
+      "peakRssKiB": {
+        "raw": [
+          48676,
+          50636,
+          49632,
+          52476,
+          52444
+        ],
+        "p50": 50636,
+        "p95": 52476
+      }
+    },
+    "contentChange": {
+      "durationMs": {
+        "raw": [
+          648.61904,
+          662.397701,
+          613.825198,
+          665.086253,
+          796.805043
+        ],
+        "p50": 662.397701,
+        "p95": 796.805043
+      },
+      "peakRssKiB": {
+        "raw": [
+          52764,
+          50604,
+          52468,
+          52212,
+          51432
+        ],
+        "p50": 52212,
+        "p95": 52764
+      }
+    },
+    "assetChange": {
+      "durationMs": {
+        "raw": [
+          628.843847,
+          696.504818,
+          629.923388,
+          710.550802,
+          820.086711
+        ],
+        "p50": 696.504818,
+        "p95": 820.086711
+      },
+      "peakRssKiB": {
+        "raw": [
+          49360,
+          52656,
+          49864,
+          52340,
+          52336
+        ],
+        "p50": 52336,
+        "p95": 52656
+      }
+    },
+    "recovery": {
+      "durationMs": {
+        "raw": [
+          184.530059,
+          201.782459,
+          183.517532,
+          183.150071,
+          248.282076
+        ],
+        "p50": 184.530059,
+        "p95": 248.282076
+      },
+      "peakRssKiB": {
+        "raw": [
+          52552,
+          52188,
+          52088,
+          50964,
+          51376
+        ],
+        "p50": 52088,
+        "p95": 52552
+      }
+    }
+  },
+  "observations": [
+    {
+      "sample": 1,
+      "fixture": "official-default-revision-3",
+      "routes": 3,
+      "publicationFiles": 8,
+      "cold": {
+        "durationMs": 7224.414769,
+        "peakRssKiB": 59516,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          ".gitignore",
+          "LICENSE",
+          "README.md",
+          "assets/favicon.svg",
+          "assets/robots.txt",
+          "assets/site.css",
+          "assets/site.webmanifest",
+          "src/domain.rs",
+          "src/main.rs"
+        ],
+        "renderedArtifacts": 7,
+        "reusedArtifacts": 0,
+        "receiptBefore": null,
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 207081,
+          "clientMicros": 0,
+          "siteMicros": 6955385,
+          "verificationMicros": 27219,
+          "totalMicros": 7217226
+        }
+      },
+      "noOp": {
+        "durationMs": 194.599545,
+        "peakRssKiB": 48676,
+        "humanNoOpVisible": true,
+        "outcome": "no-op",
+        "changedSources": [],
+        "renderedArtifacts": 0,
+        "reusedArtifacts": 7,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 187292,
+          "clientMicros": 0,
+          "siteMicros": 0,
+          "verificationMicros": 0,
+          "totalMicros": 187292
+        }
+      },
+      "contentChange": {
+        "durationMs": 648.61904,
+        "peakRssKiB": 52764,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "src/domain.rs"
+        ],
+        "renderedArtifacts": 5,
+        "reusedArtifacts": 2,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "9127167bdcc0f5072f28192f47f57a03738b5a1dba71bdfee435e7681986516e",
+        "phasesMicros": {
+          "discoveryMicros": 175825,
+          "clientMicros": 0,
+          "siteMicros": 412573,
+          "verificationMicros": 26815,
+          "totalMicros": 642568
+        }
+      },
+      "assetChange": {
+        "durationMs": 628.843847,
+        "peakRssKiB": 49360,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "assets/site.css"
+        ],
+        "renderedArtifacts": 4,
+        "reusedArtifacts": 3,
+        "receiptBefore": "9127167bdcc0f5072f28192f47f57a03738b5a1dba71bdfee435e7681986516e",
+        "receiptAfter": "27ddc67007674ef67348da156553be8a7b64feeccf233770f5db8d17922ecde9",
+        "phasesMicros": {
+          "discoveryMicros": 160463,
+          "clientMicros": 0,
+          "siteMicros": 411293,
+          "verificationMicros": 27122,
+          "totalMicros": 623493
+        }
+      },
+      "corruptCache": {
+        "rejectionDurationMs": 1.832048,
+        "rejected": true,
+        "recovery": {
+          "durationMs": 184.530059,
+          "peakRssKiB": 52552,
+          "humanNoOpVisible": true,
+          "outcome": "no-op",
+          "changedSources": [],
+          "renderedArtifacts": 0,
+          "reusedArtifacts": 7,
+          "receiptBefore": "27ddc67007674ef67348da156553be8a7b64feeccf233770f5db8d17922ecde9",
+          "receiptAfter": "27ddc67007674ef67348da156553be8a7b64feeccf233770f5db8d17922ecde9",
+          "phasesMicros": {
+            "discoveryMicros": 178750,
+            "clientMicros": 0,
+            "siteMicros": 0,
+            "verificationMicros": 0,
+            "totalMicros": 178750
+          }
+        }
+      }
+    },
+    {
+      "sample": 2,
+      "fixture": "official-default-revision-3",
+      "routes": 3,
+      "publicationFiles": 8,
+      "cold": {
+        "durationMs": 7311.975522,
+        "peakRssKiB": 61392,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          ".gitignore",
+          "LICENSE",
+          "README.md",
+          "assets/favicon.svg",
+          "assets/robots.txt",
+          "assets/site.css",
+          "assets/site.webmanifest",
+          "src/domain.rs",
+          "src/main.rs"
+        ],
+        "renderedArtifacts": 7,
+        "reusedArtifacts": 0,
+        "receiptBefore": null,
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 201037,
+          "clientMicros": 0,
+          "siteMicros": 7053685,
+          "verificationMicros": 26345,
+          "totalMicros": 7305656
+        }
+      },
+      "noOp": {
+        "durationMs": 195.729013,
+        "peakRssKiB": 50636,
+        "humanNoOpVisible": true,
+        "outcome": "no-op",
+        "changedSources": [],
+        "renderedArtifacts": 0,
+        "reusedArtifacts": 7,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 187930,
+          "clientMicros": 0,
+          "siteMicros": 0,
+          "verificationMicros": 0,
+          "totalMicros": 187930
+        }
+      },
+      "contentChange": {
+        "durationMs": 662.397701,
+        "peakRssKiB": 50604,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "src/domain.rs"
+        ],
+        "renderedArtifacts": 5,
+        "reusedArtifacts": 2,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "6858af5e173e244c1897b0e35a80af8729c160ebc40f382a084af3646e5a8cc0",
+        "phasesMicros": {
+          "discoveryMicros": 169880,
+          "clientMicros": 0,
+          "siteMicros": 422456,
+          "verificationMicros": 31359,
+          "totalMicros": 655892
+        }
+      },
+      "assetChange": {
+        "durationMs": 696.504818,
+        "peakRssKiB": 52656,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "assets/site.css"
+        ],
+        "renderedArtifacts": 4,
+        "reusedArtifacts": 3,
+        "receiptBefore": "6858af5e173e244c1897b0e35a80af8729c160ebc40f382a084af3646e5a8cc0",
+        "receiptAfter": "ae6dc40f74b5e2a5397128e3e0ec7ecaf8923ef529b67dae0d2aa4f6c2e69db9",
+        "phasesMicros": {
+          "discoveryMicros": 164930,
+          "clientMicros": 0,
+          "siteMicros": 466191,
+          "verificationMicros": 31536,
+          "totalMicros": 690544
+        }
+      },
+      "corruptCache": {
+        "rejectionDurationMs": 2.452775,
+        "rejected": true,
+        "recovery": {
+          "durationMs": 201.782459,
+          "peakRssKiB": 52188,
+          "humanNoOpVisible": true,
+          "outcome": "no-op",
+          "changedSources": [],
+          "renderedArtifacts": 0,
+          "reusedArtifacts": 7,
+          "receiptBefore": "ae6dc40f74b5e2a5397128e3e0ec7ecaf8923ef529b67dae0d2aa4f6c2e69db9",
+          "receiptAfter": "ae6dc40f74b5e2a5397128e3e0ec7ecaf8923ef529b67dae0d2aa4f6c2e69db9",
+          "phasesMicros": {
+            "discoveryMicros": 195878,
+            "clientMicros": 0,
+            "siteMicros": 0,
+            "verificationMicros": 0,
+            "totalMicros": 195878
+          }
+        }
+      }
+    },
+    {
+      "sample": 3,
+      "fixture": "official-default-revision-3",
+      "routes": 3,
+      "publicationFiles": 8,
+      "cold": {
+        "durationMs": 7481.075817,
+        "peakRssKiB": 51644,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          ".gitignore",
+          "LICENSE",
+          "README.md",
+          "assets/favicon.svg",
+          "assets/robots.txt",
+          "assets/site.css",
+          "assets/site.webmanifest",
+          "src/domain.rs",
+          "src/main.rs"
+        ],
+        "renderedArtifacts": 7,
+        "reusedArtifacts": 0,
+        "receiptBefore": null,
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 226568,
+          "clientMicros": 0,
+          "siteMicros": 7190653,
+          "verificationMicros": 29006,
+          "totalMicros": 7474773
+        }
+      },
+      "noOp": {
+        "durationMs": 232.94225,
+        "peakRssKiB": 49632,
+        "humanNoOpVisible": true,
+        "outcome": "no-op",
+        "changedSources": [],
+        "renderedArtifacts": 0,
+        "reusedArtifacts": 7,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 226531,
+          "clientMicros": 0,
+          "siteMicros": 0,
+          "verificationMicros": 0,
+          "totalMicros": 226531
+        }
+      },
+      "contentChange": {
+        "durationMs": 613.825198,
+        "peakRssKiB": 52468,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "src/domain.rs"
+        ],
+        "renderedArtifacts": 5,
+        "reusedArtifacts": 2,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "4365b05f89d686627907037aaa454e41798b1cbfffa620ae5503010476cea35f",
+        "phasesMicros": {
+          "discoveryMicros": 166754,
+          "clientMicros": 0,
+          "siteMicros": 387928,
+          "verificationMicros": 26643,
+          "totalMicros": 607012
+        }
+      },
+      "assetChange": {
+        "durationMs": 629.923388,
+        "peakRssKiB": 49864,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "assets/site.css"
+        ],
+        "renderedArtifacts": 4,
+        "reusedArtifacts": 3,
+        "receiptBefore": "4365b05f89d686627907037aaa454e41798b1cbfffa620ae5503010476cea35f",
+        "receiptAfter": "db202a037647ad312531abb660b8e0cbe1cd25efd67e1e63951e969c90483310",
+        "phasesMicros": {
+          "discoveryMicros": 159388,
+          "clientMicros": 0,
+          "siteMicros": 409015,
+          "verificationMicros": 26792,
+          "totalMicros": 623243
+        }
+      },
+      "corruptCache": {
+        "rejectionDurationMs": 1.882073,
+        "rejected": true,
+        "recovery": {
+          "durationMs": 183.517532,
+          "peakRssKiB": 52088,
+          "humanNoOpVisible": true,
+          "outcome": "no-op",
+          "changedSources": [],
+          "renderedArtifacts": 0,
+          "reusedArtifacts": 7,
+          "receiptBefore": "db202a037647ad312531abb660b8e0cbe1cd25efd67e1e63951e969c90483310",
+          "receiptAfter": "db202a037647ad312531abb660b8e0cbe1cd25efd67e1e63951e969c90483310",
+          "phasesMicros": {
+            "discoveryMicros": 178074,
+            "clientMicros": 0,
+            "siteMicros": 0,
+            "verificationMicros": 0,
+            "totalMicros": 178074
+          }
+        }
+      }
+    },
+    {
+      "sample": 4,
+      "fixture": "official-default-revision-3",
+      "routes": 3,
+      "publicationFiles": 8,
+      "cold": {
+        "durationMs": 7730.262243,
+        "peakRssKiB": 57100,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          ".gitignore",
+          "LICENSE",
+          "README.md",
+          "assets/favicon.svg",
+          "assets/robots.txt",
+          "assets/site.css",
+          "assets/site.webmanifest",
+          "src/domain.rs",
+          "src/main.rs"
+        ],
+        "renderedArtifacts": 7,
+        "reusedArtifacts": 0,
+        "receiptBefore": null,
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 221007,
+          "clientMicros": 0,
+          "siteMicros": 7438518,
+          "verificationMicros": 32101,
+          "totalMicros": 7723327
+        }
+      },
+      "noOp": {
+        "durationMs": 201.829837,
+        "peakRssKiB": 52476,
+        "humanNoOpVisible": true,
+        "outcome": "no-op",
+        "changedSources": [],
+        "renderedArtifacts": 0,
+        "reusedArtifacts": 7,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 195361,
+          "clientMicros": 0,
+          "siteMicros": 0,
+          "verificationMicros": 0,
+          "totalMicros": 195361
+        }
+      },
+      "contentChange": {
+        "durationMs": 665.086253,
+        "peakRssKiB": 52212,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "src/domain.rs"
+        ],
+        "renderedArtifacts": 5,
+        "reusedArtifacts": 2,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "d7ac6cd873891f90bbc975765e6699e39f8eb7b674b9170ad16ef983df488345",
+        "phasesMicros": {
+          "discoveryMicros": 172678,
+          "clientMicros": 0,
+          "siteMicros": 431270,
+          "verificationMicros": 26663,
+          "totalMicros": 658129
+        }
+      },
+      "assetChange": {
+        "durationMs": 710.550802,
+        "peakRssKiB": 52340,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "assets/site.css"
+        ],
+        "renderedArtifacts": 4,
+        "reusedArtifacts": 3,
+        "receiptBefore": "d7ac6cd873891f90bbc975765e6699e39f8eb7b674b9170ad16ef983df488345",
+        "receiptAfter": "95f78cb17e4b7d9d0f89b54a97296ab7599cf1bd6d3716697ef97e9cf69928b5",
+        "phasesMicros": {
+          "discoveryMicros": 156506,
+          "clientMicros": 0,
+          "siteMicros": 490453,
+          "verificationMicros": 26888,
+          "totalMicros": 704879
+        }
+      },
+      "corruptCache": {
+        "rejectionDurationMs": 2.338856,
+        "rejected": true,
+        "recovery": {
+          "durationMs": 183.150071,
+          "peakRssKiB": 50964,
+          "humanNoOpVisible": true,
+          "outcome": "no-op",
+          "changedSources": [],
+          "renderedArtifacts": 0,
+          "reusedArtifacts": 7,
+          "receiptBefore": "95f78cb17e4b7d9d0f89b54a97296ab7599cf1bd6d3716697ef97e9cf69928b5",
+          "receiptAfter": "95f78cb17e4b7d9d0f89b54a97296ab7599cf1bd6d3716697ef97e9cf69928b5",
+          "phasesMicros": {
+            "discoveryMicros": 177187,
+            "clientMicros": 0,
+            "siteMicros": 0,
+            "verificationMicros": 0,
+            "totalMicros": 177187
+          }
+        }
+      }
+    },
+    {
+      "sample": 5,
+      "fixture": "official-default-revision-3",
+      "routes": 3,
+      "publicationFiles": 8,
+      "cold": {
+        "durationMs": 8986.758771,
+        "peakRssKiB": 73200,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          ".gitignore",
+          "LICENSE",
+          "README.md",
+          "assets/favicon.svg",
+          "assets/robots.txt",
+          "assets/site.css",
+          "assets/site.webmanifest",
+          "src/domain.rs",
+          "src/main.rs"
+        ],
+        "renderedArtifacts": 7,
+        "reusedArtifacts": 0,
+        "receiptBefore": null,
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 249060,
+          "clientMicros": 0,
+          "siteMicros": 8667885,
+          "verificationMicros": 33213,
+          "totalMicros": 8980206
+        }
+      },
+      "noOp": {
+        "durationMs": 239.111323,
+        "peakRssKiB": 52444,
+        "humanNoOpVisible": true,
+        "outcome": "no-op",
+        "changedSources": [],
+        "renderedArtifacts": 0,
+        "reusedArtifacts": 7,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "phasesMicros": {
+          "discoveryMicros": 233127,
+          "clientMicros": 0,
+          "siteMicros": 0,
+          "verificationMicros": 0,
+          "totalMicros": 233127
+        }
+      },
+      "contentChange": {
+        "durationMs": 796.805043,
+        "peakRssKiB": 51432,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "src/domain.rs"
+        ],
+        "renderedArtifacts": 5,
+        "reusedArtifacts": 2,
+        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "ef66ae2b968e82fc9018790caff0b62096053f0549e955108e7235f07c65ec8a",
+        "phasesMicros": {
+          "discoveryMicros": 204135,
+          "clientMicros": 0,
+          "siteMicros": 518116,
+          "verificationMicros": 35087,
+          "totalMicros": 789840
+        }
+      },
+      "assetChange": {
+        "durationMs": 820.086711,
+        "peakRssKiB": 52336,
+        "humanNoOpVisible": false,
+        "outcome": "executed",
+        "changedSources": [
+          "assets/site.css"
+        ],
+        "renderedArtifacts": 4,
+        "reusedArtifacts": 3,
+        "receiptBefore": "ef66ae2b968e82fc9018790caff0b62096053f0549e955108e7235f07c65ec8a",
+        "receiptAfter": "36917362687d5a6bebdadc55d7d564ea86fec2e54f53e07a6585519c20f3ac8e",
+        "phasesMicros": {
+          "discoveryMicros": 201810,
+          "clientMicros": 0,
+          "siteMicros": 544398,
+          "verificationMicros": 35624,
+          "totalMicros": 812548
+        }
+      },
+      "corruptCache": {
+        "rejectionDurationMs": 3.832028,
+        "rejected": true,
+        "recovery": {
+          "durationMs": 248.282076,
+          "peakRssKiB": 51376,
+          "humanNoOpVisible": true,
+          "outcome": "no-op",
+          "changedSources": [],
+          "renderedArtifacts": 0,
+          "reusedArtifacts": 7,
+          "receiptBefore": "36917362687d5a6bebdadc55d7d564ea86fec2e54f53e07a6585519c20f3ac8e",
+          "receiptAfter": "36917362687d5a6bebdadc55d7d564ea86fec2e54f53e07a6585519c20f3ac8e",
+          "phasesMicros": {
+            "discoveryMicros": 241754,
+            "clientMicros": 0,
+            "siteMicros": 0,
+            "verificationMicros": 0,
+            "totalMicros": 241754
+          }
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "This report describes only the named revision, host, toolchain, and official default fixture.",
+    "Cold measurements include application dependency compilation but exclude release CLI compilation.",
+    "No result is a competitor comparison, device guarantee, hosted CI result, or external adoption evidence."
+  ]
+}

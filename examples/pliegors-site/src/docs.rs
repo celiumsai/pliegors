@@ -798,7 +798,10 @@ fn incremental_builds(locale: Locale) -> View {
             code_block(locale, "shell", "npm run check:g4-engineering"),
             paragraph(locale, "The gate scaffolds every official starter outside the workspace and proves executed build, verified no-op, selective route reuse, corrupted-record rejection, cache cleanup, and post-clean artifact verification. Publishable timing evidence must name one clean exact revision; a dirty run validates the harness only.", "El gate genera cada starter oficial fuera del workspace y prueba build ejecutado, no-op verificado, reutilización selectiva de rutas, rechazo de registro corrupto, limpieza de caché y verificación posterior del artefacto. La evidencia publicable de tiempos debe nombrar una revisión exacta limpia; un run dirty sólo valida el harness."),
             note(locale, "Adoption remains open", "G4 external adoption has not started. Repository-owned tests cannot replace an unaffiliated greenfield build and partial migration using only public resources.", "La adopción sigue abierta", "La adopción externa G4 no ha comenzado. Las pruebas del repositorio no reemplazan un build greenfield y una migración parcial de un equipo independiente usando sólo recursos públicos."),
-            link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/docs/51-g4-engineering-readiness.md", "Read the G4 engineering contract", "Leer el contrato de ingeniería G4")]),
+            link_list(locale, &[
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/51-g4-engineering-readiness.md", "Read the G4 engineering contract", "Leer el contrato de ingeniería G4"),
+                ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g4-engineering-readiness.md", "Inspect the accepted evidence", "Inspeccionar la evidencia aceptada"),
+            ]),
         ]),
     ].into_view()
 }

@@ -132,14 +132,14 @@
       "id": "incremental-build-engine",
       "label": "Verified incremental build engine",
       "domain": "build",
-      "availability": "source-preview",
-      "stability": "experimental",
+      "availability": "released",
+      "stability": "preview",
       "gate": "G4",
       "summary": "Verified CLI no-ops, explicit lazy-route reuse, observable build records, private cache controls, and resumable adaptive asset work.",
-      "evidence": ["docs/51-g4-engineering-readiness.md", "docs/32-golden-developer-experience.md", "docs/08-pliego-assets.md"],
+      "evidence": ["docs/51-g4-engineering-readiness.md", "docs/evidence/g4-engineering-readiness.md", "docs/32-golden-developer-experience.md", "docs/08-pliego-assets.md"],
       "limitations": [
         "Selective route reuse requires complete application-authored Page::lazy source declarations; eager and allSources producers remain conservative.",
-        "The implementation is a source preview pending accepted clean-revision evidence and release promotion. G4 external adoption has not started, and no remote or distributed build cache is provided."
+        "The released preview is backed by five accepted clean-revision Linux samples on the official default fixture. G4 external adoption has not started, and no remote or distributed build cache is provided."
       ]
     },
     {

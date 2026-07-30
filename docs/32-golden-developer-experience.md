@@ -1,6 +1,6 @@
 # Golden developer experience contract
 
-**Status:** R5 accepted; G4 engineering-readiness extensions in progress
+**Status:** R5 accepted; G4 engineering prerequisite accepted in `0.4.0-beta.1`
 
 R5 makes the shortest PliegoRS path a replayable application, then keeps every
 development rebuild causal and explainable. It does not turn PliegoRS into a
