@@ -56,7 +56,7 @@ constitution, framework contract, and official site source.
 
 Target roles are explicit:
 
-- Linux x64 and ARM64 are production release targets for `0.3.0-beta.1`.
+- Linux x64 and ARM64 are production release targets for `0.4.0-beta.1`.
 - macOS x64/ARM64 and Windows x64 are development release targets.
 - Chromium is the release-blocking browser lifecycle target.
 - Firefox and Safari are compatibility candidates until the same corpus runs
@@ -68,7 +68,7 @@ deployment adapters share the coordinated beta. G3 is preview evidence for one
 sealed-build contract, not a claim that every provider service is portable.
 
 G2 data, action, session, upload, outbound HTTP, and runtime-cache contracts are
-`released` at preview stability in `0.3.0-beta.1`. `pliego-data` and every other
+`released` at preview stability in `0.4.0-beta.1`. `pliego-data` and every other
 framework crate share the same exact version. This availability does not
 promote the included providers to production durability services.
 The in-memory stores and two-replica coordinator are conformance adapters, not
@@ -76,7 +76,7 @@ production distributed-service evidence. See
 [`evidence/g2-fullstack-beta.md`](evidence/g2-fullstack-beta.md).
 
 PBOC v1alpha1, native/OCI application deployment, and the Cloudflare
-application runtime are `released` at preview stability in `0.3.0-beta.1`.
+application runtime are `released` at preview stability in `0.4.0-beta.1`.
 Their shared provider corpus and residual limits are recorded in
 [`evidence/g3-pboc-provider-conformance.md`](evidence/g3-pboc-provider-conformance.md).
 

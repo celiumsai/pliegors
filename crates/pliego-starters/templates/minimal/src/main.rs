@@ -119,27 +119,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("target/site"));
     Site::new()
-        .page(Page::new(
+        .page(Page::lazy(
             "/",
             head(
                 "FORM / A PliegoRS foundation",
                 "A minimal Rust-native website foundation built with PliegoRS.",
                 "/",
             ),
-            home(),
+            ["src/main.rs"],
+            home,
         ))
-        .page(Page::new(
+        .page(Page::lazy(
             "/404.html",
             head(
                 "Not found / FORM",
                 "The requested route does not exist.",
                 "/404.html",
             ),
-            not_found(),
+            ["src/main.rs"],
+            not_found,
         ))
-        .asset(Asset::new("assets/site.css", CSS.to_vec()))
-        .asset(Asset::new("assets/pliego-mark.svg", MARK.to_vec()))
-        .asset(Asset::new("site.webmanifest", MANIFEST.to_vec()))
+        .asset(Asset::new("assets/site.css", CSS.to_vec()).source("assets/site.css"))
+        .asset(
+            Asset::new("assets/pliego-mark.svg", MARK.to_vec())
+                .source("assets/pliego-mark.svg"),
+        )
+        .asset(
+            Asset::new("site.webmanifest", MANIFEST.to_vec())
+                .source("assets/site.webmanifest"),
+        )
         .build(output)?;
     Ok(())
 }

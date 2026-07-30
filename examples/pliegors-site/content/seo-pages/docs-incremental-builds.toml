@@ -1,0 +1,5 @@
+key = "docs-incremental-builds"
+title = { en = "Incremental builds | PliegoRS", es = "Builds incrementales | PliegoRS" }
+description = { en = "Use PliegoRS verified no-ops, lazy-route source contracts, observable artifact reuse, and private cache controls without weakening atomic publication.", es = "Usa no-ops verificados, contratos de fuentes para rutas lazy, reutilización observable de artefactos y controles privados de caché en PliegoRS sin debilitar la publicación atómica." }
+image = "/media/pliegors/ledger-wide.webp"
+imageAlt = { en = "A verified PliegoRS build graph with selectively reused routes", es = "Un grafo de build verificado de PliegoRS con rutas reutilizadas selectivamente" }

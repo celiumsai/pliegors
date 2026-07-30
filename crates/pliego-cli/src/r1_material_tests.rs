@@ -240,6 +240,44 @@ fn cargo_target_directory_is_disjoint_or_uses_only_safe_default_children() {
 }
 
 #[test]
+fn custom_project_local_cargo_target_is_excluded_from_build_sources() {
+    let fixture = Fixture::new("custom-target-exclusion");
+    let project = fixture.directory("project");
+    let framework = fixture.directory("framework/pliego-ssg");
+    seed_workspace(&project);
+    seed_project(&project);
+    let context = project_context(&project, None);
+    let site = package("site", "site-id", &project);
+    let ssg = package("pliego-ssg", "ssg-id", &framework);
+    fs::write(
+        project.join("Cargo.lock"),
+        "version = 4\n\n[[package]]\nname = \"pliego-ssg\"\nversion = \"0.1.0\"\n",
+    )
+    .expect("write resolved framework lock entry");
+    let mut metadata = metadata(
+        &project,
+        vec![site, ssg],
+        vec![node("site-id", &["ssg-id"]), node("ssg-id", &[])],
+    );
+    metadata.target_directory = fixture.directory("project/target-cargo");
+    fs::write(
+        metadata.target_directory.join("compiler-output.bin"),
+        b"generated",
+    )
+    .expect("write generated Cargo output");
+
+    let (captured, _) =
+        capture_project_build_context(&context, &metadata).expect("capture build context");
+    assert!(captured.excluded_paths.contains(&"target-cargo".to_owned()));
+    assert!(
+        captured
+            .sources
+            .iter()
+            .all(|source| !source.path.starts_with("target-cargo/"))
+    );
+}
+
+#[test]
 fn parent_workspace_lock_and_cargo_configuration_are_evidence() {
     let fixture = Fixture::new("parent-workspace");
     let workspace = fixture.directory("workspace");

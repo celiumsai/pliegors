@@ -44,6 +44,12 @@ pageType = "web-page"
 robots = "index-follow"
 
 [[routes]]
+path = "/docs/incremental-builds"
+page = "docs-incremental-builds"
+pageType = "web-page"
+robots = "index-follow"
+
+[[routes]]
 path = "/docs/routing-and-pages"
 page = "docs-routing-and-pages"
 pageType = "web-page"

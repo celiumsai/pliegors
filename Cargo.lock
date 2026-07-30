@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "content-collections-pliegors"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-content",
  "pliego-dom",
@@ -626,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "fullstack-pliego"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "http",
  "http-body-util",
@@ -1197,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "minimal-pliego"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-dom",
  "pliego-ssg",
@@ -1243,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "native-pliego"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "futures-util",
  "http-body-util",
@@ -1403,7 +1403,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pliego-adapters"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-dom",
  "serde_json",
@@ -1412,7 +1412,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-artifact"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1425,7 +1425,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-assets"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1436,7 +1436,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-cli"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1458,7 +1458,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-cloudflare"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-pboc",
  "serde",
@@ -1468,7 +1468,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-content"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1482,7 +1482,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-data"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "base64",
  "futures-util",
@@ -1498,7 +1498,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-dom"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "js-sys",
  "pliego-reactive",
@@ -1509,7 +1509,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-fold"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-log",
  "pliego-reactive",
@@ -1520,7 +1520,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-hyphae"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "js-sys",
  "pliego-log",
@@ -1534,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-inspect"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1545,7 +1545,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-log"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1554,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-macros"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1564,7 +1564,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-pboc"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-router",
  "serde",
@@ -1577,14 +1577,14 @@ dependencies = [
 
 [[package]]
 name = "pliego-reactive"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "wasm-bindgen-test",
 ]
 
 [[package]]
 name = "pliego-resume"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-dom",
  "serde_json",
@@ -1592,7 +1592,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-router"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1603,7 +1603,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-runtime"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "axum",
  "bytes",
@@ -1634,7 +1634,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-sdk"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "psm",
  "semver",
@@ -1651,7 +1651,7 @@ dependencies = [
 
 [[package]]
 name = "pliego-ssg"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1663,11 +1663,11 @@ dependencies = [
 
 [[package]]
 name = "pliego-starters"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 
 [[package]]
 name = "pliegors-site"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-adapters",
  "pliego-content",
@@ -1680,7 +1680,7 @@ dependencies = [
 
 [[package]]
 name = "pliegors-site-client"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "js-sys",
  "pliego-dom",
@@ -1771,7 +1771,7 @@ dependencies = [
 
 [[package]]
 name = "provider-tck"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "bytes",
  "futures-util",
@@ -2145,7 +2145,7 @@ dependencies = [
 
 [[package]]
 name = "spike"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "pliego-dom",
  "pliego-fold",

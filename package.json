@@ -1,6 +1,6 @@
 {
   "name": "@pliego/pliegors-workspace",
-  "version": "0.3.0-beta.1",
+  "version": "0.4.0-beta.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +17,8 @@
     "check:email-worker": "npm --prefix workers/pliegors-email run check",
     "check:fuzz": "node scripts/check-fuzz-contract.mjs",
     "check:golden-path": "node scripts/check-golden-matrix.mjs",
+    "check:g4-engineering": "node scripts/check-g4-engineering-readiness.mjs",
+    "measure:g4-engineering": "node scripts/measure-g4-engineering-readiness.mjs",
     "check:opensdk": "node scripts/check-opensdk-contract.mjs",
     "check:opensdk:multilang": "node scripts/check-opensdk-multilang.mjs",
     "check:opensdk:browser-frameworks": "node scripts/check-opensdk-browser-frameworks.mjs",

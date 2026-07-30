@@ -9,6 +9,47 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 No changes yet.
 
+## 0.4.0-beta.1 - 2026-07-30
+
+This coordinated beta publishes the G4 incremental engineering preview across
+all twenty-one framework crates. It does not close G4 Adoption: that gate still
+requires an unaffiliated team to complete public-resource-only greenfield and
+migration trials.
+
+### Added
+
+- Add verified CLI no-op builds that skip client and site compilation only
+  after the current build context, receipt, graph, inputs, and exact output set
+  agree.
+- Add `Page::lazy` with explicit causal sources and verified prior-artifact
+  reuse inside a fresh atomic publication stage.
+- Add `pliego cache status [--format human|json]` and `pliego cache clean` for
+  bounded production-build evidence and selective private-record cleanup.
+- Add `pliego-assets status` with deterministic `pending`, `ready`, and
+  `invalid` job classification for resumable external media work.
+- Add a G4 engineering gate that scaffolds and builds every official starter,
+  proves no-op and selective reuse, rejects a corrupt cache record, and verifies
+  the publication after cache cleanup.
+- Add an independent-sample G4 measurement harness for cold, verified no-op,
+  content-only, asset-only, and corrupt-record recovery scenarios, with raw
+  timing vectors, build phases, and Linux peak RSS.
+
+### Changed
+
+- Move the default starter to revision 3 and minimal, editorial, and cinematic
+  to revision 2, with lazy routes and explicit source edges.
+- Expand the bilingual website with incremental-build and resumable-asset
+  documentation while keeping the external G4 Adoption gate explicitly open.
+
+### Security
+
+- Reopen reusable prior artifacts without following links and require their
+  path, kind, producer, route, source contract, length, and SHA-256 to match the
+  verified prior receipt and graph.
+- Treat missing causal declarations conservatively and fail closed on malformed
+  build records or unsafe, escaped, linked, oversized, or invalid staged asset
+  work.
+
 ## 0.3.0-beta.1 - 2026-07-22
 
 This coordinated beta publishes all twenty-one framework crates at one exact
@@ -273,7 +314,8 @@ does not replace the complete `v0.0.2` CLI release.
 - Static preview delivery serves `security.txt` as UTF-8 plain text and keeps
   its disclosure metadata available under `/.well-known/security.txt`.
 
-[Unreleased]: https://github.com/celiumsai/pliegors/compare/v0.3.0-beta.1...HEAD
+[Unreleased]: https://github.com/celiumsai/pliegors/compare/v0.4.0-beta.1...HEAD
+[0.4.0-beta.1]: https://github.com/celiumsai/pliegors/compare/v0.3.0-beta.1...v0.4.0-beta.1
 [0.3.0-beta.1]: https://github.com/celiumsai/pliegors/compare/v0.2.0-beta.1...v0.3.0-beta.1
 [0.2.0-beta.1]: https://github.com/celiumsai/pliegors/compare/preview-components-v0.1.0-preview.1...v0.2.0-beta.1
 [0.0.2]: https://github.com/celiumsai/pliegors/compare/v0.0.1...v0.0.2

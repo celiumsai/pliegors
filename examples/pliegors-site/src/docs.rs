@@ -51,6 +51,15 @@ pub const TOPICS: &[DocTopic] = &[
         summary_es: "Sigue eventos nativos de archivos mediante HMR tipado, grafos causales, explicaciones de artefactos y recuperación sin perder la última salida válida.",
     },
     DocTopic {
+        slug: "incremental-builds",
+        group_en: "Start",
+        group_es: "Inicio",
+        title_en: "Incremental builds",
+        title_es: "Builds incrementales",
+        summary_en: "Use verified no-ops, explicit lazy-route dependencies, observable reuse, and private cache controls without weakening atomic publication.",
+        summary_es: "Usa no-ops verificados, dependencias explícitas de rutas lazy, reutilización observable y controles privados de caché sin debilitar la publicación atómica.",
+    },
+    DocTopic {
         slug: "routing-and-pages",
         group_en: "Author",
         group_es: "Autoría",
@@ -316,7 +325,7 @@ pub fn index(locale: Locale) -> View {
                         .child(
                             el("p")
                                 .class("utility-label")
-                                .child("PLIEGORS / 0.3.0-BETA.1 / 21 CRATES"),
+                                .child("PLIEGORS / 0.4.0-BETA.1 / 21 CRATES"),
                         )
                         .child(el("h2").id("docs-status-title").child(localized(
                             locale,
@@ -325,8 +334,8 @@ pub fn index(locale: Locale) -> View {
                         )))
                         .child(el("p").child(localized(
                             locale,
-                            "The CLI and all twenty library crates are published on crates.io at the exact 0.3.0-beta.1 version, including pliego-router, pliego-runtime, pliego-data, pliego-pboc, pliego-cloudflare, and pliego-sdk. G1, G2, G3, and OpenSDK move as one graph; PBOC v1alpha1 remains a preview contract.",
-                            "El CLI y los veinte crates de librería están publicados en crates.io con la versión exacta 0.3.0-beta.1, incluyendo pliego-router, pliego-runtime, pliego-data, pliego-pboc, pliego-cloudflare y pliego-sdk. G1, G2, G3 y OpenSDK avanzan como un solo grafo; PBOC v1alpha1 sigue como contrato preview.",
+                            "The CLI and all twenty library crates are published on crates.io at the exact 0.4.0-beta.1 version, including pliego-router, pliego-runtime, pliego-data, pliego-pboc, pliego-cloudflare, and pliego-sdk. G1, G2, G3, and OpenSDK move as one graph; PBOC v1alpha1 remains a preview contract.",
+                            "El CLI y los veinte crates de librería están publicados en crates.io con la versión exacta 0.4.0-beta.1, incluyendo pliego-router, pliego-runtime, pliego-data, pliego-pboc, pliego-cloudflare y pliego-sdk. G1, G2, G3 y OpenSDK avanzan como un solo grafo; PBOC v1alpha1 sigue como contrato preview.",
                         ))),
                 )
                 .child(link_list(
@@ -337,7 +346,7 @@ pub fn index(locale: Locale) -> View {
                         ("/docs/fullstack-beta", "Use the G2 beta", "Usar la beta G2"),
                         ("/docs/portable-deployment", "Deploy one sealed PBOC", "Desplegar un PBOC sellado"),
                         ("/docs/opensdk", "Evaluate OpenSDK", "Evaluar OpenSDK"),
-                        ("https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1", "Open the coordinated beta", "Abrir la beta coordinada"),
+                        ("https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1", "Open the coordinated beta", "Abrir la beta coordinada"),
                         ("/changelog", "Read the release boundary", "Leer el límite de release"),
                     ],
                 )),
@@ -411,6 +420,7 @@ pub fn article(locale: Locale, slug: &str) -> Result<View, String> {
         "project-structure" => project_structure(locale),
         "cli" => cli_reference(locale),
         "developer-loop" => developer_loop(locale),
+        "incremental-builds" => incremental_builds(locale),
         "routing-and-pages" => routing_and_pages(locale),
         "views" => views(locale),
         "events-and-folds" => events_and_folds(locale),
@@ -651,10 +661,10 @@ fn getting_started(locale: Locale) -> View {
             "Install the CLI",
             "Instalar el CLI",
             vec![
-                note(locale, "Current release", "Install the exact 0.3.0-beta.1 CLI from crates.io. The generated project pins every released PliegoRS crate to that same exact version.", "Release actual", "Instala el CLI 0.3.0-beta.1 exacto desde crates.io. El proyecto generado fija cada crate liberado de PliegoRS a esa misma versión exacta."),
-                code_block(locale, "shell", "cargo install pliego-cli --version 0.3.0-beta.1 --locked\npliego version"),
+                note(locale, "Current release", "Install the exact 0.4.0-beta.1 CLI from crates.io. The generated project pins every released PliegoRS crate to that same exact version.", "Release actual", "Instala el CLI 0.4.0-beta.1 exacto desde crates.io. El proyecto generado fija cada crate liberado de PliegoRS a esa misma versión exacta."),
+                code_block(locale, "shell", "cargo install pliego-cli --version 0.4.0-beta.1 --locked\npliego version"),
                 paragraph(locale, "Release installers are downloaded to disk, verified, and then executed. PliegoRS never documents piping an unverified network response directly into a shell.", "Los instaladores de release se descargan a disco, se verifican y después se ejecutan. PliegoRS nunca documenta enviar una respuesta de red sin verificar directamente a un shell."),
-                link_list(locale, &[("https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1", "Download and verify the signed release bundle", "Descargar y verificar el bundle firmado"), ("https://github.com/celiumsai/pliegors/blob/main/docs/27-distribution-and-release.md", "Read the distribution contract", "Leer el contrato de distribución")]),
+                link_list(locale, &[("https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1", "Download and verify the signed release bundle", "Descargar y verificar el bundle firmado"), ("https://github.com/celiumsai/pliegors/blob/main/docs/27-distribution-and-release.md", "Read the distribution contract", "Leer el contrato de distribución")]),
             ],
         ),
         doc_section(
@@ -768,11 +778,36 @@ fn developer_loop(locale: Locale) -> View {
     ].into_view()
 }
 
+fn incremental_builds(locale: Locale) -> View {
+    vec![
+        doc_section(locale, "noop", "A verified no-op", "Un no-op verificado", vec![
+            paragraph(locale, "Before starting the client or site compiler, pliego build verifies the existing receipt and graph, captures the current build context, and compares every bound input. An exact match preserves the publication byte-for-byte and records a no-op.", "Antes de iniciar el compilador del cliente o del sitio, pliego build verifica el recibo y grafo existentes, captura el contexto actual y compara cada entrada vinculada. Una coincidencia exacta preserva la publicación byte por byte y registra un no-op."),
+            code_block(locale, "shell", "pliego build\npliego build\npliego cache status\n# PLIEGO cache: NoOp | 0 rendered | … reused"),
+            note(locale, "No timestamp shortcut", "A matching modification time or Cargo cache is never enough. The decision requires current source hashes, configuration, toolchain evidence, graph, receipt, and exact output bytes.", "Sin atajo por timestamps", "Un modification time coincidente o el cache de Cargo nunca basta. La decisión exige hashes actuales de fuentes, configuración, evidencia del toolchain, grafo, recibo y bytes exactos de salida."),
+        ]),
+        doc_section(locale, "lazy", "Declare lazy-route causality", "Declara causalidad de rutas lazy", vec![
+            code_block(locale, "rust", "let guide = Page::lazy(\n    \"/guide\",\n    guide_head(),\n    [\"src/main.rs\", \"content/guide.md\"],\n    || guide_view(),\n);"),
+            paragraph(locale, "Page::lazy executes its renderer only when one of its declared sources changed. Unaffected route bytes are copied from the verified prior publication into a fresh stage. Page::new remains eager, and missing declarations fall back to conservative allSources invalidation.", "Page::lazy ejecuta su renderer sólo cuando cambia una de sus fuentes declaradas. Los bytes de rutas no afectadas se copian desde la publicación previa verificada hacia un stage nuevo. Page::new sigue siendo eager y las declaraciones ausentes usan invalidación conservadora allSources."),
+            note(locale, "Correctness contract", "Every project file read by a lazy renderer must be declared. Incomplete source edges can reuse stale authored output and are an application bug.", "Contrato de corrección", "Cada archivo del proyecto leído por un renderer lazy debe declararse. Edges de fuentes incompletos pueden reutilizar salida de autoría obsoleta y constituyen un bug de la aplicación."),
+        ]),
+        doc_section(locale, "observe", "Observe and clean private state", "Observa y limpia estado privado", vec![
+            code_block(locale, "shell", "pliego cache status\npliego cache status --format json\npliego cache clean"),
+            paragraph(locale, "Status verifies the current output before reporting changed sources, rendered and reused artifact counts, receipt transition, and phase timings. Clean removes only last-build.json and last-rebuild.json under target/.pliego; Cargo outputs and the published site remain intact.", "Status verifica la salida actual antes de reportar fuentes cambiadas, conteos de artefactos renderizados y reutilizados, transición del recibo y tiempos por fase. Clean elimina sólo last-build.json y last-rebuild.json dentro de target/.pliego; la salida de Cargo y el sitio publicado permanecen intactos."),
+        ]),
+        doc_section(locale, "evidence", "Engineering gate, not an adoption claim", "Gate de ingeniería, no afirmación de adopción", vec![
+            code_block(locale, "shell", "npm run check:g4-engineering"),
+            paragraph(locale, "The gate scaffolds every official starter outside the workspace and proves executed build, verified no-op, selective route reuse, corrupted-record rejection, cache cleanup, and post-clean artifact verification. Publishable timing evidence must name one clean exact revision; a dirty run validates the harness only.", "El gate genera cada starter oficial fuera del workspace y prueba build ejecutado, no-op verificado, reutilización selectiva de rutas, rechazo de registro corrupto, limpieza de caché y verificación posterior del artefacto. La evidencia publicable de tiempos debe nombrar una revisión exacta limpia; un run dirty sólo valida el harness."),
+            note(locale, "Adoption remains open", "G4 external adoption has not started. Repository-owned tests cannot replace an unaffiliated greenfield build and partial migration using only public resources.", "La adopción sigue abierta", "La adopción externa G4 no ha comenzado. Las pruebas del repositorio no reemplazan un build greenfield y una migración parcial de un equipo independiente usando sólo recursos públicos."),
+            link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/docs/51-g4-engineering-readiness.md", "Read the G4 engineering contract", "Leer el contrato de ingeniería G4")]),
+        ]),
+    ].into_view()
+}
+
 fn routing_and_pages(locale: Locale) -> View {
     vec![
         doc_section(locale, "page", "Author a complete page", "Crea una página completa", vec![
-            code_block(locale, "rust", "use pliego_dom::{IntoView, el};\nuse pliego_ssg::{Head, Page};\n\nlet page = Page::new(\n    \"/guide\",\n    Head::new(\"Guide | My App\")\n        .description(\"A complete authored page.\")\n        .canonical(\"https://example.com/guide\"),\n    el(\"main\")\n        .child(el(\"h1\").child(\"Guide\"))\n        .into_view(),\n);"),
-            paragraph(locale, "A Page owns its route, Head, body, and optional language. PliegoRS emits useful HTML directly; routing does not begin as a client-side application shell.", "Una Page controla su ruta, Head, body y lenguaje opcional. PliegoRS emite HTML útil directamente; el routing no comienza como un shell de aplicación en el cliente."),
+            code_block(locale, "rust", "use pliego_dom::{IntoView, el};\nuse pliego_ssg::{Head, Page};\n\nlet page = Page::lazy(\n    \"/guide\",\n    Head::new(\"Guide | My App\")\n        .description(\"A complete authored page.\")\n        .canonical(\"https://example.com/guide\"),\n    [\"src/main.rs\", \"content/guide.md\"],\n    || el(\"main\")\n        .child(el(\"h1\").child(\"Guide\"))\n        .into_view(),\n);"),
+            paragraph(locale, "A Page owns its route, Head, renderer, source dependencies, and optional language. PliegoRS emits useful HTML directly; routing does not begin as a client-side application shell.", "Una Page controla su ruta, Head, renderer, dependencias de fuentes y lenguaje opcional. PliegoRS emite HTML útil directamente; el routing no comienza como un shell de aplicación en el cliente."),
         ]),
         doc_section(locale, "routes", "Route normalization", "Normalización de rutas", vec![
             paragraph(locale, "Clean routes publish to index documents. /guide and /guide/ resolve to guide/index.html. Distinct authored routes that normalize to the same portable output are rejected before staging.", "Las rutas limpias se publican como documentos index. /guide y /guide/ resuelven a guide/index.html. Rutas de autoría distintas que normalizan a la misma salida portable se rechazan antes del staging."),
@@ -964,8 +999,8 @@ fn dom_lifecycle(locale: Locale) -> View {
 fn native_runtime(locale: Locale) -> View {
     vec![
         doc_section(locale, "status", "Install the G1 public beta", "Instala la beta pública G1", vec![
-            paragraph(locale, "pliego-router and pliego-runtime 0.3.0-beta.1 are public on crates.io and G1 is complete. Pin both exact versions with the same version as the CLI and every other PliegoRS crate.", "pliego-router y pliego-runtime 0.3.0-beta.1 son públicos en crates.io y G1 está completo. Fija ambas versiones exactas con la misma versión del CLI y de cada crate PliegoRS."),
-            code_block(locale, "toml", "[dependencies]\npliego-router = \"=0.3.0-beta.1\"\npliego-runtime = \"=0.3.0-beta.1\""),
+            paragraph(locale, "pliego-router and pliego-runtime 0.4.0-beta.1 are public on crates.io and G1 is complete. Pin both exact versions with the same version as the CLI and every other PliegoRS crate.", "pliego-router y pliego-runtime 0.4.0-beta.1 son públicos en crates.io y G1 está completo. Fija ambas versiones exactas con la misma versión del CLI y de cada crate PliegoRS."),
+            code_block(locale, "toml", "[dependencies]\npliego-router = \"=0.4.0-beta.1\"\npliego-runtime = \"=0.4.0-beta.1\""),
             note(locale, "Preview boundary", "The tagged reference application binds to 127.0.0.1:4310 by default. It is reproducible evidence, not a production deployment or support promise.", "Límite del preview", "La aplicación de referencia etiquetada escucha en 127.0.0.1:4310 de forma predeterminada. Es evidencia reproducible, no un despliegue productivo ni una promesa de soporte."),
         ]),
         doc_section(locale, "ownership", "Keep transport and framework ownership explicit", "Mantén explícita la propiedad del transporte y del framework", vec![
@@ -1027,7 +1062,7 @@ fn native_runtime(locale: Locale) -> View {
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-layout-composition-foundation.md", "Layout composition evidence", "Evidencia de composición de layouts"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-opentelemetry-foundation.md", "OpenTelemetry evidence", "Evidencia de OpenTelemetry"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/evidence/g1-transport-load-security.md", "Transport, load, and security evidence", "Evidencia de transporte, carga y seguridad"),
-                ("https://crates.io/crates/pliego-runtime/0.3.0-beta.1", "pliego-runtime on crates.io", "pliego-runtime en crates.io"),
+                ("https://crates.io/crates/pliego-runtime/0.4.0-beta.1", "pliego-runtime on crates.io", "pliego-runtime en crates.io"),
                 ("https://github.com/celiumsai/pliegors/blob/main/docs/rfc/RFC-008-native-runtime.md", "RFC-008 native runtime", "RFC-008 runtime nativo"),
                 ("/docs/portable-deployment", "Deploy the runtime through PBOC", "Desplegar el runtime mediante PBOC"),
             ]),
@@ -1038,8 +1073,8 @@ fn native_runtime(locale: Locale) -> View {
 fn portable_deployment(locale: Locale) -> View {
     vec![
         doc_section(locale, "contract", "Install one portable contract", "Instala un contrato portable", vec![
-            paragraph(locale, "PBOC v1alpha1 is the public boundary between an application build and a deployment host. Version 0.3.0-beta.1 publishes pliego-pboc, pliego-cloudflare, and the native admission path as one preview graph; keep every pliego-* crate pinned to that exact version.", "PBOC v1alpha1 es el límite público entre el build de una aplicación y un host de despliegue. La versión 0.3.0-beta.1 publica pliego-pboc, pliego-cloudflare y la ruta de admisión nativa como un solo grafo preview; fija cada crate pliego-* en esa versión exacta."),
-            code_block(locale, "toml", "[dependencies]\npliego-pboc = \"=0.3.0-beta.1\"\npliego-runtime = \"=0.3.0-beta.1\"\n# Only for a Cloudflare Worker target\npliego-cloudflare = \"=0.3.0-beta.1\""),
+            paragraph(locale, "PBOC v1alpha1 is the public boundary between an application build and a deployment host. Version 0.4.0-beta.1 publishes pliego-pboc, pliego-cloudflare, and the native admission path as one preview graph; keep every pliego-* crate pinned to that exact version.", "PBOC v1alpha1 es el límite público entre el build de una aplicación y un host de despliegue. La versión 0.4.0-beta.1 publica pliego-pboc, pliego-cloudflare y la ruta de admisión nativa como un solo grafo preview; fija cada crate pliego-* en esa versión exacta."),
+            code_block(locale, "toml", "[dependencies]\npliego-pboc = \"=0.4.0-beta.1\"\npliego-runtime = \"=0.4.0-beta.1\"\n# Only for a Cloudflare Worker target\npliego-cloudflare = \"=0.4.0-beta.1\""),
             note(locale, "Preview boundary", "The manifest schema and diagnostics are deliberate but may change before 1.0. A PBOC proves the declared portable subset; it does not make every provider service equivalent.", "Límite del preview", "El schema del manifest y los diagnósticos son deliberados, pero pueden cambiar antes de 1.0. Un PBOC demuestra el subset portable declarado; no convierte cada servicio del proveedor en equivalente."),
         ]),
         doc_section(locale, "verify", "Verify before upload", "Verifica antes del upload", vec![
@@ -1082,8 +1117,8 @@ fn portable_deployment(locale: Locale) -> View {
 fn fullstack_beta(locale: Locale) -> View {
     vec![
         doc_section(locale, "status", "Install one exact beta graph", "Instala un grafo beta exacto", vec![
-            paragraph(locale, "G2 is public in the coordinated 0.3.0-beta.1 graph. Pin pliego-data, pliego-router, pliego-runtime, and every other pliego-* dependency to that exact version and treat them as one indivisible application contract.", "G2 es público en el grafo coordinado 0.3.0-beta.1. Fija pliego-data, pliego-router, pliego-runtime y cada dependencia pliego-* a esa versión exacta y trátalas como un solo contrato de aplicación indivisible."),
-            code_block(locale, "toml", "[dependencies]\npliego-data = \"=0.3.0-beta.1\"\npliego-router = \"=0.3.0-beta.1\"\npliego-runtime = \"=0.3.0-beta.1\""),
+            paragraph(locale, "G2 is public in the coordinated 0.4.0-beta.1 graph. Pin pliego-data, pliego-router, pliego-runtime, and every other pliego-* dependency to that exact version and treat them as one indivisible application contract.", "G2 es público en el grafo coordinado 0.4.0-beta.1. Fija pliego-data, pliego-router, pliego-runtime y cada dependencia pliego-* a esa versión exacta y trátalas como un solo contrato de aplicación indivisible."),
+            code_block(locale, "toml", "[dependencies]\npliego-data = \"=0.4.0-beta.1\"\npliego-router = \"=0.4.0-beta.1\"\npliego-runtime = \"=0.4.0-beta.1\""),
             note(locale, "Beta boundary", "The included stores and two-replica coordinator are development and conformance adapters. G3 can package their application contract, but it does not turn them into production durability or cross-process delivery providers.", "Límite de la beta", "Los stores incluidos y el coordinador de dos réplicas son adapters de desarrollo y conformidad. G3 puede empaquetar su contrato de aplicación, pero no los convierte en providers de durabilidad productiva o entrega entre procesos."),
         ]),
         doc_section(locale, "model", "Seal data authority before serving", "Sella la autoridad de datos antes de servir", vec![
@@ -1123,17 +1158,17 @@ fn fullstack_beta(locale: Locale) -> View {
 fn opensdk(locale: Locale) -> View {
     vec![
         doc_section(locale, "status", "Install the OpenSDK public beta", "Instala la beta pública de OpenSDK", vec![
-            paragraph(locale, "pliego-sdk 0.3.0-beta.1 is public on crates.io inside the coordinated framework graph. Its conformance suites remain in the repository, and RFC-006/RFC-007 plus ADR-006 remain pending before stabilization.", "pliego-sdk 0.3.0-beta.1 es público en crates.io dentro del grafo coordinado del framework. Sus suites de conformidad siguen en el repositorio y RFC-006/RFC-007 junto con ADR-006 permanecen pendientes antes de estabilizar."),
-            code_block(locale, "toml", "[dependencies]\npliego-sdk = \"=0.3.0-beta.1\""),
+            paragraph(locale, "pliego-sdk 0.4.0-beta.1 is public on crates.io inside the coordinated framework graph. Its conformance suites remain in the repository, and RFC-006/RFC-007 plus ADR-006 remain pending before stabilization.", "pliego-sdk 0.4.0-beta.1 es público en crates.io dentro del grafo coordinado del framework. Sus suites de conformidad siguen en el repositorio y RFC-006/RFC-007 junto con ADR-006 permanecen pendientes antes de estabilizar."),
+            code_block(locale, "toml", "[dependencies]\npliego-sdk = \"=0.4.0-beta.1\""),
             note(locale, "Toolchain boundary", "The beta and current main require Rust 1.86.0 for the Wasmtime 36.0.8 security floor.", "Límite del toolchain", "La beta y main actual requieren Rust 1.86.0 por el security floor de Wasmtime 36.0.8."),
             link_list(locale, &[
-                ("https://crates.io/crates/pliego-sdk/0.3.0-beta.1", "Open pliego-sdk on crates.io", "Abrir pliego-sdk en crates.io"),
-                ("https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1", "Read the coordinated beta", "Leer la beta coordinada"),
+                ("https://crates.io/crates/pliego-sdk/0.4.0-beta.1", "Open pliego-sdk on crates.io", "Abrir pliego-sdk en crates.io"),
+                ("https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1", "Read the coordinated beta", "Leer la beta coordinada"),
             ]),
         ]),
         doc_section(locale, "admission", "Admit exact bytes before execution", "Admite bytes exactos antes de ejecutar", vec![
             paragraph(locale, "An extension manifest declares its identity, exact entry points, OpenSDK API, compatible host range, required features, requested capabilities, and resource budgets. Admission verifies the component digest and policy before returning a ValidatedExtension typestate that a runtime can execute.", "El manifest de una extensión declara identidad, entry points exactos, API OpenSDK, rango de host compatible, features requeridos, capabilities solicitadas y presupuestos de recursos. La admisión verifica el digest del componente y la política antes de retornar el typestate ValidatedExtension que un runtime puede ejecutar."),
-            code_block(locale, "rust", "use pliego_sdk::{CapabilityPolicy, ExtensionManifest, HostContract};\nuse semver::Version;\n\nlet manifest: ExtensionManifest = serde_json::from_slice(manifest_bytes)?;\nlet host = HostContract::preview(\n    Version::parse(\"0.3.0-beta.1\")?,\n    CapabilityPolicy::deny_all(),\n);\nlet validated = host.admit(manifest, component_bytes)?;"),
+            code_block(locale, "rust", "use pliego_sdk::{CapabilityPolicy, ExtensionManifest, HostContract};\nuse semver::Version;\n\nlet manifest: ExtensionManifest = serde_json::from_slice(manifest_bytes)?;\nlet host = HostContract::preview(\n    Version::parse(\"0.4.0-beta.1\")?,\n    CapabilityPolicy::deny_all(),\n);\nlet validated = host.admit(manifest, component_bytes)?;"),
             note(locale, "A request is not authority", "Declaring a capability never creates a filesystem, network, clock, random, environment, or HTTP handle. The host policy and application-supplied executor remain the resource boundary.", "Una solicitud no es autoridad", "Declarar una capability nunca crea un handle de filesystem, red, reloj, random, environment o HTTP. La política del host y el executor suministrado por la aplicación siguen siendo el límite del recurso."),
         ]),
         doc_section(locale, "effects", "Broker effects and retain evidence", "Intermedia efectos y conserva evidencia", vec![
@@ -1161,7 +1196,7 @@ fn opensdk_components(locale: Locale) -> View {
     vec![
         doc_section(locale, "component", "Typed Wasm Component execution", "Ejecución tipada de Wasm Components", vec![
             paragraph(locale, "The reference sandbox compiles and admits a Rust WebAssembly Component against pliego:build/transformer@0.1.0. The host instantiates it without ambient WASI, invokes the typed export, and emits a schema-valid build transform receipt over framed input and output digests.", "El sandbox de referencia compila y admite un WebAssembly Component Rust contra pliego:build/transformer@0.1.0. El host lo instancia sin WASI ambiental, invoca el export tipado y emite un recibo de transformación válido contra schema sobre digests enmarcados de entrada y salida."),
-            note(locale, "Beta protocol", "This conformance surface belongs to OpenSDK 0.3.0-beta.1 and remains a prerelease contract.", "Protocolo beta", "Esta superficie de conformidad pertenece a OpenSDK 0.3.0-beta.1 y sigue siendo un contrato prerelease."),
+            note(locale, "Beta protocol", "This conformance surface belongs to OpenSDK 0.4.0-beta.1 and remains a prerelease contract.", "Protocolo beta", "Esta superficie de conformidad pertenece a OpenSDK 0.4.0-beta.1 y sigue siendo un contrato prerelease."),
             code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk test \\\n  fixtures/opensdk/rust-component/pliego-extension.json \\\n  --input fixtures/opensdk/transform-input.json \\\n  --format json"),
         ]),
         doc_section(locale, "languages", "One contract, independent implementations", "Un contrato, implementaciones independientes", vec![
@@ -1190,7 +1225,7 @@ fn browser_framework_conformance(locale: Locale) -> View {
     vec![
         doc_section(locale, "native", "Keep framework runtimes native", "Mantén nativos los runtimes", vec![
             paragraph(locale, "React, Svelte, and Lit keep their normal browser packages and APIs. PliegoRS does not reimplement their renderers. Each fixture is exposed through a Custom Element and admitted through adapter API v1, leaving the real integration point visible to developers.", "React, Svelte y Lit conservan sus paquetes y APIs normales del navegador. PliegoRS no reimplementa sus renderers. Cada fixture se expone mediante un Custom Element y se admite mediante adapter API v1, dejando visible para el desarrollador el punto real de integración."),
-            note(locale, "Beta protocol", "These fixtures exercise OpenSDK 0.3.0-beta.1; they are conformance evidence rather than a standalone browser-framework package.", "Protocolo beta", "Estos fixtures ejercitan OpenSDK 0.3.0-beta.1; son evidencia de conformidad, no un paquete independiente para frameworks web."),
+            note(locale, "Beta protocol", "These fixtures exercise OpenSDK 0.4.0-beta.1; they are conformance evidence rather than a standalone browser-framework package.", "Protocolo beta", "Estos fixtures ejercitan OpenSDK 0.4.0-beta.1; son evidencia de conformidad, no un paquete independiente para frameworks web."),
             note(locale, "Conformance, not a new abstraction", "The wrappers are examples and test inputs. They do not create another component model over React, Svelte, or Lit.", "Conformidad, no una abstracción nueva", "Los wrappers son ejemplos y entradas de prueba. No crean otro modelo de componentes sobre React, Svelte o Lit."),
         ]),
         doc_section(locale, "descriptor", "Match the admitted descriptor", "Coincide con el descriptor admitido", vec![
@@ -1222,14 +1257,14 @@ fn opensdk_tooling(locale: Locale) -> View {
         doc_section(locale, "protocol", "One bounded tooling plane", "Un plano de tooling limitado", vec![
             paragraph(locale, "The OpenSDK tooling host uses newline-delimited JSON-RPC 2.0 over standard input and output. Editors negotiate through pliego/handshake; the reference MCP adapter exposes the same capability handshake after completing the MCP 2025-11-25 initialization lifecycle.", "El host de tooling OpenSDK usa JSON-RPC 2.0 delimitado por líneas sobre entrada y salida estándar. Los editores negocian mediante pliego/handshake; el adapter MCP de referencia expone el mismo handshake de capabilities después de completar el lifecycle de inicialización MCP 2025-11-25."),
             definition_list(locale, &[
-                ("OpenSDK", "0.3.0-beta.1", "0.3.0-beta.1"),
+                ("OpenSDK", "0.4.0-beta.1", "0.4.0-beta.1"),
                 ("JSON-RPC", "2.0 over bounded newline-delimited messages", "2.0 sobre mensajes delimitados por líneas y limitados"),
                 ("MCP", "2025-11-25 reference client surface", "Superficie del cliente de referencia 2025-11-25"),
             ]),
         ]),
         doc_section(locale, "editor", "Negotiate before diagnostics", "Negocia antes de diagnósticos", vec![
             code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk tooling-host \\\n  --protocol pliego \\\n  --feature diagnostic-links"),
-            paragraph(locale, "The native handshake must include protocolVersion 0.3.0-beta.1. Missing or incompatible versions fail before any diagnostic or project method becomes available.", "El handshake nativo debe incluir protocolVersion 0.3.0-beta.1. Las versiones ausentes o incompatibles fallan antes de que esté disponible cualquier método de diagnóstico o proyecto."),
+            paragraph(locale, "The native handshake must include protocolVersion 0.4.0-beta.1. Missing or incompatible versions fail before any diagnostic or project method becomes available.", "El handshake nativo debe incluir protocolVersion 0.4.0-beta.1. Las versiones ausentes o incompatibles fallan antes de que esté disponible cualquier método de diagnóstico o proyecto."),
         ]),
         doc_section(locale, "mcp", "MCP is a client, not a privilege", "MCP es un cliente, no un privilegio", vec![
             code_block(locale, "shell", "cargo run -p pliego-cli --locked -- sdk tooling-host \\\n  --protocol mcp \\\n  --feature diagnostic-links\nnpm run check:opensdk:tooling"),
@@ -1254,7 +1289,7 @@ fn opensdk_compatibility(locale: Locale) -> View {
                 ("preview", "Versioned and tested, with breaking changes allowed in a new preview protocol", "Versionado y probado, con cambios incompatibles permitidos en un nuevo protocolo preview"),
                 ("stable", "Preserves the contract for the documented compatibility window", "Preserva el contrato durante la ventana de compatibilidad documentada"),
             ]),
-            note(locale, "Current tier", "OpenSDK 0.3.0-beta.1 is preview. Rust is the reference Component Model toolchain; TypeScript and Python are process-bridge conformance implementations.", "Nivel actual", "OpenSDK 0.3.0-beta.1 es preview. Rust es el toolchain Component Model de referencia; TypeScript y Python son implementaciones de conformidad mediante bridges de proceso."),
+            note(locale, "Current tier", "OpenSDK 0.4.0-beta.1 is preview. Rust is the reference Component Model toolchain; TypeScript and Python are process-bridge conformance implementations.", "Nivel actual", "OpenSDK 0.4.0-beta.1 es preview. Rust es el toolchain Component Model de referencia; TypeScript y Python son implementaciones de conformidad mediante bridges de proceso."),
         ]),
         doc_section(locale, "deprecation", "Require an executable migration path", "Exige una ruta de migración ejecutable", vec![
             steps(locale, &[
@@ -1289,6 +1324,15 @@ fn adaptive_assets(locale: Locale) -> View {
                 ("font", "Subset, axes, preload policy, license, and fallback metrics", "Subset, ejes, política de preload, licencia y métricas de fallback"),
                 ("3D", "Geometry, textures, compression, renderer tier, and static fallback", "Geometría, texturas, compresión, tier de renderer y fallback estático"),
             ]),
+        ]),
+        doc_section(locale, "work-status", "Resume external asset work", "Reanuda trabajo externo de assets", vec![
+            code_block(locale, "shell", "pliego-assets status target/assets/plan.json \\\n  --output-root target/site --format json"),
+            definition_list(locale, &[
+                ("pending", "The exact planned staging artifact is absent", "El artefacto exacto planificado para staging está ausente"),
+                ("ready", "Signature, codec or scene contract, size, and streaming SHA-256 are valid", "Firma, contrato de codec o escena, tamaño y SHA-256 por streaming son válidos"),
+                ("invalid", "The staged path or bytes failed a stable validation reason", "La ruta o bytes en staging fallaron por una razón estable de validación"),
+            ]),
+            paragraph(locale, "Status is read-only and deterministic. It creates, deletes, rewrites, and publishes nothing, so a runner can resume only unfinished jobs without trusting timestamps.", "Status es read-only y determinista. No crea, elimina, reescribe ni publica nada, por lo que un runner puede reanudar sólo jobs incompletos sin confiar en timestamps."),
         ]),
         doc_section(locale, "budgets", "Device budgets", "Presupuestos por dispositivo", vec![
             paragraph(locale, "Budgets are evaluated by route and capability tier. The first viewport, complete document, scene memory, and long-task behavior remain separate evidence instead of being collapsed into one marketing score.", "Los presupuestos se evalúan por ruta y capability tier. El primer viewport, documento completo, memoria de escena y long tasks permanecen como evidencia separada en vez de colapsarse en un score de marketing."),
@@ -1450,7 +1494,7 @@ fn build_and_deploy(locale: Locale) -> View {
         ]),
         doc_section(locale, "releases", "Release selection", "Selección de releases", vec![
             paragraph(locale, "GitHub Releases is the canonical distribution channel. Production targets are Linux x86_64 and ARM64; macOS and Windows artifacts support development. Versioned archives, sidecars, SHA256SUMS, and the signed release manifest must agree.", "GitHub Releases es el canal canónico de distribución. Los targets de producción son Linux x86_64 y ARM64; los artefactos macOS y Windows soportan desarrollo. Archives versionados, sidecars, SHA256SUMS y el manifest firmado deben coincidir."),
-            code_block(locale, "shell", "# Run only after downloading the installer to disk\n./install.sh --version 0.3.0-beta.1\n\n# Explicit mutable-channel opt-in\n./install.sh --channel latest"),
+            code_block(locale, "shell", "# Run only after downloading the installer to disk\n./install.sh --version 0.4.0-beta.1\n\n# Explicit mutable-channel opt-in\n./install.sh --channel latest"),
         ]),
         doc_section(locale, "deploy", "Deploy the static output", "Despliega la salida estática", vec![
             paragraph(locale, "Deploy the contents of target/site to any origin that preserves paths, MIME types, immutable asset caching, the authored 404 document, and clean-route fallback. The framework does not require a PliegoRS application server.", "Despliega el contenido de target/site en cualquier origen que preserve rutas, MIME types, cache inmutable de assets, el documento 404 con autoría y fallback de rutas limpias. El framework no requiere un servidor de aplicación PliegoRS."),
@@ -1471,11 +1515,11 @@ fn crate_reference(locale: Locale) -> View {
                 ("pliego-artifact / pliego-ssg / pliego-inspect", "Portable output, documents, routes, receipts, graphs, staged publication, and verification", "Salida portable, documentos, rutas, recibos, grafos, publicación por staging y verificación"),
                 ("pliego-adapters / pliego-hyphae", "External browser lifecycle and verified durable sync boundaries", "Lifecycle externo del navegador y límites de sync durable verificado"),
                 ("pliego-starters / pliego-cli", "Maintained first-use projects and the complete command surface", "Proyectos mantenidos de primer uso y superficie completa de comandos"),
-                ("pliego-router / pliego-runtime (0.3.0-beta.1)", "Public G1 beta: sealed routes, streamed layouts, bounded HTTP/1.1 and HTTP/2, OTel, failures, receipts, and three SSR modes", "Beta pública G1: rutas selladas, layouts streamed, HTTP/1.1 y HTTP/2 limitados, OTel, fallos, recibos y tres modos SSR"),
-                ("pliego-data / pliego-sdk (0.3.0-beta.1)", "Public G2 and OpenSDK beta: data authority, manifests, capability admission, Component Model runtime, effects, compatibility, and tooling", "Beta pública G2 y OpenSDK: autoridad de datos, manifests, admisión de capabilities, runtime Component Model, efectos, compatibilidad y tooling"),
-                ("pliego-pboc / pliego-cloudflare (0.3.0-beta.1)", "Public G3 preview: exact portable output, host admission, native/OCI and Cloudflare execution, rolling compatibility, and rollback", "Preview público G3: salida portable exacta, admisión de hosts, ejecución native/OCI y Cloudflare, compatibilidad rolling y rollback"),
+                ("pliego-router / pliego-runtime (0.4.0-beta.1)", "Public G1 beta: sealed routes, streamed layouts, bounded HTTP/1.1 and HTTP/2, OTel, failures, receipts, and three SSR modes", "Beta pública G1: rutas selladas, layouts streamed, HTTP/1.1 y HTTP/2 limitados, OTel, fallos, recibos y tres modos SSR"),
+                ("pliego-data / pliego-sdk (0.4.0-beta.1)", "Public G2 and OpenSDK beta: data authority, manifests, capability admission, Component Model runtime, effects, compatibility, and tooling", "Beta pública G2 y OpenSDK: autoridad de datos, manifests, admisión de capabilities, runtime Component Model, efectos, compatibilidad y tooling"),
+                ("pliego-pboc / pliego-cloudflare (0.4.0-beta.1)", "Public G3 preview: exact portable output, host admission, native/OCI and Cloudflare execution, rolling compatibility, and rollback", "Preview público G3: salida portable exacta, admisión de hosts, ejecución native/OCI y Cloudflare, compatibilidad rolling y rollback"),
             ]),
-            note(locale, "Registry boundary", "All twenty-one workspace crates are public at exactly 0.3.0-beta.1. First-party Node packages remain private repository tooling and are not published to the npm registry.", "Límite del registry", "Los veintiún crates del workspace son públicos exactamente en 0.3.0-beta.1. Los paquetes Node propios siguen como tooling privado del repositorio y no se publican en el registry npm."),
+            note(locale, "Registry boundary", "All twenty-one workspace crates are public at exactly 0.4.0-beta.1. First-party Node packages remain private repository tooling and are not published to the npm registry.", "Límite del registry", "Los veintiún crates del workspace son públicos exactamente en 0.4.0-beta.1. Los paquetes Node propios siguen como tooling privado del repositorio y no se publican en el registry npm."),
         ]),
         doc_section(locale, "symbols", "Core public entry points", "Entradas públicas principales", vec![
             definition_list(locale, &[
@@ -1499,9 +1543,9 @@ fn crate_reference(locale: Locale) -> View {
             paragraph(locale, "The repository Rustdoc is the symbol-level reference for an exact revision. This guide explains product contracts and crate ownership; it does not replace signatures, trait bounds, feature flags, or per-item safety notes emitted from the source.", "El Rustdoc del repositorio es la referencia a nivel de símbolos para una revisión exacta. Esta guía explica contratos de producto y propiedad de crates; no reemplaza firmas, trait bounds, feature flags ni notas de seguridad por item emitidas desde la fuente."),
         ]),
         doc_section(locale, "stability", "Respect the pre-1.0 boundary", "Respeta el límite pre-1.0", vec![
-            paragraph(locale, "PliegoRS 0.3.0-beta.1 is public pre-1.0 software. Crate names identify stable ownership boundaries, but public signatures may change between prereleases or minor releases. Pin one exact released version across every pliego-* dependency and never mix framework versions inside one application graph.", "PliegoRS 0.3.0-beta.1 es software público pre-1.0. Los nombres de crates identifican límites estables de propiedad, pero las firmas públicas pueden cambiar entre prereleases o releases menores. Fija una versión liberada exacta en todas las dependencias pliego-* y nunca mezcles versiones del framework dentro del grafo de una aplicación."),
-            note(locale, "Published support contract", "The compatibility matrix and changelog define supported toolchains, targets, features, deprecations, and upgrade paths for each release. Linux x64 and ARM64 are the production targets for 0.3.0-beta.1.", "Contrato de soporte publicado", "La matriz de compatibilidad y el changelog definen toolchains, targets, features, deprecaciones y rutas de upgrade para cada release. Linux x64 y ARM64 son los targets de producción para 0.3.0-beta.1."),
-            note(locale, "One coordinated beta line", "G1, G2, G3, and OpenSDK share 0.3.0-beta.1. PBOC v1alpha1 and the Cloudflare application runtime are released previews, not stable 1.0 surfaces.", "Una línea beta coordinada", "G1, G2, G3 y OpenSDK comparten 0.3.0-beta.1. PBOC v1alpha1 y el runtime de aplicaciones Cloudflare son previews liberados, no superficies estables 1.0."),
+            paragraph(locale, "PliegoRS 0.4.0-beta.1 is public pre-1.0 software. Crate names identify stable ownership boundaries, but public signatures may change between prereleases or minor releases. Pin one exact released version across every pliego-* dependency and never mix framework versions inside one application graph.", "PliegoRS 0.4.0-beta.1 es software público pre-1.0. Los nombres de crates identifican límites estables de propiedad, pero las firmas públicas pueden cambiar entre prereleases o releases menores. Fija una versión liberada exacta en todas las dependencias pliego-* y nunca mezcles versiones del framework dentro del grafo de una aplicación."),
+            note(locale, "Published support contract", "The compatibility matrix and changelog define supported toolchains, targets, features, deprecations, and upgrade paths for each release. Linux x64 and ARM64 are the production targets for 0.4.0-beta.1.", "Contrato de soporte publicado", "La matriz de compatibilidad y el changelog definen toolchains, targets, features, deprecaciones y rutas de upgrade para cada release. Linux x64 y ARM64 son los targets de producción para 0.4.0-beta.1."),
+            note(locale, "One coordinated beta line", "G1, G2, G3, and OpenSDK share 0.4.0-beta.1. PBOC v1alpha1 and the Cloudflare application runtime are released previews, not stable 1.0 surfaces.", "Una línea beta coordinada", "G1, G2, G3 y OpenSDK comparten 0.4.0-beta.1. PBOC v1alpha1 y el runtime de aplicaciones Cloudflare son previews liberados, no superficies estables 1.0."),
         ]),
         doc_section(locale, "boundaries", "Read the normative boundaries", "Lee los límites normativos", vec![
             link_list(locale, &[
@@ -1582,6 +1626,16 @@ fn command_table(locale: Locale) -> View {
             "pliego build",
             "Produce and verify production output",
             "Produce y verifica salida de producción",
+        ),
+        (
+            "pliego cache status",
+            "Verify and explain the last production build outcome",
+            "Verifica y explica el resultado del último build de producción",
+        ),
+        (
+            "pliego cache clean",
+            "Remove private build records while preserving Cargo and published output",
+            "Elimina registros privados preservando Cargo y la salida publicada",
         ),
         (
             "pliego dev",
@@ -1756,6 +1810,20 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("explain", "Explain causality", "Explicar causalidad"),
             ("recover", "Failure recovery", "Recuperación de fallos"),
         ],
+        "incremental-builds" => vec![
+            ("noop", "Verified no-op", "No-op verificado"),
+            ("lazy", "Lazy-route causality", "Causalidad de rutas lazy"),
+            (
+                "observe",
+                "Cache status and clean",
+                "Estado y limpieza del cache",
+            ),
+            (
+                "evidence",
+                "Engineering evidence",
+                "Evidencia de ingeniería",
+            ),
+        ],
         "routing-and-pages" => vec![
             ("page", "Author a page", "Crear una página"),
             ("routes", "Route normalization", "Normalización de rutas"),
@@ -1870,6 +1938,7 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
         "assets" => vec![
             ("manifest", "Asset manifest", "Manifest de assets"),
             ("profiles", "Profiles", "Perfiles"),
+            ("work-status", "Resumable work", "Trabajo reanudable"),
             ("budgets", "Device budgets", "Presupuestos"),
             ("fallbacks", "Fallbacks", "Fallbacks"),
         ],
@@ -1950,7 +2019,7 @@ mod tests {
             assert!(article(Locale::Es, topic.slug).is_ok());
             assert!(outline(topic.slug).len() >= 4);
         }
-        assert_eq!(TOPICS.len(), 29);
+        assert_eq!(TOPICS.len(), 30);
     }
 
     #[test]

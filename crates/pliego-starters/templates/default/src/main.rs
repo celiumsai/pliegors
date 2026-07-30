@@ -241,44 +241,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("target/site"));
     let state = domain::first_replayable_state()?;
+    let note_count = state.notes.len();
     Site::new()
-        .page(
-            Page::new(
+        .page(Page::lazy(
+            "/",
+            head(
+                "__NAME__ / Built with PliegoRS",
+                "A new Rust-native website built with PliegoRS.",
                 "/",
-                head(
-                    "__NAME__ / Built with PliegoRS",
-                    "A new Rust-native website built with PliegoRS.",
-                    "/",
-                ),
-                home(state.notes.len()),
-            )
-            .source("src/domain.rs")
-            .source("src/main.rs"),
-        )
-        .page(
-            Page::new(
+            ),
+            ["src/domain.rs", "src/main.rs"],
+            move || home(note_count),
+        ))
+        .page(Page::lazy(
+            "/guide/",
+            head(
+                "Project guide / __NAME__",
+                "The local first-use guide for this PliegoRS project.",
                 "/guide/",
-                head(
-                    "Project guide / __NAME__",
-                    "The local first-use guide for this PliegoRS project.",
-                    "/guide/",
-                ),
-                guide(),
-            )
-            .source("src/main.rs"),
-        )
-        .page(
-            Page::new(
+            ),
+            ["src/main.rs"],
+            guide,
+        ))
+        .page(Page::lazy(
+            "/404.html",
+            head(
+                "Route not found / __NAME__",
+                "The requested route does not exist.",
                 "/404.html",
-                head(
-                    "Route not found / __NAME__",
-                    "The requested route does not exist.",
-                    "/404.html",
-                ),
-                not_found(),
-            )
-            .source("src/main.rs"),
-        )
+            ),
+            ["src/main.rs"],
+            not_found,
+        ))
         .asset(Asset::new("assets/site.css", CSS.to_vec()).source("assets/site.css"))
         .asset(Asset::new("assets/favicon.svg", FAVICON.to_vec()).source("assets/favicon.svg"))
         .asset(Asset::new("site.webmanifest", MANIFEST.to_vec()).source("assets/site.webmanifest"))

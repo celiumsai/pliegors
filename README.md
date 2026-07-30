@@ -35,15 +35,16 @@ the same result. Useful HTML is emitted first; Rust/WASM resumes only the
 behavior the document needs. Mature browser libraries such as GSAP, Lenis, and
 Three.js remain JavaScript behind explicit lifecycle adapters.
 
-The current public beta is [`v0.3.0-beta.1`](https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1),
-published on 2026-07-22. All twenty-one framework crates are coordinated on
-crates.io at the exact `0.3.0-beta.1` version. PliegoRS remains pre-1.0
+The current public beta is [`v0.4.0-beta.1`](https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1),
+published on 2026-07-30. All twenty-one framework crates are coordinated on
+crates.io at the exact `0.4.0-beta.1` version. PliegoRS remains pre-1.0
 software: documented contracts are deliberate, while incompatible changes may
 still arrive in a new prerelease or minor version with a changelog entry and
 migration guidance.
 
-This beta unifies the previous `v0.0.2` CLI, G1 native rendering, G2 data, and
-G3 portable deployment in one exact package graph. RFC-006 and RFC-007 remain
+This beta unifies G1 native rendering, G2 data, G3 portable deployment, and the
+G4 incremental engineering preview in one exact package graph. G4 Adoption
+remains open and no external adoption claim is made. RFC-006 and RFC-007 remain
 Draft, and ADR-006 remains Proposed; OpenSDK and PBOC are public preview
 contracts, not stable or accepted 1.0 APIs. The current MSRV is Rust `1.86`.
 
@@ -57,13 +58,14 @@ the official site.
 
 | Surface | Status | Evidence |
 | --- | --- | --- |
-| PliegoRS `v0.3.0-beta.1` | Current signed public beta | [Release](https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1) and [changelog](CHANGELOG.md) |
+| PliegoRS `v0.4.0-beta.1` | Current signed public beta | [Release](https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1) and [changelog](CHANGELOG.md) |
 | R0-R7 framework hardening | Complete; preserved as regression gates | [Hardening roadmap](docs/28-hardening-roadmap.md) |
-| P8 trust and adoption | Preserved as a release gate | [P8 contract](docs/35-p8-trust-and-adoption-contract.md) and [signed release](https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1) |
+| P8 trust and adoption | Preserved as a release gate | [P8 contract](docs/35-p8-trust-and-adoption-contract.md) and [signed release](https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1) |
 | G1 native runtime and dynamic rendering | Public beta; G1 complete | [Runtime contract](docs/49-native-runtime-preview.md) and [transport/load/security evidence](docs/evidence/g1-transport-load-security.md) |
 | G2 data, actions, sessions, and cache | Public beta; G2 complete | [G2 evidence](docs/evidence/g2-fullstack-beta.md), [umbrella RFC](docs/rfc/RFC-010-data-actions-cache.md), and [ASVS ownership map](security/asvs-v5.0.0-g2.json) |
 | G3 PBOC and portable deployment | Public beta; G3 complete | [Portable deployment guide](docs/50-pboc-portable-deployment.md), [provider evidence](docs/evidence/g3-pboc-provider-conformance.md), and [ASVS ownership map](security/asvs-v5.0.0-g3.json) |
-| OpenSDK `0.3.0-beta.1` | Public beta crate; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
+| G4 incremental engineering | Public engineering preview; external adoption gate remains open | [Engineering contract](docs/51-g4-engineering-readiness.md); does not claim external adoption |
+| OpenSDK `0.4.0-beta.1` | Public beta crate; governance pending | [OpenSDK foundation](docs/42-opensdk-foundation.md) and [execution backlog](docs/19-product-execution-backlog.md) |
 | Hyphae integration | Optional verified protocol boundary | [Verified sync guide](docs/29-hyphae-verified-sync-guide.md); no production gateway claim |
 | PliegoCSS `0.1.0-rc.2` | Optional experimental build-time companion | [Integration evidence](docs/evidence/pliegocss-optional-integration.md); never a runtime or starter requirement |
 
@@ -81,9 +83,12 @@ the official site.
 - reproducible image, video, font, and 3D asset plans with device budgets;
 - a protocol v2 Hyphae client boundary with signed append/page attestations,
   stream-bound typestate replay, and no claim of a production gateway;
-- `pliego new`, `check`, `build`, native-event `dev`, `preview`, `inspect`,
-  `why artifact`, `why-rebuilt`, causal graphs, typed HMR, and maintained
+- `pliego new`, `check`, verified no-op `build`, native-event `dev`, `preview`,
+  `inspect`, `cache status`, `cache clean`, `why artifact`, `why-rebuilt`,
+  causal graphs, selective `Page::lazy` route reuse, typed HMR, and maintained
   replayable default, minimal, editorial, and cinematic starters;
+- read-only adaptive asset work status with deterministic `pending`, `ready`,
+  and `invalid` jobs for resumable external encoders;
 - default-disabled, identifier-free voluntary funnel telemetry with local
   preview, explicit export, a 64-event bound, and complete deletion;
 - `pliego doctor`, deterministic redacted support bundles, and read-only
@@ -144,7 +149,8 @@ not select exporters, storage, retention, or inbound trace trust.
 OpenSDK continues as the provider-neutral extension boundary required by that
 runtime; public preview publication is not permission to call either API stable.
 
-G2 is complete in `0.3.0-beta.1`. Its two-runtime
+G2 first closed in `0.2.0-beta.1` and remains a regression gate in
+`0.4.0-beta.1`. Its two-runtime
 reference application proves progressive authenticated mutation, session
 rotation and revocation, idempotent replay, typed failures, cache isolation,
 read-your-writes invalidation, and redacted diagnostics. The included stores
@@ -153,7 +159,8 @@ durability and cross-process delivery remain provider work. Its bundled stores
 are deliberately conformance-oriented rather than production durability
 providers.
 
-G3 is complete at preview stability in `0.3.0-beta.1`. PBOC v1alpha1 seals the
+G3 first closed at preview stability in `0.3.0-beta.1` and remains a regression
+gate in `0.4.0-beta.1`. PBOC v1alpha1 seals the
 route graph, runtime contract, artifacts, provenance, required host features,
 cache policy, secret references, and compatibility chain. The same bundle is
 verified before execution by the native/OCI and Cloudflare adapters. Portable
@@ -162,7 +169,7 @@ state migrations remain outside this preview.
 
 ## Packages
 
-All twenty-one workspace crates are public at the exact `0.3.0-beta.1` version.
+All twenty-one workspace crates are public at the exact `0.4.0-beta.1` version.
 Applications must keep every `pliego-*` dependency on that same version; mixed
 framework graphs are outside the compatibility contract.
 
@@ -186,19 +193,19 @@ framework graphs are outside the compatibility contract.
 
 | Beta package | Responsibility | Status |
 | --- | --- | --- |
-| [`pliego-router`](https://crates.io/crates/pliego-router/0.3.0-beta.1) | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | Public `0.3.0-beta.1` |
-| [`pliego-runtime`](https://crates.io/crates/pliego-runtime/0.3.0-beta.1) | Bounded HTTP/1.1 and HTTP/2 lifecycle, route-owned complete/streamed layouts, structured events, operator-enabled OTel, and three SSR modes | Public `0.3.0-beta.1` |
-| [`pliego-data`](https://crates.io/crates/pliego-data/0.3.0-beta.1) | Provider-neutral resources, loaders, actions, sessions, idempotency, secrets, outbound HTTP policy, cache, and invalidation | Public `0.3.0-beta.1` |
-| [`pliego-pboc`](https://crates.io/crates/pliego-pboc/0.3.0-beta.1) | Provider-neutral output manifest, artifact verification, host admission, routing, rolling compatibility, and rollback safety | Public `0.3.0-beta.1` |
-| [`pliego-cloudflare`](https://crates.io/crates/pliego-cloudflare/0.3.0-beta.1) | Rust Cloudflare Workers host adapter for one admitted PBOC bundle | Public `0.3.0-beta.1` |
-| [`pliego-sdk`](https://crates.io/crates/pliego-sdk/0.3.0-beta.1) | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | Public `0.3.0-beta.1` |
+| [`pliego-router`](https://crates.io/crates/pliego-router/0.4.0-beta.1) | Sealed route graph, scopes, parameters, middleware capabilities, and error-boundary identity | Public `0.4.0-beta.1` |
+| [`pliego-runtime`](https://crates.io/crates/pliego-runtime/0.4.0-beta.1) | Bounded HTTP/1.1 and HTTP/2 lifecycle, route-owned complete/streamed layouts, structured events, operator-enabled OTel, and three SSR modes | Public `0.4.0-beta.1` |
+| [`pliego-data`](https://crates.io/crates/pliego-data/0.4.0-beta.1) | Provider-neutral resources, loaders, actions, sessions, idempotency, secrets, outbound HTTP policy, cache, and invalidation | Public `0.4.0-beta.1` |
+| [`pliego-pboc`](https://crates.io/crates/pliego-pboc/0.4.0-beta.1) | Provider-neutral output manifest, artifact verification, host admission, routing, rolling compatibility, and rollback safety | Public `0.4.0-beta.1` |
+| [`pliego-cloudflare`](https://crates.io/crates/pliego-cloudflare/0.4.0-beta.1) | Rust Cloudflare Workers host adapter for one admitted PBOC bundle | Public `0.4.0-beta.1` |
+| [`pliego-sdk`](https://crates.io/crates/pliego-sdk/0.4.0-beta.1) | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | Public `0.4.0-beta.1` |
 
 ## Install
 
 Install the CLI from crates.io:
 
 ```sh
-cargo install pliego-cli --version 0.3.0-beta.1 --locked
+cargo install pliego-cli --version 0.4.0-beta.1 --locked
 pliego new my-site
 cd my-site
 pliego check
@@ -209,11 +216,11 @@ Pin all framework crates to the coordinated beta explicitly:
 
 ```toml
 [dependencies]
-pliego-router = "=0.3.0-beta.1"
-pliego-runtime = "=0.3.0-beta.1"
-pliego-data = "=0.3.0-beta.1"
-pliego-pboc = "=0.3.0-beta.1"
-pliego-sdk = "=0.3.0-beta.1"
+pliego-router = "=0.4.0-beta.1"
+pliego-runtime = "=0.4.0-beta.1"
+pliego-data = "=0.4.0-beta.1"
+pliego-pboc = "=0.4.0-beta.1"
+pliego-sdk = "=0.4.0-beta.1"
 ```
 
 Diagnose an environment, create a redacted local reproduction archive, and
@@ -224,9 +231,10 @@ pliego doctor
 pliego report --bundle
 pliego upgrade --check
 pliego telemetry status
+pliego cache status
 ```
 
-The commands above are part of the published `0.3.0-beta.1` CLI. They run locally and
+The commands above are part of the published `0.4.0-beta.1` CLI. They run locally and
 do not upload project data.
 
 ### Optional PliegoCSS companion
@@ -303,7 +311,7 @@ sentinel. See the [portable deployment guide](docs/50-pboc-portable-deployment.m
 
 ## Release trust
 
-The `v0.3.0-beta.1` release contains artifacts covering five platform targets, two
+The `v0.4.0-beta.1` release contains artifacts covering five platform targets, two
 installer formats, checksums, a reproducible source archive, verification
 tools, a CycloneDX SBOM, SLSA-compatible provenance, and the signed P8 golden
 matrix. Linux x86_64 and ARM64 are production targets; macOS x86_64/ARM64 and
@@ -345,6 +353,8 @@ npm ci
 npm run check:benchmarks
 npm run check:fuzz
 npm run check:golden-path
+npm run check:g4-engineering
+npm run measure:g4-engineering -- --samples 1
 npm run check:telemetry
 npm run check:opensdk:all
 npm run check:docs
@@ -368,6 +378,7 @@ using the native Windows CLI for normal project development.
 - [Public changelog](https://pliegors.dev/changelog/)
 - [Security and trust center](https://pliegors.dev/security/)
 - [Current execution backlog](docs/19-product-execution-backlog.md)
+- [G4 engineering readiness](docs/51-g4-engineering-readiness.md)
 - [Founding specification](docs/00-pliegors-spec.md)
 - [PliegoRS and Hyphae target protocol](docs/01-hyphae-protocol.md)
 - [Hyphae verified sync guide](docs/29-hyphae-verified-sync-guide.md)

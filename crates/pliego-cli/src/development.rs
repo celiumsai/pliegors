@@ -13,6 +13,8 @@ use std::path::Path;
 
 const REBUILD_RECORD_VERSION: &str = "pliego-rebuild/1";
 const REBUILD_RECORD_PATH: &str = "target/.pliego/last-rebuild.json";
+const BUILD_RECORD_VERSION: &str = "pliego-build/1";
+const BUILD_RECORD_PATH: &str = "target/.pliego/last-build.json";
 const MAX_REBUILD_RECORD_BYTES: usize = 1024 * 1024;
 const MAX_REBUILD_ITEMS: usize = 100_000;
 
@@ -62,6 +64,37 @@ pub(crate) struct RebuildRecord {
     pub hmr: HmrUpdate,
     pub receipt_before: Option<String>,
     pub receipt_after: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum BuildCacheOutcome {
+    Executed,
+    NoOp,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct BuildPhaseDurations {
+    pub discovery_micros: u64,
+    pub client_micros: u64,
+    pub site_micros: u64,
+    pub verification_micros: u64,
+    pub total_micros: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct BuildRecord {
+    pub record_version: String,
+    pub outcome: BuildCacheOutcome,
+    pub changed_sources: Vec<String>,
+    pub global_invalidation: bool,
+    pub rendered_artifacts: u64,
+    pub reused_artifacts: u64,
+    pub receipt_before: Option<String>,
+    pub receipt_after: String,
+    pub phases: BuildPhaseDurations,
 }
 
 pub(crate) fn load_verified_graph(output_root: &Path) -> Result<VerifiedGraph, String> {
@@ -239,6 +272,199 @@ pub(crate) fn write_rebuild_record(root: &Path, record: &RebuildRecord) -> Resul
         let _ = fs::remove_file(&temporary);
     }
     result
+}
+
+pub(crate) fn create_build_record(
+    outcome: BuildCacheOutcome,
+    before: Option<&VerifiedGraph>,
+    after: &VerifiedGraph,
+    rendered_artifacts: u64,
+    reused_artifacts: u64,
+    phases: BuildPhaseDurations,
+) -> BuildRecord {
+    let changed_sources = changed_source_paths(before, after);
+    let global_invalidation = before.is_none_or(|before| {
+        let before = &before.report.receipt.context;
+        let after = &after.report.receipt.context;
+        before.ownership != after.ownership
+            || before.framework != after.framework
+            || before.toolchain != after.toolchain
+            || before.configuration != after.configuration
+            || before.materials != after.materials
+            || before.excluded_paths != after.excluded_paths
+    });
+    BuildRecord {
+        record_version: BUILD_RECORD_VERSION.to_owned(),
+        outcome,
+        changed_sources,
+        global_invalidation,
+        rendered_artifacts,
+        reused_artifacts,
+        receipt_before: before.map(|build| build.report.receipt_sha256.clone()),
+        receipt_after: after.report.receipt_sha256.clone(),
+        phases,
+    }
+}
+
+fn changed_source_paths(before: Option<&VerifiedGraph>, after: &VerifiedGraph) -> Vec<String> {
+    let before = before
+        .map(|build| {
+            build
+                .graph
+                .sources
+                .iter()
+                .map(|source| (source.path.as_str(), source.sha256.as_str()))
+                .collect::<BTreeMap<_, _>>()
+        })
+        .unwrap_or_default();
+    let after = after
+        .graph
+        .sources
+        .iter()
+        .map(|source| (source.path.as_str(), source.sha256.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    before
+        .keys()
+        .chain(after.keys())
+        .filter(|path| before.get(**path) != after.get(**path))
+        .map(|path| (*path).to_owned())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+pub(crate) fn write_build_record(root: &Path, record: &BuildRecord) -> Result<(), String> {
+    validate_build_record(record)?;
+    write_private_record(root, BUILD_RECORD_PATH, "last-build", record)
+}
+
+pub(crate) fn read_build_record(root: &Path) -> Result<BuildRecord, String> {
+    let record: BuildRecord = read_private_record(root, BUILD_RECORD_PATH)?;
+    validate_build_record(&record)?;
+    Ok(record)
+}
+
+pub(crate) fn clean_private_cache_records(root: &Path) -> Result<Vec<String>, String> {
+    let mut removed = Vec::new();
+    for relative in [BUILD_RECORD_PATH, REBUILD_RECORD_PATH] {
+        let path = root.join(relative);
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+                return Err(format!(
+                    "refusing to remove non-regular private cache record {}",
+                    path.display()
+                ));
+            }
+            Ok(_) => {
+                fs::remove_file(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+                removed.push(relative.to_owned());
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("{}: {error}", path.display())),
+        }
+    }
+    Ok(removed)
+}
+
+fn validate_build_record(record: &BuildRecord) -> Result<(), String> {
+    if record.record_version != BUILD_RECORD_VERSION
+        || record.receipt_after.len() != 64
+        || record
+            .receipt_before
+            .as_ref()
+            .is_some_and(|receipt| receipt.len() != 64)
+        || record
+            .rendered_artifacts
+            .saturating_add(record.reused_artifacts)
+            > MAX_REBUILD_ITEMS as u64
+        || record.changed_sources.len() > MAX_REBUILD_ITEMS
+        || record
+            .changed_sources
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        || record.changed_sources.iter().any(|path| path.len() > 4096)
+    {
+        return Err("unsupported or invalid build record".to_owned());
+    }
+    for receipt in record
+        .receipt_before
+        .iter()
+        .chain(std::iter::once(&record.receipt_after))
+    {
+        if !receipt
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+        {
+            return Err("build record contains an invalid receipt digest".to_owned());
+        }
+    }
+    Ok(())
+}
+
+fn write_private_record<T: Serialize>(
+    root: &Path,
+    relative: &str,
+    temporary_stem: &str,
+    record: &T,
+) -> Result<(), String> {
+    let mut bytes = serde_json::to_vec_pretty(record).map_err(|error| error.to_string())?;
+    bytes.push(b'\n');
+    if bytes.len() > MAX_REBUILD_RECORD_BYTES {
+        return Err(format!(
+            "private build record exceeds {MAX_REBUILD_RECORD_BYTES} bytes"
+        ));
+    }
+    let path = root.join(relative);
+    let parent = path
+        .parent()
+        .ok_or_else(|| "private build record has no parent directory".to_owned())?;
+    fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    let temporary = parent.join(format!("{temporary_stem}-{}.tmp", std::process::id()));
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| format!("{}: {error}", temporary.display()))?;
+    let result = (|| {
+        file.write_all(&bytes)
+            .and_then(|()| file.sync_all())
+            .map_err(|error| format!("{}: {error}", temporary.display()))?;
+        drop(file);
+        if let Ok(metadata) = fs::symlink_metadata(&path) {
+            if metadata.file_type().is_symlink() || !metadata.is_file() {
+                return Err(format!(
+                    "refusing to replace non-regular private build record {}",
+                    path.display()
+                ));
+            }
+            fs::remove_file(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+        }
+        fs::rename(&temporary, &path)
+            .map_err(|error| format!("{} -> {}: {error}", temporary.display(), path.display()))
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
+}
+
+fn read_private_record<T: for<'de> Deserialize<'de>>(
+    root: &Path,
+    relative: &str,
+) -> Result<T, String> {
+    let path = root.join(relative);
+    let metadata =
+        fs::symlink_metadata(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!("{} is not a regular file", path.display()));
+    }
+    if metadata.len() > MAX_REBUILD_RECORD_BYTES as u64 {
+        return Err(format!(
+            "private build record exceeds {MAX_REBUILD_RECORD_BYTES} bytes"
+        ));
+    }
+    let bytes = fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    serde_json::from_slice(&bytes).map_err(|error| error.to_string())
 }
 
 pub(crate) fn read_rebuild_record(root: &Path) -> Result<RebuildRecord, String> {
@@ -488,5 +714,44 @@ mod tests {
             &after_adapter,
         );
         assert_eq!(adapter_record.hmr.kind, HmrKind::Adapter);
+    }
+
+    #[test]
+    fn build_record_is_bounded_verifiable_and_selectively_cleanable() {
+        let before = graph(b"same", b"before");
+        let mut after = graph(b"same", b"after");
+        let changed = pliego_artifact::sha256_bytes(b"changed source");
+        after.graph.sources[0].sha256.clone_from(&changed);
+        after.report.receipt.context.sources[0]
+            .sha256
+            .clone_from(&changed);
+        let record = create_build_record(
+            BuildCacheOutcome::Executed,
+            Some(&before),
+            &after,
+            1,
+            1,
+            BuildPhaseDurations {
+                discovery_micros: 10,
+                client_micros: 20,
+                site_micros: 30,
+                verification_micros: 40,
+                total_micros: 100,
+            },
+        );
+        assert_eq!(record.changed_sources, ["src/main.rs"]);
+        assert!(!record.global_invalidation);
+
+        let root = std::env::temp_dir().join(format!("pliego-build-record-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        write_build_record(&root, &record).unwrap();
+        assert_eq!(read_build_record(&root).unwrap(), record);
+        let published = root.join("target/site/index.html");
+        fs::create_dir_all(published.parent().unwrap()).unwrap();
+        fs::write(&published, b"preserve").unwrap();
+        assert_eq!(clean_private_cache_records(&root).unwrap().len(), 1);
+        assert_eq!(fs::read(published).unwrap(), b"preserve");
+        let _ = fs::remove_dir_all(root);
     }
 }

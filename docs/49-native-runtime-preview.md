@@ -3,8 +3,8 @@
 **Status:** G1 complete; coordinated public beta
 
 The workspace contains `pliego-router` and `pliego-runtime` at
-`0.3.0-beta.1`. Both are published on crates.io and tracked by the coordinated
-[`v0.3.0-beta.1` release](https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1).
+`0.4.0-beta.1`. Both are published on crates.io and tracked by the coordinated
+[`v0.4.0-beta.1` release](https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1).
 They share one exact package graph with the CLI and remain preview APIs.
 
 ## Ownership boundary

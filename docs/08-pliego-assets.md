@@ -42,10 +42,20 @@ tool without a shell, and writes only to the job's `stagingPath`. PliegoRS then
 validates and publishes those outputs:
 
 ```powershell
+cargo run -p pliego-assets -- status target\assets\plan.json `
+  --output-root target\site --format json
+
 cargo run -p pliego-assets -- finalize target\assets\plan.json `
   --output-root target\site `
   --manifest target\site\pliego.adaptive-assets.json
 ```
+
+`status` is a read-only resumability contract. Every planned job is reported as
+`pending` when no staged file exists, `ready` only after the same signature,
+codec, scene, size, and streaming SHA-256 validation used by finalization, or
+`invalid` with a stable reason. It creates, deletes, rewrites, and publishes
+nothing, so an external runner can schedule only pending or invalid jobs without
+trusting timestamps.
 
 Finalization checks the declared container signature, streams SHA-256 without
 unbounded allocation, evaluates every applicable device/tier budget before the
@@ -97,6 +107,9 @@ artifact outside the validated manifest.
   suppression. Deferred/on-demand assets cannot preload or use high priority.
 - Publication uses create-new semantics, verifies existing content-addresses,
   rejects linked destinations, and preflights collisions before writing.
+- Work-status inspection preflights aggregate staged bytes before payload
+  validation, rejects linked or escaped files, and emits deterministically
+  ordered JSON without mutating the work directory.
 - The manifest contains no timestamp, absolute path, random identifier, or
   host-specific value. Identical recipe/source bytes produce identical plans.
 

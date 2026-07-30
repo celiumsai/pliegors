@@ -26,6 +26,9 @@ pliego dev
 
 Motion is CSS-only in this starter. A production project can add a declared
 PliegoRS adapter for GSAP, Three.js, WebGL, or another external motion engine.
+Routes use `Page::lazy`; keep every `.source(...)` declaration complete when a
+renderer starts reading another project file. `pliego cache status` reports the
+last verified build outcome and artifact reuse.
 
 Third-party font attribution and license locations are recorded in
 `THIRD_PARTY_NOTICES.md`.

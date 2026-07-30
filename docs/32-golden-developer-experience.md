@@ -1,6 +1,6 @@
 # Golden developer experience contract
 
-**Status:** R5 implementation accepted on 2026-07-16
+**Status:** R5 accepted; G4 engineering-readiness extensions in progress
 
 R5 makes the shortest PliegoRS path a replayable application, then keeps every
 development rebuild causal and explainable. It does not turn PliegoRS into a
@@ -8,7 +8,7 @@ generic JavaScript bundler.
 
 ## First replayable application
 
-`pliego new <path>` selects default starter revision 2. Its `src/domain.rs`
+`pliego new <path>` selects default starter revision 3. Its `src/domain.rs`
 contains one complete vertical:
 
 ```text
@@ -39,9 +39,17 @@ explicit `allSources` compatibility edge. The graph is sorted, bounded to the
 artifact limits, and bound to the receipt's project ID, source-set digest,
 source hashes, output paths, producers, kinds, and hashes.
 
-The graph is an incremental invalidation and explanation contract. Cargo still
-performs its normal incremental compilation and the SSG still stages and commits
-the complete valid site atomically; R5 does not claim partial route execution.
+The graph is now also a verified reuse contract. When the current build context
+and the prior receipt match exactly, `pliego build` returns a no-op without
+starting the client or site compiler. When inputs changed, `Page::lazy` renders
+only routes whose declared sources changed and copies every other artifact from
+the verified prior publication into a fresh stage. The complete new site is
+still committed atomically.
+
+`Page::new` remains eager for source compatibility and is always rendered.
+`Page::lazy` is an explicit correctness promise: every byte consulted by its
+renderer must appear in `.source(...)`. A producer with no declarations uses
+`allSources` and is conservatively invalidated by any captured source change.
 
 ## Native watcher and HMR
 
@@ -81,6 +89,9 @@ and production output contain no HMR script.
 pliego why artifact /
 pliego why artifact assets/site.css
 pliego why-rebuilt
+pliego cache status
+pliego cache status --format json
+pliego cache clean
 ```
 
 `why artifact` first verifies the current receipt and graph, then prints the
@@ -89,6 +100,12 @@ source, optional route, producer, and artifact hash. `why-rebuilt` reads
 successful development rebuild. It reports changed sources, causal invalidation,
 actual byte changes, HMR class, and before/after receipts. It is not a durable
 build history and is intentionally excluded from publication inputs.
+
+`cache status` verifies the current receipt and graph before reporting the last
+production build outcome, causal source changes, rendered/reused artifact
+counts, and bounded phase timings. The strict private record lives at
+`target/.pliego/last-build.json`; `cache clean` removes only that record and the
+development rebuild record. It never removes Cargo outputs or a published site.
 
 ## Diagnostics
 

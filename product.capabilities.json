@@ -4,9 +4,9 @@
   "framework": {
     "name": "PliegoRS",
     "channel": "public-beta",
-    "releasedVersion": "0.3.0-beta.1",
-    "workspaceVersion": "0.3.0-beta.1",
-    "openSdkVersion": "0.3.0-beta.1",
+    "releasedVersion": "0.4.0-beta.1",
+    "workspaceVersion": "0.4.0-beta.1",
+    "openSdkVersion": "0.4.0-beta.1",
     "license": "Apache-2.0",
     "releasedCrateCount": 21,
     "unreleasedCrates": []
@@ -100,7 +100,7 @@
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/49-native-runtime-preview.md", "docs/evidence/g1-complete-render-foundation.md", "docs/evidence/g1-ordered-render-foundation.md", "docs/evidence/g1-async-boundary-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
         "The public preview crate exposes three bounded SSR modes and route-owned complete and streamed layouts.",
-        "The 0.3.0-beta.1 CLI coordinates G1, G2, and G3 as one exact prerelease package graph."
+        "The 0.4.0-beta.1 CLI coordinates G1, G2, G3, and the G4 incremental engineering preview as one exact prerelease package graph."
       ]
     },
     {
@@ -129,6 +129,20 @@
       "limitations": ["No production Hyphae gateway or durability service is claimed by this repository."]
     },
     {
+      "id": "incremental-build-engine",
+      "label": "Verified incremental build engine",
+      "domain": "build",
+      "availability": "source-preview",
+      "stability": "experimental",
+      "gate": "G4",
+      "summary": "Verified CLI no-ops, explicit lazy-route reuse, observable build records, private cache controls, and resumable adaptive asset work.",
+      "evidence": ["docs/51-g4-engineering-readiness.md", "docs/32-golden-developer-experience.md", "docs/08-pliego-assets.md"],
+      "limitations": [
+        "Selective route reuse requires complete application-authored Page::lazy source declarations; eager and allSources producers remain conservative.",
+        "The implementation is a source preview pending accepted clean-revision evidence and release promotion. G4 external adoption has not started, and no remote or distributed build cache is provided."
+      ]
+    },
+    {
       "id": "native-http-runtime",
       "label": "Native HTTP runtime",
       "domain": "server",
@@ -139,7 +153,7 @@
       "evidence": ["docs/rfc/RFC-008-native-runtime.md", "docs/48-fullstack-threat-model.md", "docs/evidence/g1-native-runtime-foundation.md", "docs/evidence/g1-native-socket-foundation.md", "docs/evidence/g1-layout-composition-foundation.md", "docs/evidence/g1-middleware-error-foundation.md", "docs/evidence/g1-dynamic-reference-foundation.md", "docs/evidence/g1-opentelemetry-foundation.md", "docs/evidence/g1-transport-load-security.md"],
       "limitations": [
         "The crate is a public preview, not a stable production-support promise; TLS termination and proxy trust remain explicit operator boundaries.",
-        "The 0.3.0-beta.1 CLI exposes PBOC validation, admission, and compatibility commands; application-specific native launch remains owned by the packaged executable."
+        "The 0.4.0-beta.1 CLI exposes PBOC validation, admission, and compatibility commands; application-specific native launch remains owned by the packaged executable."
       ]
     },
     {
@@ -162,7 +176,7 @@
       "gate": "G5",
       "summary": "Typed WebAssembly Component admission, resource budgets, capabilities, effect receipts, and conformance fixtures.",
       "evidence": ["docs/42-opensdk-foundation.md", "docs/43-opensdk-multilang-conformance.md"],
-      "limitations": ["OpenSDK 0.3.0-beta.1 remains a prerelease contract; RFC-006 and ADR-006 still govern stabilization work."]
+      "limitations": ["OpenSDK 0.4.0-beta.1 remains a prerelease contract; RFC-006 and ADR-006 still govern stabilization work."]
     },
     {
       "id": "opensdk-server",

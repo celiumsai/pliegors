@@ -1,6 +1,6 @@
 # PliegoRS execution backlog
 
-**Updated:** 2026-07-22
+**Updated:** 2026-07-25
 **Objective:** preserve R0-R7 and P8 as regression gates while PliegoRS executes
 the G0-G7 full-stack evolution program. OpenSDK remains a bounded preview and
 advances only where the runtime requires a public extension contract.
@@ -38,7 +38,7 @@ API status, or release of the preview crate.
 | G1 Native runtime and dynamic rendering | Complete | [Runtime](evidence/g1-native-runtime-foundation.md), [native-socket](evidence/g1-native-socket-foundation.md), [complete-render](evidence/g1-complete-render-foundation.md), [ordered-render](evidence/g1-ordered-render-foundation.md), [async-boundary](evidence/g1-async-boundary-foundation.md), [layout-composition](evidence/g1-layout-composition-foundation.md), [OpenTelemetry](evidence/g1-opentelemetry-foundation.md), [middleware/error](evidence/g1-middleware-error-foundation.md), [dynamic-reference](evidence/g1-dynamic-reference-foundation.md), and [transport/load/security](evidence/g1-transport-load-security.md) cover the sealed route graph, bounded lifecycle, real TCP HTTP/1.1 and HTTP/2, three SSR modes, route-owned complete and streamed layouts, structured logs and OTel, slow peers, fixed-load RSS, parser/body policy, capability mediation, authored errors, and the reference application. Protected CI, crates.io reconstruction, and the component prerelease completed the public-preview promotion. |
 | G2 Data, actions, and cache | Complete; public in `0.3.0-beta.1` | [G2 evidence](evidence/g2-fullstack-beta.md) covers progressive authenticated mutation across two native instances, typed resources/loaders, idempotency, truthful cancellation and commit state, sessions, bounded uploads, SSRF policy, cache isolation, coordinated invalidation, diagnostics, and the ASVS ownership map. Production durable providers remain outside this gate. |
 | G3 Portable deployment | Complete; public preview in `0.3.0-beta.1` | [G3 evidence](evidence/g3-pboc-provider-conformance.md) covers one sealed PBOC, exact pre-upload verification, native/OCI and Cloudflare same-corpus behavior, capability rejection, rolling skew, rollback, secret exclusion, and least-privilege OCI. PBOC remains v1alpha1. |
-| G4 Adoption | Not started | An unaffiliated team completes a greenfield application and partial migration using public resources only. |
+| G4 Adoption | Engineering implementation complete; clean-revision evidence and external trial pending | [G4 engineering readiness](51-g4-engineering-readiness.md) defines the internal incremental-build, DX, asset-work-queue, and measurement prerequisite. The adoption gate closes only when an unaffiliated team completes a greenfield application and partial migration using public resources only. |
 | G5 OpenSDK ecosystem | Preview foundation only | Reviewed server plane, package lock/resolution, generated SDKs, registry/discovery, and independent non-Rust extension. |
 | G6 Operational maturity | Not started | Exercised release/support/security policy with owner redundancy and incident drill. |
 | G7 Competitive claim | Not started | Reproducible comparison, three external production deployments, public limitations, and approved claim wording. |
@@ -50,8 +50,8 @@ staffed. G7 cannot close from internal demos or tests.
 
 ## Already implemented foundations
 
-- `pliego new`, `check`, `build`, `dev`, `preview`, `inspect`, `why artifact`,
-  `why-rebuilt`, official starters,
+- `pliego new`, `check`, verified no-op `build`, `cache status`, `cache clean`,
+  `dev`, `preview`, `inspect`, `why artifact`, `why-rebuilt`, official starters,
   typed content, deterministic SSG, Rust/WASM clients, adaptive assets, and
   plugin lifecycle API v1.
 - The official site exercises native Rust routes and focused JavaScript

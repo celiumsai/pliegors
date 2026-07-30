@@ -1,6 +1,6 @@
 # PBOC portable deployment preview
 
-**Status:** G3 public preview in `0.3.0-beta.1`  
+**Status:** G3 public preview in `0.4.0-beta.1`
 **Contract:** `dev.pliegors.pboc/v1alpha1`  
 **MSRV:** Rust 1.86  
 **Reference hosts:** native Linux/OCI and Cloudflare Workers
@@ -21,11 +21,11 @@ Keep the coordinated PliegoRS package graph on one exact version:
 
 ```toml
 [dependencies]
-pliego-pboc = "=0.3.0-beta.1"
-pliego-runtime = "=0.3.0-beta.1"
+pliego-pboc = "=0.4.0-beta.1"
+pliego-runtime = "=0.4.0-beta.1"
 
 # Only when the application builds a Cloudflare Worker.
-pliego-cloudflare = "=0.3.0-beta.1"
+pliego-cloudflare = "=0.4.0-beta.1"
 ```
 
 The CLI validates bundles and host admission locally:
