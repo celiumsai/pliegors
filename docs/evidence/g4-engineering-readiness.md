@@ -4,7 +4,7 @@
 **Status:** Accepted on the named revision; external adoption remains open
 **Date:** 2026-07-30
 **Contract:** `pliegors-g4-incremental-measurement/1`
-**Revision:** `5e655a06f70b825fd69e6bbf74c85c825e6cb38a`
+**Revision:** `7f9c41f20925dc82a41ffcc0703d7c1435c9cd83`
 
 ## Acceptance result
 
@@ -32,11 +32,11 @@ of 10 ms `/proc` samples summed across the command process tree.
 
 | Scenario | Duration p50 | Duration p95 | Peak RSS p50 | Peak RSS p95 |
 | --- | ---: | ---: | ---: | ---: |
-| Cold, empty Cargo target | 7,481.08 ms | 8,986.76 ms | 59,516 KiB | 73,200 KiB |
-| Verified no-op | 201.83 ms | 239.11 ms | 50,636 KiB | 52,476 KiB |
-| `src/domain.rs` change | 662.40 ms | 796.81 ms | 52,212 KiB | 52,764 KiB |
-| `assets/site.css` change | 696.50 ms | 820.09 ms | 52,336 KiB | 52,656 KiB |
-| Post-rejection recovery | 184.53 ms | 248.28 ms | 52,088 KiB | 52,552 KiB |
+| Cold, empty Cargo target | 6,774.62 ms | 6,885.98 ms | 59,708 KiB | 77,768 KiB |
+| Verified no-op | 173.88 ms | 191.80 ms | 51,496 KiB | 52,400 KiB |
+| `src/domain.rs` change | 580.75 ms | 618.21 ms | 52,260 KiB | 52,484 KiB |
+| `assets/site.css` change | 592.88 ms | 606.51 ms | 51,716 KiB | 52,048 KiB |
+| Post-rejection recovery | 172.36 ms | 178.79 ms | 52,348 KiB | 52,512 KiB |
 
 The complete raw vectors, per-phase microseconds, changed source sets, artifact
 counts, receipt transitions, host details, and release CLI digest are retained
@@ -52,7 +52,7 @@ in
 - Cargo `1.86.0`
 - Node.js `24.16.0`
 - release CLI SHA-256
-  `707d3e48db6828f3374c0f846fb10ee6048efe56e44d57aa419f9c8363ef59af`
+  `e5b8f96f8eb008c276ee21ed9ed3e53d353e9ea82d4f410dcfec796052209a9c`
 
 The source commit was copied into a clean ext4 clone before measurement because
 Git for Windows and Git in WSL applied different line-ending policies to the

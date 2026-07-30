@@ -100,7 +100,7 @@ samples, and a clean exact Git revision. The release CLI is built outside every
 timed region; each cold sample receives its own empty Cargo target.
 
 The accepted `0.4.0-beta.1` engineering run is bound to revision
-`5e655a06f70b825fd69e6bbf74c85c825e6cb38a`. Read the
+`7f9c41f20925dc82a41ffcc0703d7c1435c9cd83`. Read the
 [bounded evidence](evidence/g4-engineering-readiness.md) and
 [raw report](evidence/g4-engineering-readiness.json) for the five sample
 vectors, percentiles, environment, artifact counts, receipt transitions, and
