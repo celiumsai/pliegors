@@ -1,6 +1,6 @@
 {
   "contract": "pliegors-g4-incremental-measurement/1",
-  "revision": "5e655a06f70b825fd69e6bbf74c85c825e6cb38a",
+  "revision": "7f9c41f20925dc82a41ffcc0703d7c1435c9cd83",
   "cleanRevision": true,
   "accepted": true,
   "platform": {
@@ -9,14 +9,14 @@
     "release": "6.18.33.1-microsoft-standard-WSL2",
     "cpu": "Intel(R) Core(TM) Ultra 9 285H",
     "logicalCpus": 16,
-    "totalMemoryBytes": 16502128640
+    "totalMemoryBytes": 16502124544
   },
   "toolchain": {
     "rustc": "rustc 1.86.0 (05f9846f8 2025-03-31)",
     "cargo": "cargo 1.86.0 (adf9b6ad1 2025-02-28)",
     "node": "v24.16.0",
     "releaseCliBytes": 10433392,
-    "releaseCliSha256": "707d3e48db6828f3374c0f846fb10ee6048efe56e44d57aa419f9c8363ef59af"
+    "releaseCliSha256": "e5b8f96f8eb008c276ee21ed9ed3e53d353e9ea82d4f410dcfec796052209a9c"
   },
   "method": {
     "samples": 5,
@@ -37,121 +37,121 @@
     "cold": {
       "durationMs": {
         "raw": [
-          7224.414769,
-          7311.975522,
-          7481.075817,
-          7730.262243,
-          8986.758771
+          6830.584338,
+          6655.28508,
+          6774.623564,
+          6885.982792,
+          6183.572779
         ],
-        "p50": 7481.075817,
-        "p95": 8986.758771
+        "p50": 6774.623564,
+        "p95": 6885.982792
       },
       "peakRssKiB": {
         "raw": [
-          59516,
-          61392,
-          51644,
-          57100,
-          73200
+          59708,
+          62620,
+          51296,
+          77768,
+          51620
         ],
-        "p50": 59516,
-        "p95": 73200
+        "p50": 59708,
+        "p95": 77768
       }
     },
     "noOp": {
       "durationMs": {
         "raw": [
-          194.599545,
-          195.729013,
-          232.94225,
-          201.829837,
-          239.111323
+          191.798291,
+          173.875359,
+          172.110654,
+          179.659631,
+          171.219142
         ],
-        "p50": 201.829837,
-        "p95": 239.111323
+        "p50": 173.875359,
+        "p95": 191.798291
       },
       "peakRssKiB": {
         "raw": [
-          48676,
-          50636,
-          49632,
-          52476,
-          52444
+          52060,
+          51496,
+          49540,
+          52400,
+          50796
         ],
-        "p50": 50636,
-        "p95": 52476
+        "p50": 51496,
+        "p95": 52400
       }
     },
     "contentChange": {
       "durationMs": {
         "raw": [
-          648.61904,
-          662.397701,
-          613.825198,
-          665.086253,
-          796.805043
+          570.54306,
+          610.394791,
+          580.751627,
+          618.205751,
+          549.81316
         ],
-        "p50": 662.397701,
-        "p95": 796.805043
+        "p50": 580.751627,
+        "p95": 618.205751
       },
       "peakRssKiB": {
         "raw": [
-          52764,
-          50604,
-          52468,
-          52212,
-          51432
+          52484,
+          52248,
+          52272,
+          50296,
+          52260
         ],
-        "p50": 52212,
-        "p95": 52764
+        "p50": 52260,
+        "p95": 52484
       }
     },
     "assetChange": {
       "durationMs": {
         "raw": [
-          628.843847,
-          696.504818,
-          629.923388,
-          710.550802,
-          820.086711
+          606.415208,
+          591.477182,
+          592.878847,
+          606.514605,
+          587.01475
         ],
-        "p50": 696.504818,
-        "p95": 820.086711
+        "p50": 592.878847,
+        "p95": 606.514605
       },
       "peakRssKiB": {
         "raw": [
-          49360,
-          52656,
-          49864,
-          52340,
-          52336
+          51840,
+          50004,
+          52048,
+          50744,
+          51716
         ],
-        "p50": 52336,
-        "p95": 52656
+        "p50": 51716,
+        "p95": 52048
       }
     },
     "recovery": {
       "durationMs": {
         "raw": [
-          184.530059,
-          201.782459,
-          183.517532,
-          183.150071,
-          248.282076
+          174.887425,
+          166.094234,
+          178.794597,
+          171.158228,
+          172.360254
         ],
-        "p50": 184.530059,
-        "p95": 248.282076
+        "p50": 172.360254,
+        "p95": 178.794597
       },
       "peakRssKiB": {
         "raw": [
-          52552,
-          52188,
-          52088,
-          50964,
-          51376
+          52348,
+          52512,
+          51004,
+          50788,
+          52448
         ],
-        "p50": 52088,
-        "p95": 52552
+        "p50": 52348,
+        "p95": 52512
       }
     }
   },
@@ -162,8 +162,8 @@
       "routes": 3,
       "publicationFiles": 8,
       "cold": {
-        "durationMs": 7224.414769,
-        "peakRssKiB": 59516,
+        "durationMs": 6830.584338,
+        "peakRssKiB": 59708,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -180,36 +180,36 @@
         "renderedArtifacts": 7,
         "reusedArtifacts": 0,
         "receiptBefore": null,
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 207081,
+          "discoveryMicros": 191308,
           "clientMicros": 0,
-          "siteMicros": 6955385,
-          "verificationMicros": 27219,
-          "totalMicros": 7217226
+          "siteMicros": 6576266,
+          "verificationMicros": 31213,
+          "totalMicros": 6823488
         }
       },
       "noOp": {
-        "durationMs": 194.599545,
-        "peakRssKiB": 48676,
+        "durationMs": 191.798291,
+        "peakRssKiB": 52060,
         "humanNoOpVisible": true,
         "outcome": "no-op",
         "changedSources": [],
         "renderedArtifacts": 0,
         "reusedArtifacts": 7,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 187292,
+          "discoveryMicros": 184795,
           "clientMicros": 0,
           "siteMicros": 0,
           "verificationMicros": 0,
-          "totalMicros": 187292
+          "totalMicros": 184795
         }
       },
       "contentChange": {
-        "durationMs": 648.61904,
-        "peakRssKiB": 52764,
+        "durationMs": 570.54306,
+        "peakRssKiB": 52484,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -217,19 +217,19 @@
         ],
         "renderedArtifacts": 5,
         "reusedArtifacts": 2,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "9127167bdcc0f5072f28192f47f57a03738b5a1dba71bdfee435e7681986516e",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "0b4a927a4e177facd866ee1a72bd5c5eebb43f2bc56ca4933fb5661dfecb210c",
         "phasesMicros": {
-          "discoveryMicros": 175825,
+          "discoveryMicros": 151658,
           "clientMicros": 0,
-          "siteMicros": 412573,
-          "verificationMicros": 26815,
-          "totalMicros": 642568
+          "siteMicros": 364704,
+          "verificationMicros": 24631,
+          "totalMicros": 564840
         }
       },
       "assetChange": {
-        "durationMs": 628.843847,
-        "peakRssKiB": 49360,
+        "durationMs": 606.415208,
+        "peakRssKiB": 51840,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -237,35 +237,35 @@
         ],
         "renderedArtifacts": 4,
         "reusedArtifacts": 3,
-        "receiptBefore": "9127167bdcc0f5072f28192f47f57a03738b5a1dba71bdfee435e7681986516e",
-        "receiptAfter": "27ddc67007674ef67348da156553be8a7b64feeccf233770f5db8d17922ecde9",
+        "receiptBefore": "0b4a927a4e177facd866ee1a72bd5c5eebb43f2bc56ca4933fb5661dfecb210c",
+        "receiptAfter": "36cbc6a64add46c7feb274d54a96b46d2761f2ed7886ce8386dcf0bca4e54bbf",
         "phasesMicros": {
-          "discoveryMicros": 160463,
+          "discoveryMicros": 145659,
           "clientMicros": 0,
-          "siteMicros": 411293,
-          "verificationMicros": 27122,
-          "totalMicros": 623493
+          "siteMicros": 404379,
+          "verificationMicros": 25217,
+          "totalMicros": 601117
         }
       },
       "corruptCache": {
-        "rejectionDurationMs": 1.832048,
+        "rejectionDurationMs": 1.729294,
         "rejected": true,
         "recovery": {
-          "durationMs": 184.530059,
-          "peakRssKiB": 52552,
+          "durationMs": 174.887425,
+          "peakRssKiB": 52348,
           "humanNoOpVisible": true,
           "outcome": "no-op",
           "changedSources": [],
           "renderedArtifacts": 0,
           "reusedArtifacts": 7,
-          "receiptBefore": "27ddc67007674ef67348da156553be8a7b64feeccf233770f5db8d17922ecde9",
-          "receiptAfter": "27ddc67007674ef67348da156553be8a7b64feeccf233770f5db8d17922ecde9",
+          "receiptBefore": "36cbc6a64add46c7feb274d54a96b46d2761f2ed7886ce8386dcf0bca4e54bbf",
+          "receiptAfter": "36cbc6a64add46c7feb274d54a96b46d2761f2ed7886ce8386dcf0bca4e54bbf",
           "phasesMicros": {
-            "discoveryMicros": 178750,
+            "discoveryMicros": 168621,
             "clientMicros": 0,
             "siteMicros": 0,
             "verificationMicros": 0,
-            "totalMicros": 178750
+            "totalMicros": 168621
           }
         }
       }
@@ -276,8 +276,8 @@
       "routes": 3,
       "publicationFiles": 8,
       "cold": {
-        "durationMs": 7311.975522,
-        "peakRssKiB": 61392,
+        "durationMs": 6655.28508,
+        "peakRssKiB": 62620,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -294,36 +294,36 @@
         "renderedArtifacts": 7,
         "reusedArtifacts": 0,
         "receiptBefore": null,
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 201037,
+          "discoveryMicros": 186244,
           "clientMicros": 0,
-          "siteMicros": 7053685,
-          "verificationMicros": 26345,
-          "totalMicros": 7305656
+          "siteMicros": 6412165,
+          "verificationMicros": 26333,
+          "totalMicros": 6649554
         }
       },
       "noOp": {
-        "durationMs": 195.729013,
-        "peakRssKiB": 50636,
+        "durationMs": 173.875359,
+        "peakRssKiB": 51496,
         "humanNoOpVisible": true,
         "outcome": "no-op",
         "changedSources": [],
         "renderedArtifacts": 0,
         "reusedArtifacts": 7,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 187930,
+          "discoveryMicros": 168752,
           "clientMicros": 0,
           "siteMicros": 0,
           "verificationMicros": 0,
-          "totalMicros": 187930
+          "totalMicros": 168752
         }
       },
       "contentChange": {
-        "durationMs": 662.397701,
-        "peakRssKiB": 50604,
+        "durationMs": 610.394791,
+        "peakRssKiB": 52248,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -331,19 +331,19 @@
         ],
         "renderedArtifacts": 5,
         "reusedArtifacts": 2,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "6858af5e173e244c1897b0e35a80af8729c160ebc40f382a084af3646e5a8cc0",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "a84fb71173073bcc1dbeef3d5edd461ee76435cfc9bf6be680c8d4ae65786a8c",
         "phasesMicros": {
-          "discoveryMicros": 169880,
+          "discoveryMicros": 171926,
           "clientMicros": 0,
-          "siteMicros": 422456,
-          "verificationMicros": 31359,
-          "totalMicros": 655892
+          "siteMicros": 380708,
+          "verificationMicros": 25556,
+          "totalMicros": 604255
         }
       },
       "assetChange": {
-        "durationMs": 696.504818,
-        "peakRssKiB": 52656,
+        "durationMs": 591.477182,
+        "peakRssKiB": 50004,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -351,35 +351,35 @@
         ],
         "renderedArtifacts": 4,
         "reusedArtifacts": 3,
-        "receiptBefore": "6858af5e173e244c1897b0e35a80af8729c160ebc40f382a084af3646e5a8cc0",
-        "receiptAfter": "ae6dc40f74b5e2a5397128e3e0ec7ecaf8923ef529b67dae0d2aa4f6c2e69db9",
+        "receiptBefore": "a84fb71173073bcc1dbeef3d5edd461ee76435cfc9bf6be680c8d4ae65786a8c",
+        "receiptAfter": "986385a55adb00d61e62b99e5d6081f4275c1eabb79322fd4a4666f57cc55790",
         "phasesMicros": {
-          "discoveryMicros": 164930,
+          "discoveryMicros": 152833,
           "clientMicros": 0,
-          "siteMicros": 466191,
-          "verificationMicros": 31536,
-          "totalMicros": 690544
+          "siteMicros": 383622,
+          "verificationMicros": 25359,
+          "totalMicros": 586060
         }
       },
       "corruptCache": {
-        "rejectionDurationMs": 2.452775,
+        "rejectionDurationMs": 1.666011,
         "rejected": true,
         "recovery": {
-          "durationMs": 201.782459,
-          "peakRssKiB": 52188,
+          "durationMs": 166.094234,
+          "peakRssKiB": 52512,
           "humanNoOpVisible": true,
           "outcome": "no-op",
           "changedSources": [],
           "renderedArtifacts": 0,
           "reusedArtifacts": 7,
-          "receiptBefore": "ae6dc40f74b5e2a5397128e3e0ec7ecaf8923ef529b67dae0d2aa4f6c2e69db9",
-          "receiptAfter": "ae6dc40f74b5e2a5397128e3e0ec7ecaf8923ef529b67dae0d2aa4f6c2e69db9",
+          "receiptBefore": "986385a55adb00d61e62b99e5d6081f4275c1eabb79322fd4a4666f57cc55790",
+          "receiptAfter": "986385a55adb00d61e62b99e5d6081f4275c1eabb79322fd4a4666f57cc55790",
           "phasesMicros": {
-            "discoveryMicros": 195878,
+            "discoveryMicros": 161331,
             "clientMicros": 0,
             "siteMicros": 0,
             "verificationMicros": 0,
-            "totalMicros": 195878
+            "totalMicros": 161331
           }
         }
       }
@@ -390,8 +390,8 @@
       "routes": 3,
       "publicationFiles": 8,
       "cold": {
-        "durationMs": 7481.075817,
-        "peakRssKiB": 51644,
+        "durationMs": 6774.623564,
+        "peakRssKiB": 51296,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -408,36 +408,36 @@
         "renderedArtifacts": 7,
         "reusedArtifacts": 0,
         "receiptBefore": null,
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 226568,
+          "discoveryMicros": 206977,
           "clientMicros": 0,
-          "siteMicros": 7190653,
-          "verificationMicros": 29006,
-          "totalMicros": 7474773
+          "siteMicros": 6512745,
+          "verificationMicros": 23278,
+          "totalMicros": 6768953
         }
       },
       "noOp": {
-        "durationMs": 232.94225,
-        "peakRssKiB": 49632,
+        "durationMs": 172.110654,
+        "peakRssKiB": 49540,
         "humanNoOpVisible": true,
         "outcome": "no-op",
         "changedSources": [],
         "renderedArtifacts": 0,
         "reusedArtifacts": 7,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 226531,
+          "discoveryMicros": 166360,
           "clientMicros": 0,
           "siteMicros": 0,
           "verificationMicros": 0,
-          "totalMicros": 226531
+          "totalMicros": 166360
         }
       },
       "contentChange": {
-        "durationMs": 613.825198,
-        "peakRssKiB": 52468,
+        "durationMs": 580.751627,
+        "peakRssKiB": 52272,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -445,19 +445,19 @@
         ],
         "renderedArtifacts": 5,
         "reusedArtifacts": 2,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "4365b05f89d686627907037aaa454e41798b1cbfffa620ae5503010476cea35f",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "d465bab826074364f3fa38c8f751a8ae5c79f4fa1ea903306275e9edf084b65a",
         "phasesMicros": {
-          "discoveryMicros": 166754,
+          "discoveryMicros": 145991,
           "clientMicros": 0,
-          "siteMicros": 387928,
-          "verificationMicros": 26643,
-          "totalMicros": 607012
+          "siteMicros": 381054,
+          "verificationMicros": 25425,
+          "totalMicros": 575445
         }
       },
       "assetChange": {
-        "durationMs": 629.923388,
-        "peakRssKiB": 49864,
+        "durationMs": 592.878847,
+        "peakRssKiB": 52048,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -465,35 +465,35 @@
         ],
         "renderedArtifacts": 4,
         "reusedArtifacts": 3,
-        "receiptBefore": "4365b05f89d686627907037aaa454e41798b1cbfffa620ae5503010476cea35f",
-        "receiptAfter": "db202a037647ad312531abb660b8e0cbe1cd25efd67e1e63951e969c90483310",
+        "receiptBefore": "d465bab826074364f3fa38c8f751a8ae5c79f4fa1ea903306275e9edf084b65a",
+        "receiptAfter": "701c9a7706fe199dee8b15d9672a841cca026cc108b71e475a1836a82a804de8",
         "phasesMicros": {
-          "discoveryMicros": 159388,
+          "discoveryMicros": 151380,
           "clientMicros": 0,
-          "siteMicros": 409015,
-          "verificationMicros": 26792,
-          "totalMicros": 623243
+          "siteMicros": 386762,
+          "verificationMicros": 25231,
+          "totalMicros": 587737
         }
       },
       "corruptCache": {
-        "rejectionDurationMs": 1.882073,
+        "rejectionDurationMs": 1.672429,
         "rejected": true,
         "recovery": {
-          "durationMs": 183.517532,
-          "peakRssKiB": 52088,
+          "durationMs": 178.794597,
+          "peakRssKiB": 51004,
           "humanNoOpVisible": true,
           "outcome": "no-op",
           "changedSources": [],
           "renderedArtifacts": 0,
           "reusedArtifacts": 7,
-          "receiptBefore": "db202a037647ad312531abb660b8e0cbe1cd25efd67e1e63951e969c90483310",
-          "receiptAfter": "db202a037647ad312531abb660b8e0cbe1cd25efd67e1e63951e969c90483310",
+          "receiptBefore": "701c9a7706fe199dee8b15d9672a841cca026cc108b71e475a1836a82a804de8",
+          "receiptAfter": "701c9a7706fe199dee8b15d9672a841cca026cc108b71e475a1836a82a804de8",
           "phasesMicros": {
-            "discoveryMicros": 178074,
+            "discoveryMicros": 173668,
             "clientMicros": 0,
             "siteMicros": 0,
             "verificationMicros": 0,
-            "totalMicros": 178074
+            "totalMicros": 173668
           }
         }
       }
@@ -504,8 +504,8 @@
       "routes": 3,
       "publicationFiles": 8,
       "cold": {
-        "durationMs": 7730.262243,
-        "peakRssKiB": 57100,
+        "durationMs": 6885.982792,
+        "peakRssKiB": 77768,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -522,36 +522,36 @@
         "renderedArtifacts": 7,
         "reusedArtifacts": 0,
         "receiptBefore": null,
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 221007,
+          "discoveryMicros": 195232,
           "clientMicros": 0,
-          "siteMicros": 7438518,
-          "verificationMicros": 32101,
-          "totalMicros": 7723327
+          "siteMicros": 6634425,
+          "verificationMicros": 25811,
+          "totalMicros": 6880646
         }
       },
       "noOp": {
-        "durationMs": 201.829837,
-        "peakRssKiB": 52476,
+        "durationMs": 179.659631,
+        "peakRssKiB": 52400,
         "humanNoOpVisible": true,
         "outcome": "no-op",
         "changedSources": [],
         "renderedArtifacts": 0,
         "reusedArtifacts": 7,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 195361,
+          "discoveryMicros": 173918,
           "clientMicros": 0,
           "siteMicros": 0,
           "verificationMicros": 0,
-          "totalMicros": 195361
+          "totalMicros": 173918
         }
       },
       "contentChange": {
-        "durationMs": 665.086253,
-        "peakRssKiB": 52212,
+        "durationMs": 618.205751,
+        "peakRssKiB": 50296,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -559,19 +559,19 @@
         ],
         "renderedArtifacts": 5,
         "reusedArtifacts": 2,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "d7ac6cd873891f90bbc975765e6699e39f8eb7b674b9170ad16ef983df488345",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "0b01fa9aa0035f32c42a05debf3a0dfa7c7b08d7d06381d06b351de60f4b6617",
         "phasesMicros": {
-          "discoveryMicros": 172678,
+          "discoveryMicros": 159253,
           "clientMicros": 0,
-          "siteMicros": 431270,
-          "verificationMicros": 26663,
-          "totalMicros": 658129
+          "siteMicros": 401038,
+          "verificationMicros": 28783,
+          "totalMicros": 612850
         }
       },
       "assetChange": {
-        "durationMs": 710.550802,
-        "peakRssKiB": 52340,
+        "durationMs": 606.514605,
+        "peakRssKiB": 50744,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -579,35 +579,35 @@
         ],
         "renderedArtifacts": 4,
         "reusedArtifacts": 3,
-        "receiptBefore": "d7ac6cd873891f90bbc975765e6699e39f8eb7b674b9170ad16ef983df488345",
-        "receiptAfter": "95f78cb17e4b7d9d0f89b54a97296ab7599cf1bd6d3716697ef97e9cf69928b5",
+        "receiptBefore": "0b01fa9aa0035f32c42a05debf3a0dfa7c7b08d7d06381d06b351de60f4b6617",
+        "receiptAfter": "bddb1c9ff6d69a359c946dd1d4a77b5e61ea558e3e3dfb5227d099b869ee1c63",
         "phasesMicros": {
-          "discoveryMicros": 156506,
+          "discoveryMicros": 165310,
           "clientMicros": 0,
-          "siteMicros": 490453,
-          "verificationMicros": 26888,
-          "totalMicros": 704879
+          "siteMicros": 386866,
+          "verificationMicros": 24513,
+          "totalMicros": 600292
         }
       },
       "corruptCache": {
-        "rejectionDurationMs": 2.338856,
+        "rejectionDurationMs": 1.548639,
         "rejected": true,
         "recovery": {
-          "durationMs": 183.150071,
-          "peakRssKiB": 50964,
+          "durationMs": 171.158228,
+          "peakRssKiB": 50788,
           "humanNoOpVisible": true,
           "outcome": "no-op",
           "changedSources": [],
           "renderedArtifacts": 0,
           "reusedArtifacts": 7,
-          "receiptBefore": "95f78cb17e4b7d9d0f89b54a97296ab7599cf1bd6d3716697ef97e9cf69928b5",
-          "receiptAfter": "95f78cb17e4b7d9d0f89b54a97296ab7599cf1bd6d3716697ef97e9cf69928b5",
+          "receiptBefore": "bddb1c9ff6d69a359c946dd1d4a77b5e61ea558e3e3dfb5227d099b869ee1c63",
+          "receiptAfter": "bddb1c9ff6d69a359c946dd1d4a77b5e61ea558e3e3dfb5227d099b869ee1c63",
           "phasesMicros": {
-            "discoveryMicros": 177187,
+            "discoveryMicros": 164543,
             "clientMicros": 0,
             "siteMicros": 0,
             "verificationMicros": 0,
-            "totalMicros": 177187
+            "totalMicros": 164543
           }
         }
       }
@@ -618,8 +618,8 @@
       "routes": 3,
       "publicationFiles": 8,
       "cold": {
-        "durationMs": 8986.758771,
-        "peakRssKiB": 73200,
+        "durationMs": 6183.572779,
+        "peakRssKiB": 51620,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -636,36 +636,36 @@
         "renderedArtifacts": 7,
         "reusedArtifacts": 0,
         "receiptBefore": null,
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 249060,
+          "discoveryMicros": 183643,
           "clientMicros": 0,
-          "siteMicros": 8667885,
-          "verificationMicros": 33213,
-          "totalMicros": 8980206
+          "siteMicros": 5946345,
+          "verificationMicros": 25453,
+          "totalMicros": 6178406
         }
       },
       "noOp": {
-        "durationMs": 239.111323,
-        "peakRssKiB": 52444,
+        "durationMs": 171.219142,
+        "peakRssKiB": 50796,
         "humanNoOpVisible": true,
         "outcome": "no-op",
         "changedSources": [],
         "renderedArtifacts": 0,
         "reusedArtifacts": 7,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
         "phasesMicros": {
-          "discoveryMicros": 233127,
+          "discoveryMicros": 166200,
           "clientMicros": 0,
           "siteMicros": 0,
           "verificationMicros": 0,
-          "totalMicros": 233127
+          "totalMicros": 166200
         }
       },
       "contentChange": {
-        "durationMs": 796.805043,
-        "peakRssKiB": 51432,
+        "durationMs": 549.81316,
+        "peakRssKiB": 52260,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -673,19 +673,19 @@
         ],
         "renderedArtifacts": 5,
         "reusedArtifacts": 2,
-        "receiptBefore": "dee9e45f17a8b865de89e059daf8e3c66a827b6e853879ac0564287523aa1805",
-        "receiptAfter": "ef66ae2b968e82fc9018790caff0b62096053f0549e955108e7235f07c65ec8a",
+        "receiptBefore": "adef9de507c91c2b243e1a7b642c1973628f7870f6737420ff3b5e6981731ea9",
+        "receiptAfter": "572092bbc77cf7fc53c7a58fe582f30b19acc52fbcac6b5d11778ae13f194fb8",
         "phasesMicros": {
-          "discoveryMicros": 204135,
+          "discoveryMicros": 141308,
           "clientMicros": 0,
-          "siteMicros": 518116,
-          "verificationMicros": 35087,
-          "totalMicros": 789840
+          "siteMicros": 353814,
+          "verificationMicros": 24845,
+          "totalMicros": 543165
         }
       },
       "assetChange": {
-        "durationMs": 820.086711,
-        "peakRssKiB": 52336,
+        "durationMs": 587.01475,
+        "peakRssKiB": 51716,
         "humanNoOpVisible": false,
         "outcome": "executed",
         "changedSources": [
@@ -693,35 +693,35 @@
         ],
         "renderedArtifacts": 4,
         "reusedArtifacts": 3,
-        "receiptBefore": "ef66ae2b968e82fc9018790caff0b62096053f0549e955108e7235f07c65ec8a",
-        "receiptAfter": "36917362687d5a6bebdadc55d7d564ea86fec2e54f53e07a6585519c20f3ac8e",
+        "receiptBefore": "572092bbc77cf7fc53c7a58fe582f30b19acc52fbcac6b5d11778ae13f194fb8",
+        "receiptAfter": "457da937a7cc90bd003c95964e3354145ba49910cd746c13efcb2d28f0a38be0",
         "phasesMicros": {
-          "discoveryMicros": 201810,
+          "discoveryMicros": 143016,
           "clientMicros": 0,
-          "siteMicros": 544398,
-          "verificationMicros": 35624,
-          "totalMicros": 812548
+          "siteMicros": 390922,
+          "verificationMicros": 24272,
+          "totalMicros": 581444
         }
       },
       "corruptCache": {
-        "rejectionDurationMs": 3.832028,
+        "rejectionDurationMs": 1.804386,
         "rejected": true,
         "recovery": {
-          "durationMs": 248.282076,
-          "peakRssKiB": 51376,
+          "durationMs": 172.360254,
+          "peakRssKiB": 52448,
           "humanNoOpVisible": true,
           "outcome": "no-op",
           "changedSources": [],
           "renderedArtifacts": 0,
           "reusedArtifacts": 7,
-          "receiptBefore": "36917362687d5a6bebdadc55d7d564ea86fec2e54f53e07a6585519c20f3ac8e",
-          "receiptAfter": "36917362687d5a6bebdadc55d7d564ea86fec2e54f53e07a6585519c20f3ac8e",
+          "receiptBefore": "457da937a7cc90bd003c95964e3354145ba49910cd746c13efcb2d28f0a38be0",
+          "receiptAfter": "457da937a7cc90bd003c95964e3354145ba49910cd746c13efcb2d28f0a38be0",
           "phasesMicros": {
-            "discoveryMicros": 241754,
+            "discoveryMicros": 167702,
             "clientMicros": 0,
             "siteMicros": 0,
             "verificationMicros": 0,
-            "totalMicros": 241754
+            "totalMicros": 167702
           }
         }
       }
