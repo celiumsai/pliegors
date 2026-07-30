@@ -26,8 +26,9 @@ use pliego_dom::{View, render_html};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
+use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static BUILD_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -213,6 +214,7 @@ pub struct Page {
     pub head: Head,
     pub body: View,
     sources: Vec<String>,
+    lazy_renderer: Option<Rc<dyn Fn() -> View>>,
 }
 
 impl Page {
@@ -223,6 +225,30 @@ impl Page {
             head,
             body,
             sources: Vec::new(),
+            lazy_renderer: None,
+        }
+    }
+
+    /// Create a page whose renderer executes only when its declared sources
+    /// require a new artifact.
+    ///
+    /// `sources` must include every project-relative input that can affect the
+    /// complete page artifact, including renderer code, content, head metadata,
+    /// language selection, and route-specific assets. An empty declaration
+    /// intentionally falls back to conservative all-source invalidation.
+    pub fn lazy<I, S, F>(route: impl Into<String>, head: Head, sources: I, renderer: F) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+        F: Fn() -> View + 'static,
+    {
+        Self {
+            route: route.into(),
+            language: "en".to_owned(),
+            head,
+            body: View::Fragment(Vec::new()),
+            sources: sources.into_iter().map(Into::into).collect(),
+            lazy_renderer: Some(Rc::new(renderer)),
         }
     }
 
@@ -321,7 +347,14 @@ impl Page {
             output.push_str("</script>");
         }
         output.push_str("</head><body>");
-        output.push_str(&render_html(&self.body));
+        let lazy_body;
+        let body = if let Some(renderer) = &self.lazy_renderer {
+            lazy_body = renderer();
+            &lazy_body
+        } else {
+            &self.body
+        };
+        output.push_str(&render_html(body));
         output.push_str("</body></html>\n");
         Ok(output)
     }
@@ -437,11 +470,39 @@ impl Site {
         material_specs: &[pliego_artifact::InputMaterialSpec],
     ) -> Result<BuildReport, BuildError> {
         validate_output_target(output_dir)?;
+        let parent_path = output_dir.parent().unwrap_or_else(|| Path::new("."));
+        let output_name = output_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("site");
+        let prior = match std::fs::symlink_metadata(output_dir) {
+            Ok(_) => {
+                let publication_parent = open_or_create_directory_nofollow(parent_path)?;
+                Some(load_prior_build(
+                    validate_replaceable_output(
+                        &publication_parent,
+                        parent_path,
+                        output_name,
+                        output_dir,
+                        &context.ownership.project_id,
+                    )?,
+                    output_dir,
+                )?)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(source) => {
+                return Err(BuildError::Io {
+                    path: output_dir.to_owned(),
+                    source,
+                });
+            }
+        };
         let mut namespace = OutputNamespace::new();
         namespace.insert_str(pliego_artifact::BUILD_LEDGER_NAME, "framework ledger")?;
         namespace.insert_str(pliego_artifact::BUILD_GRAPH_NAME, "framework build graph")?;
         let mut files = BTreeMap::<String, PendingOutput>::new();
         let mut routes = BTreeSet::new();
+        let mut reused_artifacts = 0_usize;
 
         for page in &self.pages {
             validate_route(&page.route)?;
@@ -452,10 +513,31 @@ impl Site {
             let output_path =
                 namespace.insert_str(&output_path, format!("route {}", page.route))?;
             let sources = source_dependencies(&page.sources, &context)?;
+            let bytes = if page.lazy_renderer.is_some() {
+                if let Some(bytes) = try_reuse_prior_artifact(
+                    prior.as_ref(),
+                    output_dir,
+                    &context,
+                    ReuseRequest {
+                        path: output_path.as_str(),
+                        kind: "route",
+                        producer: &page.route,
+                        route: Some(&page.route),
+                        sources: &sources,
+                    },
+                )? {
+                    reused_artifacts += 1;
+                    bytes
+                } else {
+                    page.render()?.into_bytes()
+                }
+            } else {
+                page.render()?.into_bytes()
+            };
             files.insert(
                 output_path.as_str().to_owned(),
                 PendingOutput {
-                    bytes: page.render()?.into_bytes(),
+                    bytes,
                     kind: "route",
                     producer: page.route.clone(),
                     route: Some(page.route.clone()),
@@ -507,27 +589,9 @@ impl Site {
         let preflight_report = BuildReport::new(receipt.clone())?;
         validate_build_graph_against_report(&graph, &preflight_report)?;
         encode_build_report(&preflight_report)?;
-        let parent_path = output_dir.parent().unwrap_or_else(|| Path::new("."));
-        let output_name = output_dir
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("site");
-        let publication_parent = open_or_create_directory_nofollow(parent_path)?;
-        let _publication_lock =
-            PublicationLock::acquire(&publication_parent, parent_path, output_name)?;
-        let prior = if entry_exists_nofollow(&publication_parent, output_name, parent_path)? {
-            Some(validate_replaceable_output(
-                &publication_parent,
-                parent_path,
-                output_name,
-                output_dir,
-                &receipt.context.ownership.project_id,
-            )?)
-        } else {
-            None
-        };
         let previous_ownership = prior.as_ref().map(|prior| PreviousOwnership {
             project_id: prior
+                .output
                 .verified
                 .report
                 .receipt
@@ -536,6 +600,7 @@ impl Site {
                 .project_id
                 .clone(),
             site_package: prior
+                .output
                 .verified
                 .report
                 .receipt
@@ -543,7 +608,7 @@ impl Site {
                 .ownership
                 .site_package
                 .clone(),
-            receipt_sha256: prior.verified.report.receipt_sha256.clone(),
+            receipt_sha256: prior.output.verified.report.receipt_sha256.clone(),
         });
         receipt.previous_ownership = previous_ownership;
         let report = BuildReport::new(receipt)?;
@@ -558,14 +623,47 @@ impl Site {
                 BuildError::InvalidPath(format!("build inputs changed before publication: {error}"))
             })?;
         }
+        let publication_parent = open_or_create_directory_nofollow(parent_path)?;
+        let _publication_lock =
+            PublicationLock::acquire(&publication_parent, parent_path, output_name)?;
+        if let Some(expected_prior) = prior.as_ref() {
+            let current_prior = validate_replaceable_output(
+                &publication_parent,
+                parent_path,
+                output_name,
+                output_dir,
+                &report.receipt.context.ownership.project_id,
+            )?;
+            if current_prior.identity != expected_prior.output.identity
+                || current_prior.verified.report.receipt_sha256
+                    != expected_prior.output.verified.report.receipt_sha256
+            {
+                return Err(BuildError::InvalidPath(format!(
+                    "output changed during build: {}",
+                    output_dir.display()
+                )));
+            }
+        } else if entry_exists_nofollow(&publication_parent, output_name, parent_path)? {
+            return Err(BuildError::InvalidPath(format!(
+                "output appeared during build: {}",
+                output_dir.display()
+            )));
+        }
         if prior.as_ref().is_some_and(|current_prior| {
             report
                 .receipt
-                .same_artifact_core(&current_prior.verified.report.receipt)
+                .same_artifact_core(&current_prior.output.verified.report.receipt)
         }) {
+            if reused_artifacts > 0 {
+                println!(
+                    "PLIEGO incremental: reused {reused_artifacts}/{} artifacts",
+                    self.pages.len() + self.assets.len()
+                );
+            }
             return Ok(prior
                 .as_ref()
                 .expect("prior is present after is_some_and")
+                .output
                 .verified
                 .report
                 .clone());
@@ -599,9 +697,9 @@ impl Site {
                 output_dir,
                 &report.receipt.context.ownership.project_id,
             )?;
-            if current_prior.identity != expected_prior.identity
+            if current_prior.identity != expected_prior.output.identity
                 || current_prior.verified.report.receipt_sha256
-                    != expected_prior.verified.report.receipt_sha256
+                    != expected_prior.output.verified.report.receipt_sha256
             {
                 return Err(BuildError::InvalidPath(format!(
                     "output changed during build: {}",
@@ -671,6 +769,12 @@ impl Site {
                 )));
             }
             stage.publish_as(output_name)?;
+        }
+        if reused_artifacts > 0 {
+            println!(
+                "PLIEGO incremental: reused {reused_artifacts}/{} artifacts",
+                self.pages.len() + self.assets.len()
+            );
         }
         Ok(report)
     }
@@ -858,6 +962,11 @@ struct ReplaceableOutput {
     identity: FileIdentity,
 }
 
+struct PriorBuild {
+    output: ReplaceableOutput,
+    graph: BuildGraph,
+}
+
 fn file_identity(metadata: &cap_std::fs::Metadata) -> FileIdentity {
     FileIdentity {
         device: MetadataExt::dev(metadata),
@@ -937,6 +1046,215 @@ fn validate_replaceable_output(
         )));
     }
     Ok(ReplaceableOutput { verified, identity })
+}
+
+fn load_prior_build(
+    output: ReplaceableOutput,
+    output_path: &Path,
+) -> Result<PriorBuild, BuildError> {
+    let graph_file = output
+        .verified
+        .report
+        .receipt
+        .outputs
+        .files
+        .iter()
+        .find(|file| file.path == pliego_artifact::BUILD_GRAPH_NAME)
+        .ok_or_else(|| {
+            BuildError::InvalidPath(format!(
+                "verified output has no {} entry",
+                pliego_artifact::BUILD_GRAPH_NAME
+            ))
+        })?;
+    let graph_bytes = read_verified_prior_file(&output, output_path, graph_file)?;
+    let graph = pliego_artifact::decode_build_graph(&graph_bytes)?;
+    validate_build_graph_against_report(&graph, &output.verified.report)?;
+    Ok(PriorBuild { output, graph })
+}
+
+fn read_verified_prior_file(
+    prior: &ReplaceableOutput,
+    output_path: &Path,
+    expected: &OutputFile,
+) -> Result<Vec<u8>, BuildError> {
+    let portable = PortablePath::parse(&expected.path)?;
+    if portable.as_str() != expected.path {
+        return Err(BuildError::InvalidPath(expected.path.clone()));
+    }
+    let components = portable.as_str().split('/').collect::<Vec<_>>();
+    let mut directory =
+        Dir::open_ambient_dir(output_path, ambient_authority()).map_err(|source| {
+            BuildError::Io {
+                path: output_path.to_owned(),
+                source,
+            }
+        })?;
+    let identity = file_identity(&directory.dir_metadata().map_err(|source| BuildError::Io {
+        path: output_path.to_owned(),
+        source,
+    })?);
+    if identity != prior.identity {
+        return Err(BuildError::InvalidPath(format!(
+            "prior output changed before incremental reuse: {}",
+            output_path.display()
+        )));
+    }
+    for (index, component) in components[..components.len().saturating_sub(1)]
+        .iter()
+        .enumerate()
+    {
+        directory = directory
+            .open_dir_nofollow(component)
+            .map_err(|source| BuildError::Io {
+                path: components[..=index]
+                    .iter()
+                    .fold(output_path.to_owned(), |path, component| {
+                        path.join(component)
+                    }),
+                source,
+            })?;
+    }
+    let leaf = components
+        .last()
+        .ok_or_else(|| BuildError::InvalidPath(expected.path.clone()))?;
+    let path = components
+        .iter()
+        .fold(output_path.to_owned(), |path, component| {
+            path.join(component)
+        });
+    let mut options = CapOpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    let mut file = directory
+        .open_with(leaf, &options)
+        .map_err(|source| BuildError::Io {
+            path: path.clone(),
+            source,
+        })?;
+    let metadata = file.metadata().map_err(|source| BuildError::Io {
+        path: path.clone(),
+        source,
+    })?;
+    if !metadata.is_file()
+        || MetadataExt::nlink(&metadata) != 1
+        || metadata.len() != expected.bytes
+        || expected.bytes > pliego_artifact::MAX_OUTPUT_FILE_BYTES
+    {
+        return Err(BuildError::InvalidPath(format!(
+            "prior artifact changed before incremental reuse: {}",
+            path.display()
+        )));
+    }
+    let mut bytes = Vec::new();
+    Read::by_ref(&mut file)
+        .take(expected.bytes.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|source| BuildError::Io {
+            path: path.clone(),
+            source,
+        })?;
+    if bytes.len() as u64 != expected.bytes || sha256_bytes(&bytes) != expected.sha256 {
+        return Err(BuildError::InvalidPath(format!(
+            "prior artifact digest changed before incremental reuse: {}",
+            path.display()
+        )));
+    }
+    Ok(bytes)
+}
+
+fn contexts_allow_selective_reuse(before: &BuildContext, after: &BuildContext) -> bool {
+    before.ownership == after.ownership
+        && before.framework == after.framework
+        && before.toolchain == after.toolchain
+        && before.configuration == after.configuration
+        && before.materials == after.materials
+        && before.excluded_paths == after.excluded_paths
+}
+
+fn dependencies_unchanged(
+    dependencies: &SourceDependencies,
+    before: &BuildGraph,
+    after: &BuildContext,
+) -> bool {
+    match dependencies {
+        SourceDependencies::AllSources => before.source_set_sha256 == after.source_set_sha256,
+        SourceDependencies::Explicit { paths } => {
+            let before_sources = before
+                .sources
+                .iter()
+                .map(|source| (source.path.as_str(), source.sha256.as_str()))
+                .collect::<BTreeMap<_, _>>();
+            let after_sources = after
+                .sources
+                .iter()
+                .map(|source| (source.path.as_str(), source.sha256.as_str()))
+                .collect::<BTreeMap<_, _>>();
+            paths.iter().all(|path| {
+                before_sources
+                    .get(path.as_str())
+                    .zip(after_sources.get(path.as_str()))
+                    .is_some_and(|(before, after)| before == after)
+            })
+        }
+    }
+}
+
+struct ReuseRequest<'a> {
+    path: &'a str,
+    kind: &'a str,
+    producer: &'a str,
+    route: Option<&'a str>,
+    sources: &'a SourceDependencies,
+}
+
+fn try_reuse_prior_artifact(
+    prior: Option<&PriorBuild>,
+    output_path: &Path,
+    context: &BuildContext,
+    request: ReuseRequest<'_>,
+) -> Result<Option<Vec<u8>>, BuildError> {
+    let Some(prior) = prior else {
+        return Ok(None);
+    };
+    if !contexts_allow_selective_reuse(&prior.output.verified.report.receipt.context, context) {
+        return Ok(None);
+    }
+    let Some(artifact) = prior
+        .graph
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.path == request.path)
+    else {
+        return Ok(None);
+    };
+    if artifact.kind != request.kind
+        || artifact.producer != request.producer
+        || artifact.route.as_deref() != request.route
+        || artifact.sources != *request.sources
+        || !dependencies_unchanged(request.sources, &prior.graph, context)
+    {
+        return Ok(None);
+    }
+    let expected = prior
+        .output
+        .verified
+        .report
+        .receipt
+        .outputs
+        .files
+        .iter()
+        .find(|file| {
+            file.path == request.path
+                && file.kind == request.kind
+                && file.producer == request.producer
+                && file.sha256 == artifact.sha256
+        })
+        .ok_or_else(|| {
+            BuildError::InvalidPath(format!(
+                "prior graph artifact has no matching receipt output: {}",
+                request.path
+            ))
+        })?;
+    read_verified_prior_file(&prior.output, output_path, expected).map(Some)
 }
 
 #[cfg(test)]
@@ -1645,6 +1963,7 @@ fn escape_inline_script(value: &str) -> String {
 mod tests {
     use super::*;
     use pliego_dom::{IntoView, el};
+    use std::cell::Cell;
     use std::fs;
 
     fn test_project(parent: &Path, project_id: &str) -> (PathBuf, BuildContext) {
@@ -1745,6 +2064,138 @@ mod tests {
             }
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn lazy_pages_execute_only_when_their_verified_sources_are_invalidated() {
+        let root = std::env::temp_dir().join(format!(
+            "pliego-ssg-incremental-{}-{}",
+            std::process::id(),
+            BUILD_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let (project, seed_context) = test_project(&root, "incremental-site");
+        fs::create_dir_all(project.join("content")).unwrap();
+        fs::write(project.join("content/a.md"), b"first a\n").unwrap();
+        fs::write(project.join("content/b.md"), b"first b\n").unwrap();
+        let capture = || {
+            capture_build_context(
+                &project,
+                seed_context.ownership.clone(),
+                seed_context.framework.clone(),
+                &["pliego.toml".to_owned()],
+                &[],
+            )
+            .unwrap()
+        };
+        let output = root.join("site");
+
+        let first_a = Rc::new(Cell::new(0_u32));
+        let first_b = Rc::new(Cell::new(0_u32));
+        let first_global = Rc::new(Cell::new(0_u32));
+        let first = Site::new()
+            .page(Page::lazy(
+                "/a/",
+                Head::new("A"),
+                ["src/main.rs", "content/a.md"],
+                {
+                    let calls = Rc::clone(&first_a);
+                    move || {
+                        calls.set(calls.get() + 1);
+                        el("main").child("A").into_view()
+                    }
+                },
+            ))
+            .page(Page::lazy(
+                "/b/",
+                Head::new("B"),
+                ["src/main.rs", "content/b.md"],
+                {
+                    let calls = Rc::clone(&first_b);
+                    move || {
+                        calls.set(calls.get() + 1);
+                        el("main").child("B").into_view()
+                    }
+                },
+            ))
+            .page(Page::lazy(
+                "/global/",
+                Head::new("Global"),
+                std::iter::empty::<&str>(),
+                {
+                    let calls = Rc::clone(&first_global);
+                    move || {
+                        calls.set(calls.get() + 1);
+                        el("main").child("Global").into_view()
+                    }
+                },
+            ));
+        first
+            .build_with_context(&output, &project, capture())
+            .unwrap();
+        assert_eq!(first_a.get(), 1);
+        assert_eq!(first_b.get(), 1);
+        assert_eq!(first_global.get(), 1);
+
+        fs::write(project.join("content/a.md"), b"second a\n").unwrap();
+        let second_a = Rc::new(Cell::new(0_u32));
+        let second_b = Rc::new(Cell::new(0_u32));
+        let second_global = Rc::new(Cell::new(0_u32));
+        let second = Site::new()
+            .page(Page::lazy(
+                "/a/",
+                Head::new("A"),
+                ["src/main.rs", "content/a.md"],
+                {
+                    let calls = Rc::clone(&second_a);
+                    move || {
+                        calls.set(calls.get() + 1);
+                        el("main").child("A changed").into_view()
+                    }
+                },
+            ))
+            .page(Page::lazy(
+                "/b/",
+                Head::new("B"),
+                ["src/main.rs", "content/b.md"],
+                {
+                    let calls = Rc::clone(&second_b);
+                    move || {
+                        calls.set(calls.get() + 1);
+                        el("main").child("B should be reused").into_view()
+                    }
+                },
+            ))
+            .page(Page::lazy(
+                "/global/",
+                Head::new("Global"),
+                std::iter::empty::<&str>(),
+                {
+                    let calls = Rc::clone(&second_global);
+                    move || {
+                        calls.set(calls.get() + 1);
+                        el("main").child("Global changed").into_view()
+                    }
+                },
+            ));
+        second
+            .build_with_context(&output, &project, capture())
+            .unwrap();
+
+        assert_eq!(second_a.get(), 1, "changed route must execute");
+        assert_eq!(
+            second_b.get(),
+            0,
+            "unaffected route must reuse verified bytes"
+        );
+        assert_eq!(
+            second_global.get(),
+            1,
+            "allSources route must conservatively execute"
+        );
+        let b_html = fs::read_to_string(output.join("b/index.html")).unwrap();
+        assert!(b_html.contains(">B</main>"));
+        assert!(!b_html.contains("should be reused"));
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
@@ -2432,12 +2883,11 @@ mod tests {
             .build_with_context_at(&output, context, Some(&project), &[]);
         assert!(result.is_err());
         assert!(!output.exists());
-        assert!(
-            fs::read_dir(project.join("target"))
-                .unwrap()
-                .filter_map(Result::ok)
-                .all(|entry| !is_private_build_directory(&entry.file_name().to_string_lossy()))
-        );
+        if let Ok(entries) = fs::read_dir(project.join("target")) {
+            assert!(entries.filter_map(Result::ok).all(|entry| {
+                !is_private_build_directory(&entry.file_name().to_string_lossy())
+            }));
+        }
         let _ = fs::remove_dir_all(project);
     }
 

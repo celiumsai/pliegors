@@ -7,7 +7,11 @@ mod sdk;
 mod telemetry;
 mod trust;
 
-use development::{HmrUpdate, explain_artifact, explain_rebuild, load_verified_graph};
+use development::{
+    BuildCacheOutcome, BuildPhaseDurations, HmrUpdate, clean_private_cache_records,
+    create_build_record, explain_artifact, explain_rebuild, load_verified_graph, read_build_record,
+    write_build_record,
+};
 use notify::{
     Config as WatchConfig, Event as WatchEvent, RecommendedWatcher, RecursiveMode, Watcher,
 };
@@ -618,7 +622,7 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
 
     if !matches!(
         command.as_str(),
-        "build" | "check" | "dev" | "preview" | "inspect" | "why" | "why-rebuilt"
+        "build" | "cache" | "check" | "dev" | "preview" | "inspect" | "why" | "why-rebuilt"
     ) {
         return Err(CliFailure::new(
             FailureKind::Usage,
@@ -629,7 +633,7 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
     let context = load_context().map_err(|error| CliFailure::new(FailureKind::Project, error))?;
     match command.as_str() {
         "build" => {
-            build(&context).map_err(|error| CliFailure::new(FailureKind::Build, error))?;
+            let _ = build(&context).map_err(|error| CliFailure::new(FailureKind::Build, error))?;
             record_telemetry(telemetry::FunnelEvent::Build);
             Ok(())
         }
@@ -638,6 +642,8 @@ fn run(arguments: Vec<String>) -> Result<(), CliFailure> {
             record_telemetry(telemetry::FunnelEvent::Check);
             Ok(())
         }
+        "cache" => cache_command(&context, arguments.collect())
+            .map_err(|error| CliFailure::new(FailureKind::Artifact, error)),
         "dev" => {
             let options = parse_server_options(arguments.collect(), 4400)
                 .map_err(|error| CliFailure::new(FailureKind::Usage, error))?;
@@ -673,7 +679,7 @@ fn print_help() {
         "FULL-STACK DIAGNOSTICS:\n  pliego inspect action <id> [--contract <runtime-contract.json>]\n  pliego why request <runtime-receipt.json>\n  pliego why cache <cache-receipt-or-invalidation.json>\n"
     );
     println!(
-        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego telemetry <status|enable|preview|export|disable> [options]\n  pliego sdk <check|test> <manifest> [--input <transform.json>] [--grant <capability>] [--feature <id>] [--format <human|json>]\n  pliego sdk compatibility [--format <human|json>]\n  pliego sdk tooling-host --protocol <pliego|mcp> [--feature <id>]\n  pliego pboc validate <manifest> [--root <bundle>]\n  pliego pboc admit <manifest> --host <native|cloudflare> [--root <bundle>] [--host-version <version>]\n  pliego pboc compatibility <active> <candidate> --direction <rolling|rollback>\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport, SDK admission, PBOC admission, upgrade checks, and voluntary telemetry exports are local and never upload project data.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
+        "PliegoRS project tool\n\nUSAGE:\n  pliego new <path> [--template <id>] [--name <name>] [--framework-path <path>]\n  pliego templates\n  pliego doctor [--format <human|json>]\n  pliego report --bundle [--output <path>]\n  pliego upgrade --check [--target <version>] [--format <human|json>]\n  pliego telemetry <status|enable|preview|export|disable> [options]\n  pliego sdk <check|test> <manifest> [--input <transform.json>] [--grant <capability>] [--feature <id>] [--format <human|json>]\n  pliego sdk compatibility [--format <human|json>]\n  pliego sdk tooling-host --protocol <pliego|mcp> [--feature <id>]\n  pliego pboc validate <manifest> [--root <bundle>]\n  pliego pboc admit <manifest> --host <native|cloudflare> [--root <bundle>] [--host-version <version>]\n  pliego pboc compatibility <active> <candidate> --direction <rolling|rollback>\n  pliego check\n  pliego css check [pliego-cssc check options]\n  pliego build\n  pliego cache status [--format <human|json>]\n  pliego cache clean\n  pliego dev [port] [--host <ip>|--lan]\n  pliego preview [port] [--host <ip>|--lan]\n  pliego inspect\n  pliego why artifact <path|route>\n  pliego why-rebuilt\n  pliego version\n\nGLOBAL OPTIONS:\n  --diagnostic-format <human|json>\n\nReport, SDK admission, PBOC admission, upgrade checks, and voluntary telemetry exports are local and never upload project data.\n`pliego css check` is experimental delegation to a separately installed executable.\nServers bind to 127.0.0.1 unless --host or --lan is explicit.\nThe nearest pliego.toml defines an existing project."
     );
 }
 
@@ -682,6 +688,89 @@ fn record_telemetry(event: telemetry::FunnelEvent) {
         eprintln!(
             "PLIEGO[PLG-TEL-001] telemetry: {error}\nhelp: Run `pliego telemetry status` or disable local telemetry."
         );
+    }
+}
+
+fn cache_command(context: &Context, arguments: Vec<String>) -> Result<(), String> {
+    let mut arguments = arguments.into_iter();
+    match arguments.next().as_deref() {
+        Some("status") => {
+            let mut format = "human".to_owned();
+            while let Some(argument) = arguments.next() {
+                if argument == "--format" {
+                    format = arguments
+                        .next()
+                        .ok_or_else(|| "--format requires human or json".to_owned())?;
+                } else if let Some(value) = argument.strip_prefix("--format=") {
+                    format = value.to_owned();
+                } else {
+                    return Err(format!("unexpected cache status argument `{argument}`"));
+                }
+            }
+            if !matches!(format.as_str(), "human" | "json") {
+                return Err("--format must be human or json".to_owned());
+            }
+            let record = read_build_record(&context.root)?;
+            let output_root = context.root.join(&context.manifest.project.output);
+            let verified = load_verified_graph(&output_root)?;
+            if record.receipt_after != verified.report.receipt_sha256 {
+                return Err(
+                    "private build record does not describe the current verified output".to_owned(),
+                );
+            }
+            let artifacts = verified.graph.artifacts.len() as u64;
+            if record
+                .rendered_artifacts
+                .saturating_add(record.reused_artifacts)
+                != artifacts
+            {
+                return Err(
+                    "private build record artifact counts do not match the verified graph"
+                        .to_owned(),
+                );
+            }
+            if format == "json" {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&record).map_err(|error| error.to_string())?
+                );
+            } else {
+                println!(
+                    "PLIEGO cache: {:?} | {} rendered | {} reused | {:.3} ms",
+                    record.outcome,
+                    record.rendered_artifacts,
+                    record.reused_artifacts,
+                    record.phases.total_micros as f64 / 1000.0
+                );
+                println!("receipt: {}", record.receipt_after);
+                if record.changed_sources.is_empty() {
+                    println!("changed sources: none");
+                } else {
+                    println!("changed sources: {}", record.changed_sources.join(", "));
+                }
+                println!(
+                    "phases: discovery {:.3} ms | client {:.3} ms | site {:.3} ms | verify {:.3} ms",
+                    record.phases.discovery_micros as f64 / 1000.0,
+                    record.phases.client_micros as f64 / 1000.0,
+                    record.phases.site_micros as f64 / 1000.0,
+                    record.phases.verification_micros as f64 / 1000.0
+                );
+            }
+            Ok(())
+        }
+        Some("clean") => {
+            if arguments.next().is_some() {
+                return Err("usage: pliego cache clean".to_owned());
+            }
+            let removed = clean_private_cache_records(&context.root)?;
+            println!(
+                "PLIEGO cache: removed {} private record{}; published output and Cargo cache were preserved",
+                removed.len(),
+                if removed.len() == 1 { "" } else { "s" }
+            );
+            Ok(())
+        }
+        _ => Err("usage: pliego cache <status|clean>".to_owned()),
     }
 }
 
@@ -1729,7 +1818,22 @@ fn automatic_cargo_target_directory(project_root: &Path) -> Result<Option<PathBu
     Ok(Some(target))
 }
 
-fn build(context: &Context) -> Result<(), String> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BuildOutcomeKind {
+    NoOp,
+    Executed,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct BuildOutcome {
+    kind: BuildOutcomeKind,
+    receipt_sha256: String,
+}
+
+fn build(context: &Context) -> Result<BuildOutcome, String> {
+    let build_started = Instant::now();
+    let output_root = context.root.join(&context.manifest.project.output);
+    let before = load_verified_graph(&output_root).ok();
     validate_reproducible_command_context(context)?;
     // Resolve the effective workspace and materialize Cargo.lock before the
     // receipt snapshot so first-use builds cannot create an unrecorded input.
@@ -1737,9 +1841,41 @@ fn build(context: &Context) -> Result<(), String> {
     let cargo_target = validate_cargo_target_directory(context, &metadata)?;
     let (build_context, material_specs) = capture_project_build_context(context, &metadata)?;
     revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
+    if let Some(receipt_sha256) =
+        verified_noop_build(context, &metadata, &build_context, &material_specs)?
+    {
+        let after = load_verified_graph(&output_root)?;
+        let total_artifacts = after.graph.artifacts.len() as u64;
+        let total_micros = duration_micros(build_started.elapsed());
+        let record = create_build_record(
+            BuildCacheOutcome::NoOp,
+            before.as_ref(),
+            &after,
+            0,
+            total_artifacts,
+            BuildPhaseDurations {
+                discovery_micros: total_micros,
+                total_micros,
+                ..BuildPhaseDurations::default()
+            },
+        );
+        write_build_record(&context.root, &record)?;
+        println!(
+            "PLIEGO build: {} -> {} [no-op {}]",
+            context.manifest.project.name,
+            context.manifest.project.output.display(),
+            &receipt_sha256[..12]
+        );
+        return Ok(BuildOutcome {
+            kind: BuildOutcomeKind::NoOp,
+            receipt_sha256,
+        });
+    }
     let context_path = write_project_build_context(context, &build_context, &material_specs)?;
     let _context_cleanup = FileCleanup::new(context_path.clone());
 
+    let discovery_micros = duration_micros(build_started.elapsed());
+    let client_started = Instant::now();
     if let Some(client) = &context.manifest.client {
         revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
         execute(
@@ -1780,10 +1916,12 @@ fn build(context: &Context) -> Result<(), String> {
         )?;
         revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
     }
+    let client_micros = duration_micros(client_started.elapsed());
 
     let output = path_argument(&context.manifest.project.output)?;
     revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
-    execute_with_environment(
+    let site_started = Instant::now();
+    let site_output = execute_with_environment(
         &context.root,
         "cargo",
         &[
@@ -1796,19 +1934,96 @@ fn build(context: &Context) -> Result<(), String> {
         ],
         Some((BUILD_CONTEXT_ENV, &context_path)),
     )?;
+    let site_micros = duration_micros(site_started.elapsed());
+    let verification_started = Instant::now();
     revalidate_build_inputs(context, &metadata, &build_context, &material_specs)?;
-    let output_root = context.root.join(&context.manifest.project.output);
     let verified = verify_build_report(&output_root).map_err(|error| error.to_string())?;
     if verified.report.receipt.context != build_context {
         return Err("site emitted a receipt for a different build context".to_owned());
     }
+    let after = load_verified_graph(&output_root)?;
+    let total_artifacts = after.graph.artifacts.len() as u64;
+    let (reused_artifacts, rendered_artifacts) =
+        incremental_execution_counts(&site_output, total_artifacts);
+    let verification_micros = duration_micros(verification_started.elapsed());
+    let phases = BuildPhaseDurations {
+        discovery_micros,
+        client_micros,
+        site_micros,
+        verification_micros,
+        total_micros: duration_micros(build_started.elapsed()),
+    };
+    let record = create_build_record(
+        BuildCacheOutcome::Executed,
+        before.as_ref(),
+        &after,
+        rendered_artifacts,
+        reused_artifacts,
+        phases,
+    );
+    write_build_record(&context.root, &record)?;
     println!(
         "PLIEGO build: {} -> {} [{}]",
         context.manifest.project.name,
         context.manifest.project.output.display(),
         &verified.report.receipt_sha256[..12]
     );
-    Ok(())
+    Ok(BuildOutcome {
+        kind: BuildOutcomeKind::Executed,
+        receipt_sha256: verified.report.receipt_sha256,
+    })
+}
+
+fn duration_micros(duration: Duration) -> u64 {
+    u64::try_from(duration.as_micros()).unwrap_or(u64::MAX)
+}
+
+fn incremental_execution_counts(output: &str, total_artifacts: u64) -> (u64, u64) {
+    let parsed = output.lines().rev().find_map(|line| {
+        let value = line
+            .trim()
+            .strip_prefix("PLIEGO incremental: reused ")?
+            .strip_suffix(" artifacts")?;
+        let (reused, total) = value.split_once('/')?;
+        Some((reused.parse::<u64>().ok()?, total.parse::<u64>().ok()?))
+    });
+    match parsed {
+        Some((reused, total)) if total == total_artifacts && reused <= total => {
+            (reused, total - reused)
+        }
+        _ => (0, total_artifacts),
+    }
+}
+
+fn verified_noop_build(
+    context: &Context,
+    metadata: &CargoMetadata,
+    build_context: &BuildContext,
+    material_specs: &[InputMaterialSpec],
+) -> Result<Option<String>, String> {
+    let output_root = context.root.join(&context.manifest.project.output);
+    match fs::symlink_metadata(&output_root) {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(format!(
+                "cannot inspect existing output {}: {error}",
+                output_root.display()
+            ));
+        }
+    }
+
+    let verified = verify_build_report(&output_root).map_err(|error| {
+        format!(
+            "cannot use or replace invalid existing output {}: {error}",
+            output_root.display()
+        )
+    })?;
+    if verified.report.receipt.context != *build_context {
+        return Ok(None);
+    }
+    revalidate_build_inputs(context, metadata, build_context, material_specs)?;
+    Ok(Some(verified.report.receipt_sha256))
 }
 
 fn revalidate_build_inputs(
@@ -1862,7 +2077,18 @@ fn capture_project_build_context(
     metadata: &CargoMetadata,
 ) -> Result<(BuildContext, Vec<InputMaterialSpec>), String> {
     let selection = cargo_input_selection(context, metadata)?;
-    let excluded = vec![path_argument(&context.manifest.project.output)?];
+    let mut excluded = vec![path_argument(&context.manifest.project.output)?];
+    let cargo_target =
+        canonical_unlinked_directory(&metadata.target_directory, "Cargo target directory", true)?;
+    if let Ok(relative) = cargo_target.strip_prefix(&context.root) {
+        excluded.push(
+            portable_relative_path(relative, "Cargo target directory")?
+                .as_str()
+                .to_owned(),
+        );
+    }
+    excluded.sort();
+    excluded.dedup();
     let framework_package = resolved_framework_package(context, metadata)?;
     let preliminary_framework = resolved_framework_evidence(metadata, framework_package, None)?;
     let mut build_context = capture_build_context_with_materials(
@@ -2763,7 +2989,7 @@ fn path_argument(path: &Path) -> Result<String, String> {
 }
 
 fn execute(root: &Path, program: &str, arguments: &[&str]) -> Result<(), String> {
-    execute_with_environment(root, program, arguments, None)
+    execute_with_environment(root, program, arguments, None).map(|_| ())
 }
 
 fn execute_with_environment(
@@ -2771,7 +2997,7 @@ fn execute_with_environment(
     program: &str,
     arguments: &[&str],
     environment: Option<(&str, &Path)>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let mut command = Command::new(program);
     command
         .args(arguments)
@@ -2808,7 +3034,7 @@ fn execute_with_environment(
         .join()
         .map_err(|_| format!("cannot collect {program} standard error"))?;
     if status.success() {
-        Ok(())
+        Ok(stdout)
     } else {
         let detail = if stderr.trim().is_empty() {
             stdout.trim()
@@ -3001,7 +3227,7 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
     validate_reproducible_command_context(context).map_err(DevFailure::Project)?;
     let output_root = context.root.join(&context.manifest.project.output);
     let (initial_failure, mut current_graph) = match build(context) {
-        Ok(()) => match load_verified_graph(&output_root) {
+        Ok(_) => match load_verified_graph(&output_root) {
             Ok(graph) => (None, Some(graph)),
             Err(error) => (Some(error), None),
         },
@@ -3035,7 +3261,7 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
             next_watch_changes(&events, &context.root, &context.manifest.project.output)
                 .map_err(DevFailure::Project)?;
         match build(context) {
-            Ok(()) => {
+            Ok(_) => {
                 let after = match load_verified_graph(&root) {
                     Ok(graph) => graph,
                     Err(error) => {
@@ -4201,6 +4427,23 @@ mod tests {
         )
         .unwrap();
         assert_eq!(changed, BTreeSet::from(["src/target/input.txt".to_owned()]));
+    }
+
+    #[test]
+    fn incremental_summary_requires_exact_bounded_artifact_counts() {
+        assert_eq!(
+            incremental_execution_counts("noise\nPLIEGO incremental: reused 7/10 artifacts\n", 10),
+            (7, 3)
+        );
+        assert_eq!(
+            incremental_execution_counts("PLIEGO incremental: reused 11/10 artifacts\n", 10),
+            (0, 10)
+        );
+        assert_eq!(
+            incremental_execution_counts("PLIEGO incremental: reused 7/9 artifacts\n", 10),
+            (0, 10)
+        );
+        assert_eq!(incremental_execution_counts("untrusted output", 4), (0, 4));
     }
 
     #[test]

@@ -117,7 +117,7 @@ fn hero(locale: Locale) -> View {
                 .child(
                     el("p")
                         .class("utility-label")
-                        .child("PLIEGORS / 0.3.0-BETA.1 / PUBLIC BETA"),
+                        .child("PLIEGORS / 0.4.0-BETA.1 / PUBLIC BETA"),
                 )
                 .child(el("h1").child("Pliego").child(el("em").child("RS")))
                 .child(el("p").class("rs-hero__lead").child(l(
@@ -663,15 +663,15 @@ fn distribution(locale: Locale) -> View {
                 .child(el("h2").child(l(locale, "Built once. Verified per target.", "Compilado una vez. Verificado por target.")))
                 .child(el("p").child(l(
                     locale,
-                    "PliegoRS 0.3.0-beta.1 is public on crates.io and GitHub Releases. Linux artifacts are production targets; macOS and Windows builds support local development. The release carries complete R0-R7, P8, G1, G2, and G3 evidence.",
-                    "PliegoRS 0.3.0-beta.1 está disponible en crates.io y GitHub Releases. Los artefactos Linux son targets de producción; los builds de macOS y Windows sirven al desarrollo local. El release contiene la evidencia R0-R7, P8, G1, G2 y G3 completa.",
+                    "PliegoRS 0.4.0-beta.1 is public on crates.io and GitHub Releases. Linux artifacts are production targets; macOS and Windows builds support local development. The release carries complete R0-R7, P8, G1, G2, and G3 evidence.",
+                    "PliegoRS 0.4.0-beta.1 está disponible en crates.io y GitHub Releases. Los artefactos Linux son targets de producción; los builds de macOS y Windows sirven al desarrollo local. El release contiene la evidencia R0-R7, P8, G1, G2 y G3 completa.",
                 ))),
         )
         .child(
             el("pre")
                 .class("rs-terminal")
                 .attr("aria-label", l(locale, "PliegoRS installation example", "Ejemplo de instalación de PliegoRS"))
-                .child(el("code").child("$ cargo install pliego-cli --version 0.3.0-beta.1 --locked\n$ pliego new field-notes\n$ cd field-notes\n$ pliego dev\n\nPLIEGORS  local  http://127.0.0.1:4400")),
+                .child(el("code").child("$ cargo install pliego-cli --version 0.4.0-beta.1 --locked\n$ pliego new field-notes\n$ cd field-notes\n$ pliego dev\n\nPLIEGORS  local  http://127.0.0.1:4400")),
         )
         .into_view()
 }
@@ -901,7 +901,7 @@ fn about_release(locale: Locale) -> View {
             "04",
             l(locale, "Current state", "Estado actual"),
         ))
-        .child(el("p").class("utility-label").child("0.3.0-BETA.1 / PUBLIC BETA"))
+        .child(el("p").class("utility-label").child("0.4.0-BETA.1 / PUBLIC BETA"))
         .child(el("h2").child(l(
             locale,
             "The current release is a reproducible claim.",
@@ -909,8 +909,8 @@ fn about_release(locale: Locale) -> View {
         )))
         .child(el("p").child(l(
             locale,
-            "Source, documentation, 21 crates.io packages, five platform builds, signed attestations, the nine-environment golden matrix, and R0-R7, P8, G1, G2, and G3 evidence agree on the 0.3.0-beta.1 public beta.",
-            "El código, la documentación, 21 paquetes de crates.io, cinco builds de plataforma, attestations firmadas, la matriz golden de nueve entornos y la evidencia R0-R7, P8, G1, G2 y G3 coinciden en la beta pública 0.3.0-beta.1.",
+            "Source, documentation, 21 crates.io packages, five platform builds, signed attestations, the nine-environment golden matrix, and R0-R7, P8, G1, G2, G3, and G4 engineering evidence agree on the 0.4.0-beta.1 public beta. G4 external adoption remains open.",
+            "El código, la documentación, 21 paquetes de crates.io, cinco builds de plataforma, attestations firmadas, la matriz golden de nueve entornos y la evidencia R0-R7, P8, G1, G2, G3 y de ingeniería G4 coinciden en la beta pública 0.4.0-beta.1. La adopción externa G4 sigue abierta.",
         )))
         .child(
             el("div")
@@ -951,6 +951,30 @@ pub fn changelog(locale: Locale) -> View {
                 "aria-label",
                 l(locale, "Release history", "Historial de releases"),
             )
+            .child(change_entry(
+                locale,
+                "v0-4-0-beta-1",
+                "0.4.0-beta.1",
+                "2026-07-30",
+                Some("2026-07-30"),
+                l(locale, "Verified incremental engineering preview", "Preview verificado de ingeniería incremental"),
+                l(locale, "Rebuild only what the evidence invalidates.", "Reconstruir sólo lo que la evidencia invalida."),
+                l(
+                    locale,
+                    "All twenty-one framework crates add verified no-op builds, causal lazy-route reuse, observable private cache controls, resumable adaptive asset work, and a clean-revision measurement contract. G4 Adoption remains explicitly open.",
+                    "Los veintiún crates del framework agregan builds no-op verificados, reutilización causal de rutas lazy, controles observables de caché privado, trabajo reanudable de assets adaptativos y un contrato de medición sobre revisión limpia. G4 Adoption sigue explícitamente abierto.",
+                ),
+                &[
+                    l(locale, "Build reuse is receipt-bound, exact-set verified, and conservative when causal declarations are absent.", "La reutilización de builds está vinculada al receipt, verifica el conjunto exacto y es conservadora cuando faltan declaraciones causales."),
+                    l(locale, "Every official starter proves cold, no-op, content-only, asset-only, corruption rejection, and recovery paths.", "Cada starter oficial prueba rutas cold, no-op, cambio sólo de contenido, cambio sólo de asset, rechazo de corrupción y recuperación."),
+                    l(locale, "The adaptive asset queue reports deterministic pending, ready, and invalid work without mutating staging.", "La cola de assets adaptativos reporta trabajo pending, ready e invalid de forma determinista sin mutar staging."),
+                    l(locale, "No remote cache, competitor benchmark, low-end-device guarantee, or external adoption result is claimed.", "No se afirma caché remoto, benchmark contra competidores, garantía para equipos modestos ni resultado de adopción externa."),
+                ],
+                Some((
+                    "https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1",
+                    l(locale, "Verify release 0.4.0-beta.1", "Verificar el release 0.4.0-beta.1"),
+                )),
+            ))
             .child(change_entry(
                 locale,
                 "v0-3-0-beta-1",
@@ -1076,9 +1100,9 @@ fn changelog_overview(locale: Locale) -> View {
     let facts = [
         (
             l(locale, "Current release", "Release actual"),
-            "0.3.0-beta.1",
+            "0.4.0-beta.1",
         ),
-        (l(locale, "Published", "Publicado"), "2026-07-22"),
+        (l(locale, "Published", "Publicado"), "2026-07-30"),
         (l(locale, "Published crates", "Crates publicados"), "21"),
         (l(locale, "Release channel", "Canal de release"), "BETA"),
     ];
@@ -1095,7 +1119,7 @@ fn changelog_overview(locale: Locale) -> View {
         .child(
             el("div")
                 .class("rs-changelog-overview__copy")
-                .child(el("p").class("utility-label").child("RELEASE LEDGER / 003"))
+                .child(el("p").class("utility-label").child("RELEASE LEDGER / 004"))
                 .child(el("h2").child(l(
                     locale,
                     "The latest claim is the one you can verify.",
@@ -1110,7 +1134,7 @@ fn changelog_overview(locale: Locale) -> View {
                     el("div")
                         .class("rs-actions")
                         .child(action(
-                            "https://github.com/celiumsai/pliegors/releases/tag/v0.3.0-beta.1",
+                            "https://github.com/celiumsai/pliegors/releases/tag/v0.4.0-beta.1",
                             l(locale, "Open latest release", "Abrir el último release"),
                             true,
                         ))
@@ -1286,7 +1310,7 @@ fn security_hero(locale: Locale) -> View {
                 .child(
                     el("span")
                         .child("PUBLIC BETA")
-                        .child(el("small").child(l(locale, "0.3.0-beta.1 supported", "0.3.0-beta.1 soportado"))),
+                        .child(el("small").child(l(locale, "0.4.0-beta.1 supported", "0.4.0-beta.1 soportado"))),
                 ),
         )
         .into_view()
@@ -1360,8 +1384,8 @@ fn security_posture(locale: Locale) -> View {
                 )))
                 .child(el("p").child(l(
                     locale,
-                    "These numbers describe the 0.3.0-beta.1 public beta and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
-                    "Estas cifras describen la beta pública 0.3.0-beta.1 y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
+                    "These numbers describe the 0.4.0-beta.1 public beta and its frozen dependency graph. Every release must reproduce the same gates against its own bytes.",
+                    "Estas cifras describen la beta pública 0.4.0-beta.1 y su grafo congelado de dependencias. Cada release debe reproducir los mismos gates contra sus propios bytes.",
                 ))),
         )
         .child(grid)
@@ -1821,7 +1845,7 @@ fn security_support(locale: Locale) -> View {
                         .child(
                             el("tbody").child(
                                 el("tr")
-                                    .child(el("th").attr("scope", "row").child("0.3.0-beta.1"))
+                                    .child(el("th").attr("scope", "row").child("0.4.0-beta.1"))
                                     .child(el("td").child(l(locale, "Public beta", "Beta pública")))
                                     .child(el("td").child(l(locale, "Latest beta and main", "Última beta y main"))),
                             ),
@@ -2078,8 +2102,8 @@ pub fn legal_document(locale: Locale, slug: &str) -> Result<View, String> {
                     "01",
                     "Current status",
                     "Estado actual",
-                    "PliegoRS 0.3.0-beta.1 is public pre-1.0 software. Documented APIs may change between prereleases or minor releases and changes are recorded in the changelog.",
-                    "PliegoRS 0.3.0-beta.1 es software público pre-1.0. Las APIs documentadas pueden cambiar entre prereleases o releases menores y los cambios se registran en el changelog.",
+                    "PliegoRS 0.4.0-beta.1 is public pre-1.0 software. Documented APIs may change between prereleases or minor releases and changes are recorded in the changelog.",
+                    "PliegoRS 0.4.0-beta.1 es software público pre-1.0. Las APIs documentadas pueden cambiar entre prereleases o releases menores y los cambios se registran en el changelog.",
                 ),
                 (
                     "02",

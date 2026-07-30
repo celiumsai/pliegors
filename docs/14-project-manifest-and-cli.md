@@ -97,6 +97,13 @@ direct `pliego-cssc` workflows rather than hidden PliegoRS build steps. See the
    recalculate both build inputs and the exact output set before accepting the
    build.
 
+Before steps 4-6, the CLI verifies any existing report, graph, and current build
+context. An exact match is a verified no-op: neither the client nor site
+compiler starts, and the existing publication remains byte-for-byte unchanged.
+After a changed build, lazy routes with unchanged declared dependencies can
+reuse prior verified artifacts while the SSG still stages and atomically
+publishes one complete output tree.
+
 The first metadata pass may materialize an absent effective workspace
 `Cargo.lock`; capture happens only after that pass. The build itself, subsequent
 metadata checks, `inspect`, and `preview` use locked resolution. The public
@@ -206,6 +213,12 @@ and byte totals. It never creates or repairs `Cargo.lock`.
 `pliego why artifact <path|route>` requires a current verified build and fails
 closed when the graph, output, source set, or receipt disagree. `pliego
 why-rebuilt` becomes available after the first successful development rebuild.
+
+`pliego cache status [--format human|json]` verifies the current output before
+reporting whether the last production build executed or was a no-op, its causal
+source changes, rendered/reused artifact counts, receipt transition, and phase
+timings. `pliego cache clean` removes only the bounded private build/rebuild
+records under `target/.pliego`; it preserves Cargo caches and published output.
 
 ## Artifact trust and ownership
 

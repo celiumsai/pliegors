@@ -19,4 +19,7 @@ pliego dev
 - `pliego.toml`: project name, Cargo package, and output directory.
 
 Production output is written to `target/site` by default. Run `pliego inspect`
-after a build to review its route, file, and byte totals.
+after a build to review its route, file, and byte totals. Routes use
+`Page::lazy`; keep every `.source(...)` declaration complete when a renderer
+starts reading another project file. `pliego cache status` explains whether the
+last build executed or was a verified no-op.

@@ -2,8 +2,8 @@ use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir, OpenOptions};
 use pliego_assets::{
-    AdaptivePlan, AdaptiveRecipe, FfmpegBackend, RasterFormat, RasterRecipe, build_raster,
-    finalize_adaptive_assets, plan_adaptive_assets,
+    AdaptivePlan, AdaptiveRecipe, AdaptiveWorkStatus, FfmpegBackend, RasterFormat, RasterRecipe,
+    build_raster, finalize_adaptive_assets, inspect_adaptive_asset_work, plan_adaptive_assets,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -22,6 +22,9 @@ Usage:
       [--manifest <file>] [--ffmpeg <program>] [--ffprobe <program>]
 
   pliego-assets plan <recipe.json> --source-root <directory> --out <plan.json>
+
+  pliego-assets status <plan.json> --output-root <directory>
+      [--format human|json]
 
   pliego-assets finalize <plan.json> --output-root <directory>
       --manifest <manifest.json>
@@ -58,8 +61,9 @@ fn run(arguments: Vec<String>) -> Result<(), String> {
     match arguments.first().map(String::as_str) {
         Some("raster") => run_raster(&arguments),
         Some("plan") => run_plan(&arguments),
+        Some("status") => run_status(&arguments),
         Some("finalize") => run_finalize(&arguments),
-        _ => Err("expected the raster, plan, or finalize subcommand".to_owned()),
+        _ => Err("expected the raster, plan, status, or finalize subcommand".to_owned()),
     }
 }
 
@@ -123,6 +127,70 @@ fn run_plan(arguments: &[String]) -> Result<(), String> {
         destination.display()
     );
     Ok(())
+}
+
+fn run_status(arguments: &[String]) -> Result<(), String> {
+    let (plan_path, options) = parse_path_command(
+        arguments,
+        "status",
+        &["--output-root", "--format"],
+        &["--output-root"],
+    )?;
+    let output_root = PathBuf::from(required(&options, "--output-root")?);
+    let bytes = read_json_input(&plan_path)?;
+    let plan = AdaptivePlan::from_json(&bytes).map_err(|error| error.to_string())?;
+    let status =
+        inspect_adaptive_asset_work(&plan, &output_root).map_err(|error| error.to_string())?;
+    match options
+        .get("--format")
+        .map(String::as_str)
+        .unwrap_or("human")
+    {
+        "human" => {
+            print!("{}", format_human_status(&status));
+        }
+        "json" => {
+            let json = status.to_json_bytes().map_err(|error| error.to_string())?;
+            print!(
+                "{}",
+                String::from_utf8(json)
+                    .map_err(|_| "asset work status JSON is not UTF-8".to_owned())?
+            );
+        }
+        format => {
+            return Err(format!(
+                "unsupported status format {format:?}; expected human or json"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn format_human_status(status: &AdaptiveWorkStatus) -> String {
+    use std::fmt::Write as _;
+
+    let mut output = format!(
+        "PLIEGO assets: {} ready | {} pending | {} invalid\n",
+        status.ready, status.pending, status.invalid
+    );
+    for job in status
+        .jobs
+        .iter()
+        .filter(|job| job.state != pliego_assets::AssetWorkState::Ready)
+    {
+        let _ = writeln!(
+            output,
+            "{}\t{}\t{}{}",
+            job.state.as_str(),
+            job.id,
+            job.staging_path,
+            job.diagnostic
+                .as_deref()
+                .map(|diagnostic| format!("\t{diagnostic}"))
+                .unwrap_or_default()
+        );
+    }
+    output
 }
 
 fn run_finalize(arguments: &[String]) -> Result<(), String> {
@@ -417,6 +485,49 @@ mod tests {
                 &["--out", "--source-root"]
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn human_status_is_stable_and_lowercase() {
+        let status = AdaptiveWorkStatus {
+            status_version: "pliego-adaptive-work/1".to_owned(),
+            recipe_sha256: "0".repeat(64),
+            pending: 1,
+            ready: 1,
+            invalid: 1,
+            jobs: vec![
+                pliego_assets::AssetJobStatus {
+                    id: "hero-ready".to_owned(),
+                    staging_path: "hero.avif".to_owned(),
+                    state: pliego_assets::AssetWorkState::Ready,
+                    bytes: Some(8),
+                    sha256: Some("1".repeat(64)),
+                    diagnostic: None,
+                },
+                pliego_assets::AssetJobStatus {
+                    id: "hero-pending".to_owned(),
+                    staging_path: "pending.avif".to_owned(),
+                    state: pliego_assets::AssetWorkState::Pending,
+                    bytes: None,
+                    sha256: None,
+                    diagnostic: None,
+                },
+                pliego_assets::AssetJobStatus {
+                    id: "hero-invalid".to_owned(),
+                    staging_path: "invalid.avif".to_owned(),
+                    state: pliego_assets::AssetWorkState::Invalid,
+                    bytes: Some(4),
+                    sha256: None,
+                    diagnostic: Some("artifact-validation-failed".to_owned()),
+                },
+            ],
+        };
+        assert_eq!(
+            format_human_status(&status),
+            "PLIEGO assets: 1 ready | 1 pending | 1 invalid\n\
+pending\thero-pending\tpending.avif\n\
+invalid\thero-invalid\tinvalid.avif\tartifact-validation-failed\n"
         );
     }
 

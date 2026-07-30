@@ -27,5 +27,9 @@ pliego dev
 The starter intentionally contains authored demonstration content. Treat it as
 a structural and visual system, not final client copy.
 
+Routes use `Page::lazy`; keep every `.source(...)` declaration complete when a
+renderer starts reading another project file. `pliego cache status` reports the
+last verified build outcome and artifact reuse.
+
 Third-party font attribution and license locations are recorded in
 `THIRD_PARTY_NOTICES.md`.

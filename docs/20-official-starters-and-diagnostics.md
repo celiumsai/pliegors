@@ -1,6 +1,6 @@
 # Official starters and CLI diagnostics
 
-**Status:** R5 accepted; official first-use contract revision 2 on 2026-07-16
+**Status:** R5 accepted; G4 starter revisions in progress
 
 ## Architecture
 
@@ -32,10 +32,10 @@ to run inside a PliegoRS checkout, and it never mixes first-party versions.
 
 | ID | Revision | Intended use | Capabilities |
 | --- | ---: | --- | --- |
-| `default` | 2 | first replayable PliegoRS application | SSG, events, projection, replay tests, branded errors |
-| `minimal` | 1 | studios, portfolios, small authored sites | SSG, SEO, responsive |
-| `editorial` | 1 | journals, archives, research, publishing | SSG, SEO, local media, dark mode |
-| `cinematic` | 1 | films, festivals, visual launches | SSG, SEO, local media, adaptive motion |
+| `default` | 3 | first replayable PliegoRS application | SSG, events, projection, replay tests, branded errors |
+| `minimal` | 2 | studios, portfolios, small authored sites | SSG, SEO, responsive |
+| `editorial` | 2 | journals, archives, research, publishing | SSG, SEO, local media, dark mode |
+| `cinematic` | 2 | films, festivals, visual launches | SSG, SEO, local media, adaptive motion |
 
 ```powershell
 pliego templates
@@ -49,6 +49,11 @@ sealed schema catalog, reducer identity, transactional projection, live versus
 replay test, snapshot-tail test, invalid-action test, `/`, `/guide/`, an
 authored `/404.html`, local identity assets, metadata, and Apache-2.0 license.
 The other entries remain opt-in design starters.
+
+Every maintained route now uses `Page::lazy` with explicit source edges.
+Standalone starter assets also declare their source files. This lets a changed
+build skip unaffected route renderers without weakening the verified receipt or
+atomic publication contract.
 
 Each generated README identifies the source, identity, domain, metadata, image,
 font, copy, and style files that must be changed before launch. Demonstration

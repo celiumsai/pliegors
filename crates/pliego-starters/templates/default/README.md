@@ -30,7 +30,8 @@ failures are rendered as diagnostic pages while the watcher remains alive.
 
 Add an `Action` and its typed event in `src/domain.rs`, extend the reducer, and
 keep live state equal to replay in the included tests. For a new route, add a
-`Page::new(...)` entry and declare each causal `.source(...)` edge.
+`Page::lazy(...)` entry and declare every file read by its renderer with a
+causal `.source(...)` edge.
 
 ## Production
 
@@ -40,11 +41,14 @@ pliego build
 pliego inspect
 pliego why artifact /
 pliego why-rebuilt
+pliego cache status
 pliego preview
 ```
 
 The deployable site is written to `target/site`. `pliego.graph.json` explains
 source to route to artifact causality and is covered by the build receipt.
+An unchanged build is a verified no-op; changed builds can reuse only verified
+lazy-route artifacts whose declared sources remain unchanged.
 Replace `https://example.com` in `src/main.rs` before launch so canonical and
 social URLs are correct.
 

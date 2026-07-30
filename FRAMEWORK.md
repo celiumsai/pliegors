@@ -35,6 +35,14 @@ then compiles the package for `wasm32-unknown-unknown`, runs `wasm-bindgen`, and
 executes the site package, revalidating captured inputs around each step. The
 site produces `pliego.build.json` through `pliego-ssg`.
 
+Before starting either compiler, `pliego build` verifies an existing receipt,
+causal graph, exact output set, and current build context. An exact match is a
+no-op that preserves the publication byte-for-byte. A changed build can reuse
+only verified artifacts produced by `Page::lazy` whose explicitly declared
+sources are unchanged; eager pages and `allSources` dependencies remain
+conservative. Every changed publication is still written to a fresh private
+stage and committed atomically.
+
 Output must remain below `target/<name>`. The CLI and SSG reject traversal,
 links, ancestors, current-directory output, and replacement of directories
 without a valid ownership ledger.
@@ -84,7 +92,10 @@ replaces an existing output only after that tree verifies from disk and has the
 same `project.id`. A changed build records the actual validated prior
 `projectId`, `sitePackage`, and `receiptSha256` in `previousOwnership`. An
 identical rebuild returns the already-verified report without replacing the
-tree, so its ledger bytes remain unchanged. `replacementPolicy` separately
+tree, so its ledger bytes remain unchanged. A selective build reopens prior
+route artifacts without following links, checks their length and SHA-256, and
+copies them into the new stage only after the prior receipt and graph agree.
+`replacementPolicy` separately
 records the stable overwrite authorization rule. `pliego inspect` and `pliego
 preview` recalculate both disk outputs and the current build context; they do
 not trust or repair stale evidence.
@@ -170,16 +181,18 @@ Hyphae durability claim.
 
 ## Official starters
 
-`pliego templates` lists `minimal`, `editorial`, and `cinematic`. A generated
-project includes explicit customization guidance and uses framework crates
-either from a local checkout or one exact canonical Git revision.
+`pliego templates` lists `default`, `minimal`, `editorial`, and `cinematic`.
+A generated project includes explicit customization guidance, lazy routes with
+causal source declarations, and framework crates from either a local checkout
+or one exact coordinated registry version.
 
 ## Current limits
 
-Streaming SSR, server functions, authenticated Hyphae infrastructure, durable
-outbox/replay persistence, production key distribution,
-selective build invalidation, deployment automation, and public package
-distribution are not stable surfaces. The R0-R7 gates in
+Authenticated Hyphae infrastructure, durable outbox/replay persistence,
+production key distribution, distributed build caching, deployment automation,
+and a stable 1.0 API are not current surfaces. Lazy route reuse and resumable
+asset work status are G4 source-preview contracts; external adoption evidence
+is still open. The R0-R7 gates in
 [`docs/28-hardening-roadmap.md`](docs/28-hardening-roadmap.md) take precedence
 over expanding those areas.
 
@@ -187,10 +200,12 @@ The full-stack evolution is specified by RFC-008 through RFC-014. G1 native
 HTTP, dynamic SSR, and routing are part of the coordinated public beta. G2 loaders,
 actions, sessions, idempotency, uploads, outbound HTTP policy, runtime cache,
 and causal invalidation are published in that same exact package graph.
+Streaming SSR is available through the bounded G1 ordered and asynchronous
+boundary contracts; it is independent from G4 static route reuse.
 The included G2 stores are development/conformance adapters. Production
 durability remains provider work. G3 PBOC execution, Linux OCI packaging,
 rolling/rollback compatibility, and Cloudflare application hosting are public
-preview surfaces in `0.3.0-beta.1`, backed by the same sealed-build provider
+preview surfaces in `0.4.0-beta.1`, backed by the same sealed-build provider
 corpus. Portable databases, queues, schedules, durable objects, provider
 billing, and automatic state migration remain outside that contract.
 

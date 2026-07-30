@@ -327,8 +327,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| PathBuf::from("target/site"));
 
     let report = Site::new()
-        .page(Page::new("/", home_head(), home()).language("en"))
-        .page(Page::new("/404.html", not_found_head(), not_found()).language("en"))
+        .page(Page::lazy("/", home_head(), ["src/main.rs"], home).language("en"))
+        .page(
+            Page::lazy(
+                "/404.html",
+                not_found_head(),
+                ["src/main.rs"],
+                not_found,
+            )
+            .language("en"),
+        )
         .asset(Asset::new("assets/site.css", CSS.to_vec()))
         .asset(Asset::new(
             "assets/afterlight-scene.jpg",

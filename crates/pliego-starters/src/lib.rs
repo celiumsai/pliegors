@@ -135,7 +135,7 @@ const CINEMATIC_FILES: &[TemplateFile] = &[
 pub const TEMPLATES: &[Template] = &[
     Template {
         id: DEFAULT_TEMPLATE_ID,
-        revision: 2,
+        revision: 3,
         description: "Replayable first-use project with a typed event vertical",
         capabilities: &[
             "ssg",
@@ -151,7 +151,7 @@ pub const TEMPLATES: &[Template] = &[
     },
     Template {
         id: "minimal",
-        revision: 1,
+        revision: 2,
         description: "Quiet, typography-led foundation for a small site",
         capabilities: &["ssg", "seo", "responsive"],
         cargo_toml: include_str!("../templates/minimal/Cargo.toml.tmpl"),
@@ -161,7 +161,7 @@ pub const TEMPLATES: &[Template] = &[
     },
     Template {
         id: "editorial",
-        revision: 1,
+        revision: 2,
         description: "Image-rich journal and independent publishing system",
         capabilities: &["ssg", "seo", "local-media", "dark-mode"],
         cargo_toml: include_str!("../templates/editorial/Cargo.toml.tmpl"),
@@ -171,7 +171,7 @@ pub const TEMPLATES: &[Template] = &[
     },
     Template {
         id: "cinematic",
-        revision: 1,
+        revision: 2,
         description: "Full-bleed narrative launch with adaptive motion",
         capabilities: &["ssg", "seo", "local-media", "motion"],
         cargo_toml: include_str!("../templates/cinematic/Cargo.toml.tmpl"),

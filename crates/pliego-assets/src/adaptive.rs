@@ -340,6 +340,52 @@ pub struct AdaptivePlan {
     pub jobs: Vec<AssetJob>,
 }
 
+pub const ADAPTIVE_WORK_STATUS_VERSION: &str = "pliego-adaptive-work/1";
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AssetWorkState {
+    Pending,
+    Ready,
+    Invalid,
+}
+
+impl AssetWorkState {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Ready => "ready",
+            Self::Invalid => "invalid",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AssetJobStatus {
+    pub id: String,
+    pub staging_path: String,
+    pub state: AssetWorkState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diagnostic: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AdaptiveWorkStatus {
+    pub status_version: String,
+    pub recipe_sha256: String,
+    pub pending: u64,
+    pub ready: u64,
+    pub invalid: u64,
+    pub jobs: Vec<AssetJobStatus>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PublishedVariant {
@@ -435,6 +481,12 @@ impl AdaptivePlan {
         serde_json::from_slice(bytes).map_err(AssetError::Json)
     }
 
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>, AssetError> {
+        pretty_json(self)
+    }
+}
+
+impl AdaptiveWorkStatus {
     pub fn to_json_bytes(&self) -> Result<Vec<u8>, AssetError> {
         pretty_json(self)
     }
@@ -555,6 +607,237 @@ pub fn plan_adaptive_assets(
     };
     validate_plan(&plan)?;
     Ok(plan)
+}
+
+pub fn inspect_adaptive_asset_work(
+    plan: &AdaptivePlan,
+    output_root: &Path,
+) -> Result<AdaptiveWorkStatus, AssetError> {
+    validate_plan(plan)?;
+    let root_metadata = match fs::symlink_metadata(output_root) {
+        Ok(metadata) => metadata,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(summarize_work_status(
+                plan,
+                plan.jobs
+                    .iter()
+                    .map(|job| work_status(job, AssetWorkState::Pending, None, None, None))
+                    .collect(),
+            ));
+        }
+        Err(source) => {
+            return Err(AssetError::Io {
+                path: output_root.to_owned(),
+                source,
+            });
+        }
+    };
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(invalid(format!(
+            "adaptive work root must be an unlinked directory: {}",
+            output_root.display()
+        )));
+    }
+    let canonical_root = output_root
+        .canonicalize()
+        .map_err(|source| AssetError::Io {
+            path: output_root.to_owned(),
+            source,
+        })?;
+
+    enum Preflight {
+        Classified(AssetJobStatus),
+        Candidate { path: PathBuf, bytes: u64 },
+    }
+
+    let mut preflight = Vec::with_capacity(plan.jobs.len());
+    let mut total_artifact_bytes = 0_u64;
+    for job in &plan.jobs {
+        let relative = validate_relative_path(&job.staging_path)?;
+        if reject_symlink_components(&canonical_root, &relative).is_err() {
+            preflight.push(Preflight::Classified(work_status(
+                job,
+                AssetWorkState::Invalid,
+                None,
+                None,
+                Some("unsafe-staging-path"),
+            )));
+            continue;
+        }
+        let staged = canonical_root.join(relative);
+        let metadata = match fs::symlink_metadata(&staged) {
+            Ok(metadata) => metadata,
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+                preflight.push(Preflight::Classified(work_status(
+                    job,
+                    AssetWorkState::Pending,
+                    None,
+                    None,
+                    None,
+                )));
+                continue;
+            }
+            Err(_) => {
+                preflight.push(Preflight::Classified(work_status(
+                    job,
+                    AssetWorkState::Invalid,
+                    None,
+                    None,
+                    Some("metadata-unavailable"),
+                )));
+                continue;
+            }
+        };
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            preflight.push(Preflight::Classified(work_status(
+                job,
+                AssetWorkState::Invalid,
+                None,
+                None,
+                Some("not-regular"),
+            )));
+            continue;
+        }
+        if metadata.len() == 0 || metadata.len() > MAX_ARTIFACT_BYTES {
+            preflight.push(Preflight::Classified(work_status(
+                job,
+                AssetWorkState::Invalid,
+                Some(metadata.len()),
+                None,
+                Some("size-limit"),
+            )));
+            continue;
+        }
+        total_artifact_bytes = checked_artifact_total(total_artifact_bytes, metadata.len())?;
+        let canonical = match staged.canonicalize() {
+            Ok(canonical) => canonical,
+            Err(_) => {
+                preflight.push(Preflight::Classified(work_status(
+                    job,
+                    AssetWorkState::Invalid,
+                    Some(metadata.len()),
+                    None,
+                    Some("changed-during-inspection"),
+                )));
+                continue;
+            }
+        };
+        if !canonical.starts_with(&canonical_root) {
+            preflight.push(Preflight::Classified(work_status(
+                job,
+                AssetWorkState::Invalid,
+                Some(metadata.len()),
+                None,
+                Some("escaped-root"),
+            )));
+            continue;
+        }
+        preflight.push(Preflight::Candidate {
+            path: canonical,
+            bytes: metadata.len(),
+        });
+    }
+
+    let mut jobs = Vec::with_capacity(plan.jobs.len());
+    for (job, preflight) in plan.jobs.iter().zip(preflight) {
+        let Preflight::Candidate { path, bytes } = preflight else {
+            let Preflight::Classified(status) = preflight else {
+                unreachable!();
+            };
+            jobs.push(status);
+            continue;
+        };
+        let mut file = match open_regular_nofollow(&path) {
+            Ok(file) => file,
+            Err(_) => {
+                jobs.push(work_status(
+                    job,
+                    AssetWorkState::Invalid,
+                    Some(bytes),
+                    None,
+                    Some("open-failed"),
+                ));
+                continue;
+            }
+        };
+        if !file
+            .metadata()
+            .is_ok_and(|metadata| metadata.len() == bytes)
+        {
+            jobs.push(work_status(
+                job,
+                AssetWorkState::Invalid,
+                Some(bytes),
+                None,
+                Some("changed-during-inspection"),
+            ));
+            continue;
+        }
+        if validate_artifact(&mut file, &path, job).is_err() {
+            jobs.push(work_status(
+                job,
+                AssetWorkState::Invalid,
+                Some(bytes),
+                None,
+                Some("artifact-validation-failed"),
+            ));
+            continue;
+        }
+        match hash_open_file(&mut file, &path) {
+            Ok(sha256) => jobs.push(work_status(
+                job,
+                AssetWorkState::Ready,
+                Some(bytes),
+                Some(sha256),
+                None,
+            )),
+            Err(_) => jobs.push(work_status(
+                job,
+                AssetWorkState::Invalid,
+                Some(bytes),
+                None,
+                Some("read-failed"),
+            )),
+        }
+    }
+    Ok(summarize_work_status(plan, jobs))
+}
+
+fn work_status(
+    job: &AssetJob,
+    state: AssetWorkState,
+    bytes: Option<u64>,
+    sha256: Option<String>,
+    diagnostic: Option<&str>,
+) -> AssetJobStatus {
+    AssetJobStatus {
+        id: job.id.clone(),
+        staging_path: job.staging_path.clone(),
+        state,
+        bytes,
+        sha256,
+        diagnostic: diagnostic.map(ToOwned::to_owned),
+    }
+}
+
+fn summarize_work_status(plan: &AdaptivePlan, jobs: Vec<AssetJobStatus>) -> AdaptiveWorkStatus {
+    AdaptiveWorkStatus {
+        status_version: ADAPTIVE_WORK_STATUS_VERSION.to_owned(),
+        recipe_sha256: plan.recipe_sha256.clone(),
+        pending: jobs
+            .iter()
+            .filter(|job| job.state == AssetWorkState::Pending)
+            .count() as u64,
+        ready: jobs
+            .iter()
+            .filter(|job| job.state == AssetWorkState::Ready)
+            .count() as u64,
+        invalid: jobs
+            .iter()
+            .filter(|job| job.state == AssetWorkState::Invalid)
+            .count() as u64,
+        jobs,
+    }
 }
 
 pub fn finalize_adaptive_assets(
@@ -1939,6 +2222,63 @@ mod tests {
         assert!(!output.join("assets").exists());
         fs::remove_dir_all(source).unwrap();
         fs::remove_dir_all(output).unwrap();
+    }
+
+    #[test]
+    fn work_status_is_resumable_and_classifies_invalid_staging_without_mutation() {
+        assert_eq!(AssetWorkState::Pending.as_str(), "pending");
+        assert_eq!(AssetWorkState::Ready.as_str(), "ready");
+        assert_eq!(AssetWorkState::Invalid.as_str(), "invalid");
+
+        let source = temp();
+        fs::write(source.join("hero.png"), b"source").unwrap();
+        let plan = plan_adaptive_assets(&image_recipe(), &source).unwrap();
+        let output = source.join("work");
+
+        let pending = inspect_adaptive_asset_work(&plan, &output).unwrap();
+        assert_eq!(pending.pending, 1);
+        assert_eq!(pending.ready, 0);
+        assert_eq!(pending.invalid, 0);
+        assert!(!output.exists(), "status must not create the work root");
+
+        let staged = output.join(&plan.jobs[0].staging_path);
+        fs::create_dir_all(staged.parent().unwrap()).unwrap();
+        fs::write(&staged, b"not really avif").unwrap();
+        let invalid = inspect_adaptive_asset_work(&plan, &output).unwrap();
+        assert_eq!(invalid.pending, 0);
+        assert_eq!(invalid.ready, 0);
+        assert_eq!(invalid.invalid, 1);
+        assert_eq!(
+            invalid.jobs[0].diagnostic.as_deref(),
+            Some("artifact-validation-failed")
+        );
+        assert_eq!(
+            fs::read(&staged).unwrap(),
+            b"not really avif",
+            "status must not delete or rewrite invalid work"
+        );
+
+        let valid = b"\0\0\0\x14ftypavifpayload";
+        fs::write(&staged, valid).unwrap();
+        let ready = inspect_adaptive_asset_work(&plan, &output).unwrap();
+        assert_eq!(ready.pending, 0);
+        assert_eq!(ready.ready, 1);
+        assert_eq!(ready.invalid, 0);
+        assert_eq!(ready.jobs[0].bytes, Some(valid.len() as u64));
+        let expected_digest = sha256(valid);
+        assert_eq!(
+            ready.jobs[0].sha256.as_deref(),
+            Some(expected_digest.as_str())
+        );
+        assert_eq!(
+            ready.to_json_bytes().unwrap(),
+            inspect_adaptive_asset_work(&plan, &output)
+                .unwrap()
+                .to_json_bytes()
+                .unwrap(),
+            "unchanged staging must produce deterministic status JSON"
+        );
+        fs::remove_dir_all(source).unwrap();
     }
 
     #[test]
