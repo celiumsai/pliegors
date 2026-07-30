@@ -98,7 +98,7 @@ The non-circular promotion order is:
 
 1. Run a canary candidate for the intended version and source revision. The
    eight hosted rows use the signed candidate source archive.
-2. Review the sealed bundle and publish all 19 exact-version crates from the
+2. Review the sealed bundle and publish all 21 exact-version crates from the
    same clean revision through the guarded publisher.
 3. Run the signed golden runner on WSL2 using the sealed canary bundle and
    `--dependency-source registry`.
@@ -123,16 +123,18 @@ directory and publishing the exact crates version, run:
 ```sh
 node ./run-golden-path.mjs \
   --release . \
-  --output ./wsl2-x64.json \
+  --output ../wsl2-x64.json \
   --environment-id wsl2-x64 \
   --target x86_64-unknown-linux-gnu \
   --scenario standard \
   --dependency-source registry
 
-base64 -w 0 ./wsl2-x64.json
+base64 -w 0 ../wsl2-x64.json
 ```
 
-The encoded output is a workflow input, not a repository file or credential.
+The report must stay outside the sealed bundle so the verifier sees the exact
+release asset set. The encoded output is a workflow input, not a repository
+file or credential.
 The aggregator revalidates all report fields and exact hashes; it does not
 trust the filename or the operator's description.
 
