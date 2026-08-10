@@ -76,6 +76,10 @@ the official site.
 - signals, memos, effects, ownership scopes, typed/versioned events with exact
   schema-value round trips, transactional projections, and contract-bound
   snapshots;
+- source-preview StateRoot and bounded causal transaction contracts with
+  N+1 effect-event queueing and deterministic before/after receipts;
+- opt-in renderer-neutral DOM plan observation with mount-local identities and
+  post-commit receipts for direct and adopted browser mounts;
 - typed Markdown, JSON, and TOML content with bounded discovery;
 - Rust/WASM clients and a versioned mount/update/unmount adapter contract;
 - lazy loading, capability policy, Save-Data, reduced motion, cancellation, and
@@ -126,6 +130,32 @@ PliegoRS is not a Vite, Astro, Next.js, or Leptos clone. Its differentiator is
 the trust model across events, folds, effects, artifacts, and lifecycles.
 Hyphae is the first-class durable data plane when a project needs it, but static
 projects do not require Hyphae.
+
+The active `0.5.x` program, codenamed PliegoRS Next, evolves this repository
+rather than restarting its packages or contracts. The current native build and
+development path is the reference host; Vite remains an experimental adapter
+until equivalence and benchmark gates pass. See the [0.5 roadmap](ROADMAP.md)
+and [transition program](docs/52-pliegors-next-transition.md).
+
+Phase 0 now has versioned fixture and baseline-report contracts. Run
+`npm run measure:next-baseline -- --output <new-directory>` to produce the
+current inventory and `npm run check:next-baseline -- --baseline <directory>`
+to verify its JSON/Markdown exact pair. The report remains incomplete until all
+three executable fixtures and collectors are implemented.
+
+The minimal causal fixture is executable. Add `--execute-minimal` to collect its
+cold/warm build, build-phase, emitted WASM/asset, verified-reuse, and supported
+process-tree RSS measurements.
+
+The stress dashboard is also executable. `npm run
+check:next-stress-dashboard-browser` proves 1,536 keyed rows, deterministic
+filters/sort, 120 tick updates, replay parity, DOM identity, remount persistence,
+and a 10,000-cycle representative ownership/DOM/WASM-memory plateau. Use
+`--execute-stress-dashboard` to collect its build evidence.
+
+Add `--execute-dev-hmr` with either executable fixture flag to collect native
+dev cold/warm readiness and serialized CSS HMR server/browser visibility. The
+collector does not infer typed remount or reload reasons from navigation.
 
 R0-R7 and P8 are complete and remain regression gates: reactive safety,
 artifact trust, verified sync, snapshots and schemas, DOM lifecycle, developer
@@ -350,6 +380,10 @@ cargo test --workspace --all-targets --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo clippy --target wasm32-unknown-unknown --locked -p pliegors-site-client -p spike -- -D warnings
 npm ci
+npm run test:next-baseline
+npm run check:next-baseline -- --baseline <baseline-directory>
+npm run check:next-minimal-browser
+npm run check:next-stress-dashboard-browser
 npm run check:benchmarks
 npm run check:fuzz
 npm run check:golden-path
@@ -377,6 +411,12 @@ using the native Windows CLI for normal project development.
 - [Online documentation](https://pliegors.dev/docs/)
 - [Public changelog](https://pliegors.dev/changelog/)
 - [Security and trust center](https://pliegors.dev/security/)
+- [PliegoRS 0.5 roadmap](ROADMAP.md)
+- [PliegoRS Next transition program](docs/52-pliegors-next-transition.md)
+- [Next migration inventory](docs/53-next-migration-inventory.md)
+- [StateRoot v1 decision](docs/adr/ADR-009-state-root-v1.md)
+- [Causal transaction scheduler decision](docs/adr/ADR-010-causal-transaction-scheduler.md)
+- [Next Phase 0 smoke](docs/evidence/next-phase0-smoke-2026-08-09.md)
 - [Current execution backlog](docs/19-product-execution-backlog.md)
 - [G4 engineering readiness](docs/51-g4-engineering-readiness.md)
 - [G4 accepted engineering evidence](docs/evidence/g4-engineering-readiness.md)

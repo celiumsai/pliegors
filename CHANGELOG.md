@@ -7,7 +7,43 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ## Unreleased
 
-No changes yet.
+### Added
+
+- Add the PliegoRS `0.5.x` transition roadmap, fixed release and pre-Next source
+  references, package migration inventory, and architecture decisions for the
+  repository/release topology and native-first BuildHost evaluation.
+- Add strict Next fixture and baseline-report schemas, three source-bound
+  fixture specifications, an exact-set inventory publisher, deterministic
+  Markdown rendering, and semantic validation for samples and percentiles.
+- Add the executable minimal causal fixture with typed counter/list events,
+  genesis and snapshot-tail replay, keyed and conditional DOM, owner-bound local
+  state/effects, explicit mount disposal, and real build/artifact collectors.
+- Add the executable 1,536-row stress dashboard with typed tick/filter/sort
+  events, stable keyed row bindings, chart updates, replay parity, nested
+  ownership, remount persistence, a 10,000-cycle browser lifecycle gate, and the
+  shared native build collector.
+- Add the native dev/CSS HMR collector with strict SSE and rebuild-record
+  validation, cold/warm readiness, computed-style post-frame settlement, DOM
+  mutation records, browser identity, and explicit typed-receipt gaps.
+- Split CSS HMR latency into verified discovery, Rust/WASM, site, verification,
+  and residual host/transport phases using the post-update build receipt.
+- Add bounded Phase 0 smoke findings and define StateRoot v1 as a separately
+  domain-versioned digest derived from verified projection snapshots.
+- Add the bounded causal scheduler preview with explicit phases, N+1 effect
+  event queues, atomic projection preparation, StateRoot-bound transaction
+  receipts, iterative drains, and unwind-target recovery tests.
+- Add observable DOM plans and successful commit receipts for dynamic text,
+  attributes, subtree replacement, and keyed reconciliation without exposing a
+  second executor or browser DOM types.
+- Defer the reduced Hyphae Console fixture to the released Hyphae Native 1.0
+  contract, with explicit G7/G8, release, adapter, and MSRV boundaries.
+
+### Changed
+
+- Reconcile current release, package-count, support, starter, and crate README
+  statements with the canonical `0.4.0-beta.1` capability manifest.
+- Extend the product-truth gate to cover security, distribution, roadmap,
+  starter, project-manifest, and selected crate documentation.
 
 ## 0.4.0-beta.1 - 2026-07-30
 
