@@ -32,3 +32,10 @@ last verified build outcome and artifact reuse.
 
 Third-party font attribution and license locations are recorded in
 `THIRD_PARTY_NOTICES.md`.
+
+## Project license
+
+The copied starter code and PliegoRS engine are GPL-3.0-only. New original work
+you author remains yours and is not automatically licensed by PliegoRS. Choose
+an SPDX identifier in `Cargo.toml` and replace `LICENSE.md` before distribution,
+while preserving GPL obligations for covered or combined work.

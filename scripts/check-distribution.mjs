@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -32,7 +32,7 @@ assert.deepEqual(crates.map((pkg) => pkg.name), expected);
 const packagesByName = new Map(allCrates.map((pkg) => [pkg.name, pkg]));
 for (const pkg of allCrates) {
   assert.equal(pkg.version, workspaceVersion, `${pkg.name} version drift`);
-  assert.equal(pkg.license, 'Apache-2.0', `${pkg.name} license`);
+  assert.equal(pkg.license, 'GPL-3.0-only', `${pkg.name} license`);
   assert.equal(pkg.repository, 'https://github.com/celiumsai/pliegors', `${pkg.name} repository`);
   assert.equal(pkg.homepage, 'https://pliegors.dev', `${pkg.name} homepage`);
   assert.equal(pkg.rust_version, '1.86', `${pkg.name} rust-version`);
@@ -101,6 +101,7 @@ assert.ok(
   'CI lacks the pinned actionlint 1.7.12 Linux digest',
 );
 assert.ok(ci.includes('actionlint" .github/workflows/*.yml'), 'CI does not validate workflows');
+assert.ok(ci.includes('npm run check:licenses'), 'CI does not validate the repository license contract');
 assert.ok(!ci.includes('.sha256sum'), 'CI must not trust a checksum sidecar from the asset release');
 const releaseTargets = [
   'x86_64-unknown-linux-gnu',
@@ -122,6 +123,8 @@ for (const contract of [
   'ubuntu-22.04', 'ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15-intel', 'macos-15', 'windows-2025',
   'link-arg=/Brepro',
   'pliego-$env:RELEASE_TARGET.zip', 'retention-days: 7', 'retention-days: 14',
+  'Copy-Item LICENSE, LICENSE-DOCUMENTATION, LICENSING.md, NOTICE, README.md, THIRD_PARTY_NOTICES.md, TRADEMARKS.md',
+  'Copy-Item LICENSES/GPL-3.0-only.txt, LICENSES/CC-BY-SA-4.0.txt',
   'CANDIDATE-METADATA.json',
   'PLIEGORS_CANDIDATE_SIGNING_KEY', 'create-release-manifest.mjs',
   'verify-release-bundle.mjs', 'install.sh', 'install.ps1', 'golden_path',
@@ -199,6 +202,10 @@ const publicProjectFiles = [
   'CONTRIBUTING.md',
   'GOVERNANCE.md',
   'LICENSE',
+  'LICENSE-DOCUMENTATION',
+  'LICENSES/CC-BY-SA-4.0.txt',
+  'LICENSES/GPL-3.0-only.txt',
+  'LICENSING.md',
   'NOTICE',
   'SECURITY.md',
   'SUPPORT.md',
@@ -225,13 +232,14 @@ const publicProjectFiles = [
   'scripts/run-golden-path.mjs',
   'scripts/source-archive-listing.mjs',
   'scripts/check-golden-matrix.mjs',
+  'scripts/check-license-contract.mjs',
   'scripts/check-telemetry-contract.mjs',
   'schemas/pliego.golden-path-report.schema.json',
   'schemas/pliego.golden-matrix.schema.json',
   'schemas/pliego.telemetry-report.schema.json',
   'docs/41-voluntary-telemetry.md',
   'scripts/publish-crates.mjs',
-  'crates/pliego-starters/LICENSE',
+  'crates/pliego-starters/templates/PROJECT-LICENSE.md',
   'examples/pliegors-site/public/fonts/LICENSE-fragment-mono.txt',
   'examples/pliegors-site/public/fonts/LICENSE-instrument-sans.txt',
   'examples/pliegors-site/public/fonts/LICENSE-instrument-serif.txt',

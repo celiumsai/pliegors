@@ -1,12 +1,12 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 
 # PliegoRS trademark policy
 
-The Apache-2.0 license grants copyright and patent permissions for the source;
-it does not grant permission to use Celiums Solutions LLC trademarks. PliegoRS,
-the PliegoRS wordmark and symbol, Celiums, and associated visual identities are
-marks of Celiums Solutions LLC, whether or not registered in a particular
-jurisdiction.
+GPL-3.0-only and CC-BY-SA-4.0 grant copyright permissions for their respective
+materials; neither grants permission to use Celiums Solutions LLC trademarks.
+PliegoRS, the PliegoRS wordmark and symbol, Celiums, and associated visual
+identities are marks of Celiums Solutions LLC, whether or not registered in a
+particular jurisdiction.
 
 ## Uses that do not require separate permission
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 import { spawn, spawnSync } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
@@ -198,7 +198,7 @@ async function createFixture(workspace, project) {
     cp(path.join(root, 'examples', 'content-collections-pliegors', 'pliego.toml'), path.join(project, 'pliego.toml')),
   ]);
   const dependency = (name) => path.join(root, 'crates', name).replaceAll('\\', '/');
-  const manifest = `# SPDX-License-Identifier: Apache-2.0\n[package]\nname = "content-collections-pliegors"\nversion = "0.0.0"\nedition = "2024"\nrust-version = "1.85"\npublish = false\n\n[workspace]\n\n[[bin]]\nname = "content-collections-pliegors"\npath = "src/main.rs"\ntest = false\nbench = false\n\n[dependencies]\npliego-content = { path = "${dependency('pliego-content')}" }\npliego-dom = { path = "${dependency('pliego-dom')}" }\npliego-ssg = { path = "${dependency('pliego-ssg')}" }\nserde = { version = "1", features = ["derive"] }\n`;
+  const manifest = `# SPDX-License-Identifier: GPL-3.0-only\n[package]\nname = "content-collections-pliegors"\nversion = "0.0.0"\nedition = "2024"\nrust-version = "1.85"\npublish = false\n\n[workspace]\n\n[[bin]]\nname = "content-collections-pliegors"\npath = "src/main.rs"\ntest = false\nbench = false\n\n[dependencies]\npliego-content = { path = "${dependency('pliego-content')}" }\npliego-dom = { path = "${dependency('pliego-dom')}" }\npliego-ssg = { path = "${dependency('pliego-ssg')}" }\nserde = { version = "1", features = ["derive"] }\n`;
   await writeFile(path.join(project, 'Cargo.toml'), manifest, 'utf8');
 }
 

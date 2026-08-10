@@ -47,7 +47,8 @@ pliego new my-film --template cinematic
 `default` is the explicit CLI default. It ships a typed action, versioned event,
 sealed schema catalog, reducer identity, transactional projection, live versus
 replay test, snapshot-tail test, invalid-action test, `/`, `/guide/`, an
-authored `/404.html`, local identity assets, metadata, and Apache-2.0 license.
+authored `/404.html`, local identity assets, metadata, and an explicit
+user-selected application-license placeholder.
 The other entries remain opt-in design starters.
 
 Every maintained route now uses `Page::lazy` with explicit source edges.
@@ -63,7 +64,8 @@ internals.
 The editorial and cinematic source trees also include the complete SIL OFL
 license texts and a `THIRD_PARTY_NOTICES.md` file. A crate test requires those
 files whenever a starter embeds local font binaries. Every maintained starter
-ships the framework `LICENSE` file.
+ships a neutral `LICENSE.md` project placeholder. Copied starter code remains
+GPL-3.0-only; new original user work is not automatically licensed by PliegoRS.
 
 ## Diagnostics
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 #[cfg(any(target_arch = "wasm32", test))]
 fn normalize_search(value: &str) -> String {

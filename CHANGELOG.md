@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 
 # Changelog
 
@@ -8,6 +8,11 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 ## Unreleased
 
 ### Added
+
+- Relicense future PliegoRS software revisions under GPL-3.0-only and
+  project-authored documentation/original non-software media under
+  CC-BY-SA-4.0, with explicit historical Apache-2.0 continuity and neutral
+  generated-project licensing.
 
 - Add the PliegoRS `0.5.x` transition roadmap, fixed release and pre-Next source
   references, package migration inventory, and architecture decisions for the

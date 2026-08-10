@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 import assert from 'node:assert/strict';
 import { access, readFile } from 'node:fs/promises';
