@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 import { access, readFile, stat } from "node:fs/promises";
 import { createServer } from "node:http";

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: GPL-3.0-only
 
 [workspace]
 resolver = "2"
@@ -10,7 +10,7 @@ exclude = []
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.86"
-license = "Apache-2.0"
+license = "GPL-3.0-only"
 
 [workspace.dependencies]
 pliego-dom = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-dom" }

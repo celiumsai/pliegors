@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 export const pliegoComponent = Object.freeze({
   apiVersion: "0.2.0-beta.1",

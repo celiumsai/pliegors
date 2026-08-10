@@ -281,8 +281,8 @@ pub const TOPICS: &[DocTopic] = &[
         group_es: "Proyecto",
         title_en: "Licensing and policy",
         title_es: "Licenciamiento y políticas",
-        summary_en: "Understand Apache-2.0, third-party notices, trademarks, security reports, support, and contributions.",
-        summary_es: "Entiende Apache-2.0, avisos de terceros, marcas, reportes de seguridad, soporte y contribuciones.",
+        summary_en: "Understand GPL-3.0-only, CC-BY-SA-4.0, third-party notices, trademarks, security reports, support, and contributions.",
+        summary_es: "Entiende GPL-3.0-only, CC-BY-SA-4.0, avisos de terceros, marcas, reportes de seguridad, soporte y contribuciones.",
     },
 ];
 
@@ -1562,18 +1562,18 @@ fn crate_reference(locale: Locale) -> View {
 
 fn licensing(locale: Locale) -> View {
     vec![
-        doc_section(locale, "apache", "Apache License 2.0", "Licencia Apache 2.0", vec![
-            paragraph(locale, "PliegoRS framework source is licensed under Apache-2.0. You may use, modify, and distribute it under that license, subject to its copyright, notice, patent, and redistribution terms. The LICENSE file is the controlling text.", "El código fuente del framework PliegoRS está licenciado bajo Apache-2.0. Puedes usarlo, modificarlo y distribuirlo bajo esa licencia, sujeto a sus términos de copyright, avisos, patentes y redistribución. El archivo LICENSE es el texto rector."),
+        doc_section(locale, "copyleft", "Copyleft licensing", "Licenciamiento copyleft", vec![
+            paragraph(locale, "PliegoRS software is licensed under GPL-3.0-only. Project-authored documentation and original non-software media are licensed under CC-BY-SA-4.0. LICENSING.md and the license files define the controlling boundary.", "El software PliegoRS está licenciado bajo GPL-3.0-only. La documentación del proyecto y los medios originales que no son software están licenciados bajo CC-BY-SA-4.0. LICENSING.md y los archivos de licencia definen el límite rector."),
             link_list(locale, &[
                 ("https://github.com/celiumsai/pliegors/blob/main/LICENSE", "Read LICENSE", "Leer LICENSE"),
                 ("https://github.com/celiumsai/pliegors/blob/main/NOTICE", "Read NOTICE", "Leer NOTICE"),
             ]),
         ]),
         doc_section(locale, "starters", "Generated starters", "Starters generados", vec![
-            paragraph(locale, "Official starter source is provided under Apache-2.0 and includes its license. Your application code, content, brand, and original assets remain yours; choose and document the license that fits your project before publication. Third-party fonts and media retain their own notices.", "El código de los starters oficiales se ofrece bajo Apache-2.0 e incluye su licencia. El código, contenido, marca y assets originales de tu aplicación siguen siendo tuyos; elige y documenta la licencia adecuada antes de publicar. Las fuentes y medios de terceros conservan sus propios avisos."),
+            paragraph(locale, "Generated starters include a neutral application-license placeholder. Copied template code remains GPL-covered; new original application code, content, brand, and assets remain yours and are not automatically licensed by PliegoRS. Choose and document your project license before publication while preserving applicable GPL and third-party obligations.", "Los starters generados incluyen un marcador neutral para la licencia de la aplicación. El código copiado de la plantilla conserva la GPL; el nuevo código, contenido, marca y assets originales de tu aplicación siguen siendo tuyos y PliegoRS no los licencia automáticamente. Elige y documenta la licencia del proyecto antes de publicar, preservando las obligaciones GPL y de terceros aplicables."),
         ]),
         doc_section(locale, "trademarks", "Names and marks", "Nombres y marcas", vec![
-            paragraph(locale, "Apache-2.0 does not grant permission to use PliegoRS or Celiums names, logos, or marks to imply endorsement. Descriptive references such as “Built with PliegoRS” are governed by the repository trademark policy.", "Apache-2.0 no concede permiso para usar nombres, logos o marcas de PliegoRS o Celiums para implicar respaldo. Referencias descriptivas como “Built with PliegoRS” se rigen por la política de marcas del repositorio."),
+            paragraph(locale, "GPL-3.0-only and CC-BY-SA-4.0 do not grant permission to use PliegoRS or Celiums names, logos, or marks to imply endorsement. Descriptive references such as “Built with PliegoRS” are governed by the repository trademark policy.", "GPL-3.0-only y CC-BY-SA-4.0 no conceden permiso para usar nombres, logos o marcas de PliegoRS o Celiums para implicar respaldo. Referencias descriptivas como “Built with PliegoRS” se rigen por la política de marcas del repositorio."),
             link_list(locale, &[("https://github.com/celiumsai/pliegors/blob/main/TRADEMARKS.md", "Trademark policy", "Política de marcas")]),
         ]),
         doc_section(locale, "project-policy", "Public project policy", "Política pública del proyecto", vec![
@@ -1989,7 +1989,7 @@ fn outline(slug: &str) -> Vec<(&'static str, &'static str, &'static str)> {
             ("boundaries", "Normative boundaries", "Límites normativos"),
         ],
         "licensing" => vec![
-            ("apache", "Apache-2.0", "Apache-2.0"),
+            ("copyleft", "GPL and CC BY-SA", "GPL y CC BY-SA"),
             ("starters", "Generated starters", "Starters generados"),
             ("trademarks", "Names and marks", "Nombres y marcas"),
             ("project-policy", "Project policy", "Política del proyecto"),

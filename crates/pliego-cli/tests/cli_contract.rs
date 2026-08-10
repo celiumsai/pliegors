@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -581,7 +581,7 @@ fn new_without_template_builds_the_official_first_use_contract() {
     assert!(!main.contains("__NAME__"));
     for path in [
         "README.md",
-        "LICENSE",
+        "LICENSE.md",
         "src/domain.rs",
         "assets/favicon.svg",
         "assets/site.webmanifest",

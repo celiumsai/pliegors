@@ -23,3 +23,10 @@ after a build to review its route, file, and byte totals. Routes use
 `Page::lazy`; keep every `.source(...)` declaration complete when a renderer
 starts reading another project file. `pliego cache status` explains whether the
 last build executed or was a verified no-op.
+
+## License
+
+The copied starter code and PliegoRS engine are GPL-3.0-only. New original work
+you author remains yours and is not automatically licensed by PliegoRS. Choose
+an SPDX identifier in `Cargo.toml` and replace `LICENSE.md` before distribution,
+while preserving GPL obligations for covered or combined work.

@@ -56,6 +56,8 @@ Documentation: https://pliegors.dev/docs/getting-started
 
 ## License
 
-This starter is distributed under Apache-2.0; see `LICENSE`. Your original
-application code and assets remain yours. Preserve notices for any third-party
-dependencies or media you add.
+The copied starter code and PliegoRS engine are GPL-3.0-only. New original
+application code, content, brand, and assets that you author remain yours and
+are not automatically licensed by PliegoRS. Choose an SPDX identifier in
+`Cargo.toml` and replace `LICENSE.md` before distribution, while preserving GPL
+obligations for covered or combined work. Preserve third-party notices.

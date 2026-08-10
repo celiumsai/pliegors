@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: GPL-3.0-only
 
 [workspace]
 resolver = "2"
@@ -9,7 +9,7 @@ default-members = ["client", "site"]
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.86"
-license = "Apache-2.0"
+license = "GPL-3.0-only"
 
 [workspace.dependencies]
 js-sys = "=0.3.103"

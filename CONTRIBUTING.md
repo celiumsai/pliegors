@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 
 # Contributing to PliegoRS
 
@@ -43,7 +43,9 @@ commands used for verification, and call out compatibility or security effects.
 Keep unrelated refactors out of the same change.
 
 By submitting a contribution, you represent that you have the right to submit
-it and agree that it is licensed under Apache-2.0, the repository license.
+it and agree that software contributions are licensed under GPL-3.0-only and
+documentation or original non-software media contributions are licensed under
+CC-BY-SA-4.0, according to `LICENSING.md` and file-level notices.
 
 Participation is governed by `CODE_OF_CONDUCT.md`. Security reports follow
 `SECURITY.md`, not the public issue tracker.

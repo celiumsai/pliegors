@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 use crate::{SecretHandle, SessionToken, validate_stable_id};
 use base64::Engine;

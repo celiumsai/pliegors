@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 
 # Support policy
 
@@ -29,9 +29,9 @@ Use `hello@pliegors.dev` for private project correspondence. Vulnerabilities
 must follow `SECURITY.md`. Do not send secrets or proprietary source unless a
 separate secure exchange has been agreed.
 
-PliegoRS is provided under Apache-2.0 without a support SLA or warranty. A
-future commercial support policy, if any, will be published separately and will
-not change the rights granted by the open-source license.
+PliegoRS is provided under GPL-3.0-only and CC-BY-SA-4.0 without a support SLA
+or warranty. A future commercial support policy, if any, will be published
+separately and will not change rights already granted by those licenses.
 
 Release-channel and compatibility windows are defined in the
 [product constitution](docs/34-product-constitution.md). Before `1.0`, only the

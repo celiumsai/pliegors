@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 //! Maintained project trees embedded in the standalone `pliego` binary.
 
@@ -46,11 +46,11 @@ macro_rules! text_file {
     };
 }
 
-macro_rules! framework_license {
+macro_rules! project_license {
     () => {
         TemplateFile {
-            path: "LICENSE",
-            bytes: include_bytes!("../LICENSE"),
+            path: "LICENSE.md",
+            bytes: include_bytes!("../templates/PROJECT-LICENSE.md"),
             mode: TemplateFileMode::Copy,
         }
     };
@@ -70,7 +70,7 @@ const DEFAULT_FILES: &[TemplateFile] = &[
     ),
     copy_file!("default", "assets/robots.txt"),
     text_file!("default", "README.md", TemplateFileMode::PlainText),
-    framework_license!(),
+    project_license!(),
 ];
 
 const MINIMAL_FILES: &[TemplateFile] = &[
@@ -83,7 +83,7 @@ const MINIMAL_FILES: &[TemplateFile] = &[
         TemplateFileMode::JsonText
     ),
     text_file!("minimal", "README.md", TemplateFileMode::PlainText),
-    framework_license!(),
+    project_license!(),
 ];
 
 const EDITORIAL_FILES: &[TemplateFile] = &[
@@ -109,7 +109,7 @@ const EDITORIAL_FILES: &[TemplateFile] = &[
         TemplateFileMode::PlainText
     ),
     text_file!("editorial", "README.md", TemplateFileMode::PlainText),
-    framework_license!(),
+    project_license!(),
 ];
 
 const CINEMATIC_FILES: &[TemplateFile] = &[
@@ -129,7 +129,7 @@ const CINEMATIC_FILES: &[TemplateFile] = &[
         TemplateFileMode::PlainText
     ),
     text_file!("cinematic", "README.md", TemplateFileMode::PlainText),
-    framework_license!(),
+    project_license!(),
 ];
 
 pub const TEMPLATES: &[Template] = &[
@@ -221,7 +221,7 @@ mod tests {
             assert!(template.project_toml.contains("__PACKAGE__"));
             assert!(template.files.iter().any(|file| file.path == "src/main.rs"));
             assert!(template.files.iter().any(|file| file.path == "README.md"));
-            assert!(template.files.iter().any(|file| file.path == "LICENSE"));
+            assert!(template.files.iter().any(|file| file.path == "LICENSE.md"));
         }
     }
 

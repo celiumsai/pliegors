@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 
 use pliego_pboc::{
     ArtifactRole, BuildIdentity, CompatibilityIdentity, DeploymentTarget, FeatureRequirement,

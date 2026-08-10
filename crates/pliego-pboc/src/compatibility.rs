@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 Celiums Solutions LLC
 
 use crate::{PbocError, PbocManifest, validate_manifest};

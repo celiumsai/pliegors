@@ -132,6 +132,8 @@ jobs:
 
       - name: Check canonical product capabilities
         run: npm run check:product-truth
+      - name: Check repository license contract
+        run: npm run check:licenses
 
       - name: Check PBOC schema contract
         run: npm run check:pboc
