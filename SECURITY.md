@@ -67,8 +67,15 @@ public repository keeps `main` as its sole persistent branch. Maintainers batch
 reviewed updates in short-lived branches, pass the protected-branch gates, and
 delete those branches immediately after a linear merge.
 
-The current lockfile has no known vulnerability advisories. `cargo audit`
-reports one allowed maintenance warning, `RUSTSEC-2026-0173`, for the
-build-time transitive `proc-macro-error2` dependency introduced by `rstml`.
-It is not a reported vulnerability and is excluded only as a documented
-maintenance exception. PliegoRS tracks removal in a maintenance release.
+The current source lockfile retains low-severity `RUSTSEC-2026-0222` for
+Wasmtime `36.0.8` only to preserve package verification for the already
+published `0.4.0-beta.1` graph. That released graph pins `pliego-sdk` to the
+same Wasmtime patch and cannot be rewritten in place. Runtime execution keeps
+the isolated-engine and typed-boundary restrictions from ADR-006. The `0.5.x`
+release line must upgrade Wasmtime before publishing any new package.
+
+`cargo audit` also reports one allowed maintenance warning,
+`RUSTSEC-2026-0173`, for the build-time transitive `proc-macro-error2`
+dependency introduced by `rstml`. It is not a reported vulnerability and is
+excluded only as a documented maintenance exception. PliegoRS tracks removal
+in a maintenance release.

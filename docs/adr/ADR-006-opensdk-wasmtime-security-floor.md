@@ -30,6 +30,11 @@ before OpenSDK and keeps its existing Rust `1.85.0` evidence.
    epoch deadline covering instantiation and invocation. Sharing one epoch
    across concurrent untrusted extensions is forbidden because one timeout
    could otherwise trap an unrelated store.
+6. The source tree may temporarily retain `36.0.8` after
+   `RUSTSEC-2026-0222` because package verification reconstructs the immutable
+   `0.4.0-beta.1` dependency graph from crates.io. This low-severity exception
+   does not extend to the `0.5.x` release line, which must upgrade Wasmtime
+   before publishing.
 
 ## Consequences
 
