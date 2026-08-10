@@ -16,8 +16,19 @@ const toolchain = await readText('rust-toolchain.toml');
 const sdkCargo = await readText('crates/pliego-sdk/Cargo.toml');
 const readme = await readText('README.md');
 const framework = await readText('FRAMEWORK.md');
+const roadmap = await readText('ROADMAP.md');
+const security = await readText('SECURITY.md');
 const constitution = await readText('docs/34-product-constitution.md');
 const capabilityDocs = await readText('docs/47-product-capability-manifest.md');
+const distribution = await readText('docs/27-distribution-and-release.md');
+const apiBoundaries = await readText('docs/15-framework-api-boundaries.md');
+const executionBacklog = await readText('docs/19-product-execution-backlog.md');
+const p8Contract = await readText('docs/35-p8-trust-and-adoption-contract.md');
+const projectManifestDocs = await readText('docs/14-project-manifest-and-cli.md');
+const starterDocs = await readText('docs/20-official-starters-and-diagnostics.md');
+const runtimeReadme = await readText('crates/pliego-runtime/README.md');
+const routerReadme = await readText('crates/pliego-router/README.md');
+const dataReadme = await readText('crates/pliego-data/README.md');
 const siteMain = await readText('examples/pliegors-site/src/main.rs');
 const sitePages = await readText('examples/pliegors-site/src/pages.rs');
 const siteDocs = await readText('examples/pliegors-site/src/docs.rs');
@@ -81,6 +92,7 @@ for (const relativePath of new Set([
 const requiredSurfaces = new Map([
   ['deterministic-ssg', ['released', 'preview', 'preserved']],
   ['rust-wasm-ui', ['released', 'preview', 'preserved']],
+  ['causal-transaction-kernel', ['source-preview', 'experimental', 'G4']],
   ['native-http-runtime', ['released', 'preview', 'G1']],
   ['dynamic-ssr', ['released', 'preview', 'G1']],
   ['fullstack-routing', ['released', 'preview', 'G1']],
@@ -105,8 +117,19 @@ for (const [id, expected] of requiredSurfaces) {
 const publicTruth = [
   ['README.md', readme],
   ['FRAMEWORK.md', framework],
+  ['ROADMAP.md', roadmap],
+  ['SECURITY.md', security],
   ['docs/34-product-constitution.md', constitution],
   ['docs/47-product-capability-manifest.md', capabilityDocs],
+  ['docs/27-distribution-and-release.md', distribution],
+  ['docs/15-framework-api-boundaries.md', apiBoundaries],
+  ['docs/19-product-execution-backlog.md', executionBacklog],
+  ['docs/35-p8-trust-and-adoption-contract.md', p8Contract],
+  ['docs/14-project-manifest-and-cli.md', projectManifestDocs],
+  ['docs/20-official-starters-and-diagnostics.md', starterDocs],
+  ['crates/pliego-runtime/README.md', runtimeReadme],
+  ['crates/pliego-router/README.md', routerReadme],
+  ['crates/pliego-data/README.md', dataReadme],
 ];
 for (const [name, content] of publicTruth) {
   for (const stale of ['v0.0.1', 'PliegoRS 0.0.1', 'Rust 1.85 is the current minimum']) {
@@ -117,7 +140,18 @@ for (const [name, content] of publicTruth) {
 for (const [name, content, required] of [
   ['README.md', readme, ['product.capabilities.json', '0.4.0-beta.1', 'Rust `1.86`']],
   ['FRAMEWORK.md', framework, ['product.capabilities.json', 'deterministic static sites', 'Streaming SSR']],
+  ['ROADMAP.md', roadmap, ['0.5.0-beta.1', 'v0.4.0-beta.1', 'Vite']],
+  ['SECURITY.md', security, [manifest.framework.releasedVersion, 'latest', 'published pre-release']],
   ['docs/34-product-constitution.md', constitution, ['product.capabilities.json', 'Linux x64 and ARM64', 'Chromium']],
+  ['docs/27-distribution-and-release.md', distribution, [`${manifest.framework.releasedCrateCount} \`pliego-*\` Rust packages`, manifest.framework.releasedVersion]],
+  ['docs/15-framework-api-boundaries.md', apiBoundaries, [manifest.framework.releasedVersion, 'released previews']],
+  ['docs/19-product-execution-backlog.md', executionBacklog, ['PliegoRS 0.5 roadmap', 'integrates the remaining', 'G4 external adoption']],
+  ['docs/35-p8-trust-and-adoption-contract.md', p8Contract, ['complete for `0.0.2`', 'release regression gate']],
+  ['docs/14-project-manifest-and-cli.md', projectManifestDocs, ['exact crates.io requirements', 'never mixes first-party framework versions']],
+  ['docs/20-official-starters-and-diagnostics.md', starterDocs, [manifest.framework.releasedVersion, 'exact crates.io requirements']],
+  ['crates/pliego-runtime/README.md', runtimeReadme, [manifest.framework.releasedVersion, 'G3 PBOC']],
+  ['crates/pliego-router/README.md', routerReadme, [manifest.framework.releasedVersion]],
+  ['crates/pliego-data/README.md', dataReadme, [manifest.framework.releasedVersion, 'Public beta surface']],
   ['website pages', sitePages, ['0.4.0-beta.1 is public on crates.io', 'G4 engineering evidence', 'G4 external adoption remains open']],
   ['website docs', siteDocs, ['/capabilities.json', 'OpenSDK 0.4.0-beta.1', 'Rust 1.86', 'Portable deployment']],
 ]) {

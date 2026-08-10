@@ -355,6 +355,10 @@ without pretending the committed event rolled back. The detailed ordering,
 limits, and panic boundary are fixed in
 [ADR-010](adr/ADR-010-causal-transaction-scheduler.md).
 
+`pliego-dom` now provides separate opt-in observation of successful renderer
+commits. It does not yet compose those plans into `CausalScheduler` receipts;
+that browser coordinator remains a later layer.
+
 ## Determinism and parity
 
 The principal R3 invariant is:

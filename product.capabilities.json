@@ -248,7 +248,7 @@
       "gate": "G4",
       "summary": "Versioned StateRoot identities and bounded event transactions whose effect-produced events enter the next transaction generation.",
       "evidence": ["docs/adr/ADR-009-state-root-v1.md", "docs/adr/ADR-010-causal-transaction-scheduler.md", "docs/30-event-schema-and-snapshot-contract.md"],
-      "limitations": ["The preview coordinates typed events, projections, effects, and receipts only; DOM plans, routing, cancellation, HMR, and panic-abort browser recovery remain outside this contract."]
+      "limitations": ["DOM plan observation is separate in pliego-dom. A combined browser coordinator, routing, cancellation, HMR, and panic-abort browser recovery remain outside this contract."]
     },
     {
       "id": "server-deployment",
