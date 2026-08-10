@@ -1,0 +1,26 @@
+{
+  "contract": "dev.pliegors.next-fixture/v1",
+  "id": "hyphae-console",
+  "stage": "deferred",
+  "workload": "hyphae-console-v1",
+  "objective": "Exercise navigation, simulated authentication, SSR, streaming, queries, optional PliegoCSS output, and persistent verified state.",
+  "sourceDonors": [
+    "crates/pliego-hyphae",
+    "examples/fullstack-pliego",
+    "examples/native-pliego",
+    "examples/spike"
+  ],
+  "requiredCapabilities": [
+    "verified-sync-v2",
+    "simulated-authentication",
+    "dynamic-ssr",
+    "streaming",
+    "persistent-state"
+  ],
+  "blockedBy": [
+    "hyphae-native-g7-closure",
+    "hyphae-native-g8-closure",
+    "hyphae-native-1.0.0-release",
+    "pliegors-native-v2-adapter-decision"
+  ]
+}

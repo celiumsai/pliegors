@@ -1,0 +1,10 @@
+[project]
+id = "stress-dashboard-next"
+name = "Stress dashboard Next fixture"
+site_package = "stress-dashboard-next-site"
+output = "target/site"
+
+[client]
+package = "stress-dashboard-next-client"
+wasm_name = "stress_dashboard_next_client"
+bindgen_output = "target/stress-dashboard-next-client/pkg"

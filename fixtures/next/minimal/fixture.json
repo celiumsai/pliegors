@@ -1,0 +1,19 @@
+{
+  "contract": "dev.pliegors.next-fixture/v1",
+  "id": "minimal",
+  "stage": "executable",
+  "workload": "minimal-causal-ui-v1",
+  "objective": "Exercise a counter, local state, keyed list, conditional view, owned effect, repeated mount/unmount, typed application events, genesis replay, and snapshot-tail replay.",
+  "sourceDonors": [
+    "examples/spike",
+    "crates/pliego-starters/templates/default"
+  ],
+  "requiredCapabilities": [
+    "typed-events",
+    "projection-replay",
+    "snapshot-tail-replay",
+    "surgical-dom",
+    "owned-effect",
+    "mount-unmount"
+  ]
+}

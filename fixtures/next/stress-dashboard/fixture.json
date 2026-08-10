@@ -1,0 +1,26 @@
+{
+  "contract": "dev.pliegors.next-fixture/v1",
+  "id": "stress-dashboard",
+  "stage": "executable",
+  "workload": "stress-dashboard-v1",
+  "objective": "Exercise thousands of owned nodes, filters, a keyed table, charts, frequent updates, nested components, and lifecycle plateaus.",
+  "sourceDonors": [
+    "benchmarks/browser-apply",
+    "tools/route-lab",
+    "crates/pliego-reactive",
+    "crates/pliego-dom"
+  ],
+  "requiredCapabilities": [
+    "thousands-of-nodes",
+    "typed-events",
+    "projection-replay",
+    "snapshot-tail-replay",
+    "keyed-reconciliation",
+    "retained-row-updates",
+    "chart-updates",
+    "frequent-updates",
+    "nested-ownership",
+    "mount-unmount",
+    "resource-plateau"
+  ]
+}

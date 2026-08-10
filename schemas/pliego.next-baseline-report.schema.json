@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.next-baseline-report.schema.json",
+  "title": "PliegoRS Next baseline report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "contract",
+    "status",
+    "createdAt",
+    "completedAt",
+    "sourceRevision",
+    "sourceTreeDirty",
+    "fixtureManifestPath",
+    "fixtureManifestIdentity",
+    "authority",
+    "policy",
+    "environment",
+    "fixtures",
+    "bottlenecks",
+    "limitations"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://pliegors.dev/schemas/pliego.next-baseline-report.schema.json"
+    },
+    "contract": {
+      "const": "dev.pliegors.next-baseline-report/v1"
+    },
+    "status": {
+      "enum": ["incomplete", "complete"]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sourceRevision": {
+      "$ref": "#/$defs/revision"
+    },
+    "sourceTreeDirty": {
+      "type": "boolean"
+    },
+    "fixtureManifestPath": {
+      "const": "fixtures/next/manifest.json"
+    },
+    "fixtureManifestIdentity": {
+      "$ref": "#/$defs/manifestIdentity"
+    },
+    "authority": {
+      "$ref": "#/$defs/authority"
+    },
+    "policy": {
+      "$ref": "#/$defs/reportPolicy"
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/fixtureResult"
+      }
+    },
+    "bottlenecks": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/bottleneck"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    }
+  },
+  "$defs": {
+    "revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releasedTag", "releasedRevision", "preNextRevision"],
+      "properties": {
+        "releasedTag": {
+          "const": "v0.4.0-beta.1"
+        },
+        "releasedRevision": {
+          "$ref": "#/$defs/revision"
+        },
+        "preNextRevision": {
+          "$ref": "#/$defs/revision"
+        }
+      }
+    },
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "digest"],
+      "properties": {
+        "algorithm": {
+          "const": "sha256-tree-v1"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "manifestIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "digest"],
+      "properties": {
+        "algorithm": {
+          "const": "sha256-canonical-json-v1"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "reportPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["warmupRuns", "measuredRuns", "percentileMethod", "outlierPolicy"],
+      "properties": {
+        "warmupRuns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "measuredRuns": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 30
+        },
+        "percentileMethod": {
+          "const": "nearest-rank"
+        },
+        "outlierPolicy": {
+          "const": "none"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "architecture",
+        "osRelease",
+        "cpuModel",
+        "logicalCpuCount",
+        "totalMemoryBytes",
+        "storageClass",
+        "powerAndThermalState",
+        "node",
+        "rustc",
+        "cargo",
+        "browser"
+      ],
+      "properties": {
+        "platform": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "osRelease": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "cpuModel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "logicalCpuCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "totalMemoryBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "storageClass": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "powerAndThermalState": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "node": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "rustc": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "cargo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "browser": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    },
+    "reasonCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "count"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample", "value"],
+      "properties": {
+        "sample": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reasons": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/reasonCount"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50", "p95", "p99"],
+      "properties": {
+        "p50": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p99": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "measuredResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "unit", "status", "observations", "summary"],
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "unit": {
+          "enum": ["milliseconds", "bytes", "count", "ratio"]
+        },
+        "status": {
+          "const": "measured"
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 30,
+          "items": {
+            "$ref": "#/$defs/observation"
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/summary"
+        }
+      }
+    },
+    "unavailableResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "unit", "status", "reasonCode", "explanation"],
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "unit": {
+          "enum": ["milliseconds", "bytes", "count", "ratio"]
+        },
+        "status": {
+          "const": "unavailable"
+        },
+        "reasonCode": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    },
+    "notApplicableResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "unit", "status", "reasonCode", "explanation"],
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "unit": {
+          "enum": ["milliseconds", "bytes", "count", "ratio"]
+        },
+        "status": {
+          "const": "not-applicable"
+        },
+        "reasonCode": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    },
+    "result": {
+      "oneOf": [
+        { "$ref": "#/$defs/measuredResult" },
+        { "$ref": "#/$defs/unavailableResult" },
+        { "$ref": "#/$defs/notApplicableResult" }
+      ]
+    },
+    "fixtureResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceIdentity", "results"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sourceIdentity": {
+          "$ref": "#/$defs/sourceIdentity"
+        },
+        "results": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/result"
+          }
+        }
+      }
+    },
+    "bottleneck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rank", "fixtureId", "caseId", "statistic", "value", "unit"],
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "fixtureId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "caseId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "statistic": {
+          "const": "p95"
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "const": "milliseconds"
+        }
+      }
+    }
+  }
+}
