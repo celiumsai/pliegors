@@ -190,6 +190,54 @@
         }
       }
     },
+    "externalAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "releaseTag",
+        "releaseRevision",
+        "releaseChecksumsSha256",
+        "transport",
+        "productMediaType",
+        "errorMediaType",
+        "rustMsrv"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "releaseTag": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "releaseRevision": {
+          "$ref": "#/$defs/revision"
+        },
+        "releaseChecksumsSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "transport": {
+          "$ref": "#/$defs/identifier"
+        },
+        "productMediaType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "errorMediaType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "rustMsrv": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
     "notApplicable": {
       "type": "object",
       "additionalProperties": false,
@@ -242,6 +290,9 @@
         "sourceIdentity": {
           "$ref": "#/$defs/sourceIdentity"
         },
+        "externalAuthority": {
+          "$ref": "#/$defs/externalAuthority"
+        },
         "notApplicable": {
           "type": "array",
           "maxItems": 32,
@@ -249,7 +300,35 @@
             "$ref": "#/$defs/notApplicable"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "hyphae-console"
+              }
+            },
+            "required": ["id"]
+          },
+          "then": {
+            "properties": {
+              "externalAuthority": {
+                "$ref": "#/$defs/externalAuthority"
+              }
+            },
+            "required": ["externalAuthority"]
+          },
+          "else": {
+            "properties": {
+              "externalAuthority": false
+            },
+            "not": {
+              "required": ["externalAuthority"]
+            }
+          }
+        }
+      ]
     }
   }
 }

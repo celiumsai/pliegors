@@ -42,6 +42,9 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
   second executor or browser DOM types.
 - Defer the reduced Hyphae Console fixture to the released Hyphae Native 1.0
   contract, with explicit G7/G8, release, adapter, and MSRV boundaries.
+- Specify the reduced Hyphae Console against exact Hyphae `v1.0.1` through a
+  PliegoRS-owned loopback HTTP `/v2` sidecar, preserving Rust `1.86` while G7
+  and durable G8 closure continue to gate claims and final fixture acceptance.
 
 ### Changed
 

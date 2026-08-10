@@ -55,5 +55,7 @@ baseline.md   sha256 8527852682024d61156804e532d05389e01ef33cb04b12dd179d1a7a90b
   dedicated non-virtualized hardware requirement.
 - Cache lookup attempts/hits/misses, internal owner/resource census, and typed
   remount/reload receipts remain unavailable.
-- Hyphae Console remains deferred behind Native G7, G8, public `1.0.0`, and the
-  PliegoRS Native integration decision.
+- At capture time, Hyphae Console was deferred behind Native G7, G8, a public
+  release, and the PliegoRS Native integration decision. Hyphae `v1.0.1` later
+  satisfied the release prerequisite; ADR-011 now permits sidecar-adapter work
+  while G7/G8 continue to block performance claims and final fixture acceptance.
