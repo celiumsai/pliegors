@@ -9,6 +9,7 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..');
 const softwareLicense = 'GPL-3.0-only';
 const documentationLicense = 'CC-BY-SA-4.0';
+const obsoleteSpdx = ['SPDX-License-Identifier:', 'Apache-2.0'].join(' ');
 
 const metadata = JSON.parse(execFileSync('cargo', [
   'metadata', '--no-deps', '--format-version', '1',
@@ -45,7 +46,7 @@ for (const relativePath of tracked) {
   if (!isTextSource(relativePath)) continue;
   const source = readFileSync(path.join(root, relativePath), 'utf8');
   assert.ok(
-    !source.includes('SPDX-License-Identifier: Apache-2.0'),
+    !source.includes(obsoleteSpdx),
     `${relativePath} retains the obsolete Apache SPDX identifier`,
   );
   if (generatedTemplates.has(relativePath)) {
