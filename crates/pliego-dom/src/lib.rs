@@ -26,6 +26,7 @@ use pliego_reactive::untrack;
 
 mod keyed;
 mod name;
+mod plan;
 
 #[cfg(target_arch = "wasm32")]
 mod mount;
@@ -38,11 +39,15 @@ pub use name::{
     AttributeName, ElementNamespace, EventName, MAX_DOM_NAME_BYTES, NameError, NameKind,
     NameViolation, TagName,
 };
+pub use plan::{
+    DomCommitContext, DomCommitObserver, DomCommitReceipt, DomOp, DomPlan, DomPlanId, DomTargetId,
+};
 
 #[cfg(target_arch = "wasm32")]
 pub use mount::{
     MountDiagnostic, MountError, MountOperation, MountScope, MountStructureViolation, MountedRoot,
-    adopt, adopt_to, adopt_with_limits, mount, mount_to, mount_to_body,
+    adopt, adopt_to, adopt_with_limits, adopt_with_observer, mount, mount_to, mount_to_body,
+    mount_with_observer,
 };
 
 // On the browser target listeners receive the real event; natively (SSR/tests)

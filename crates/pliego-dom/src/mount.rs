@@ -19,15 +19,16 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
 
 use super::{
-    AttrValue, DirectChildState, DomError, Element, ElementNamespace, KeyedError, KeyedKey,
-    ParentContext, ParserContext, RenderError, RenderLimits, TagName, View, keyed::KeyedSpec,
+    AttrValue, DirectChildState, DomCommitObserver, DomCommitReceipt, DomError, DomOp, DomPlan,
+    DomPlanId, DomTargetId, Element, ElementNamespace, KeyedError, KeyedKey, ParentContext,
+    ParserContext, RenderError, RenderLimits, TagName, View, keyed::KeyedSpec,
     validate_attribute_value, validate_direct_element, validate_direct_text,
     validate_parser_adjusted_svg_attribute, validate_parser_adjusted_svg_tag,
 };
 
 mod adopt;
 
-pub use adopt::{adopt, adopt_to, adopt_with_limits};
+pub use adopt::{adopt, adopt_to, adopt_with_limits, adopt_with_observer};
 
 /// Maximum text retained from a browser exception or caller-controlled host ID.
 pub const MAX_MOUNT_DIAGNOSTIC_BYTES: usize = 256;
@@ -286,18 +287,73 @@ struct ErrorOriginState {
 struct ErrorSlot {
     queue: Rc<RefCell<ErrorState>>,
     origin: Rc<RefCell<ErrorOriginState>>,
+    commits: DomCommitState,
 }
 
 impl Default for ErrorSlot {
     fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+#[derive(Clone)]
+struct DomCommitState {
+    observer: Option<Rc<dyn DomCommitObserver>>,
+    next_plan: Rc<Cell<u64>>,
+    next_target: Rc<Cell<u64>>,
+}
+
+impl DomCommitState {
+    fn new(observer: Option<Rc<dyn DomCommitObserver>>) -> Self {
         Self {
-            queue: Rc::new(RefCell::new(ErrorState::default())),
-            origin: Rc::new(RefCell::new(ErrorOriginState::default())),
+            observer,
+            next_plan: Rc::new(Cell::new(1)),
+            next_target: Rc::new(Cell::new(1)),
         }
+    }
+
+    fn allocate(next: &Cell<u64>, label: &str) -> u64 {
+        let current = next.get();
+        let following = current
+            .checked_add(1)
+            .unwrap_or_else(|| panic!("mount-local {label} IDs are exhausted"));
+        next.set(following);
+        current
+    }
+
+    fn next_target(&self) -> DomTargetId {
+        DomTargetId::new(Self::allocate(&self.next_target, "DOM target"))
+    }
+
+    fn before_commit(&self, target: DomTargetId, operation: DomOp) -> Option<DomPlan> {
+        let observer = self.observer.as_ref()?;
+        let plan = DomPlan {
+            id: DomPlanId::new(Self::allocate(&self.next_plan, "DOM plan")),
+            target,
+            context: observer.context(),
+            operation,
+        };
+        observer.before_commit(&plan);
+        Some(plan)
+    }
+
+    fn after_commit(&self, plan: Option<DomPlan>) {
+        let (Some(observer), Some(plan)) = (self.observer.as_ref(), plan) else {
+            return;
+        };
+        observer.after_commit(&DomCommitReceipt::from_plan(plan));
     }
 }
 
 impl ErrorSlot {
+    fn new(observer: Option<Rc<dyn DomCommitObserver>>) -> Self {
+        Self {
+            queue: Rc::new(RefCell::new(ErrorState::default())),
+            origin: Rc::new(RefCell::new(ErrorOriginState::default())),
+            commits: DomCommitState::new(observer),
+        }
+    }
+
     fn fork_origin(&self) -> Self {
         Self {
             queue: Rc::clone(&self.queue),
@@ -305,7 +361,20 @@ impl ErrorSlot {
                 parent: Some(Rc::downgrade(&self.origin)),
                 ..ErrorOriginState::default()
             })),
+            commits: self.commits.clone(),
         }
+    }
+
+    fn next_dom_target(&self) -> DomTargetId {
+        self.commits.next_target()
+    }
+
+    fn before_dom_commit(&self, target: DomTargetId, operation: DomOp) -> Option<DomPlan> {
+        self.commits.before_commit(target, operation)
+    }
+
+    fn after_dom_commit(&self, plan: Option<DomPlan>) {
+        self.commits.after_commit(plan);
     }
 
     fn record(&self, error: MountError) {
@@ -2077,10 +2146,27 @@ struct MountPosition<'a> {
 
 /// Mount a view as a new sibling range under `parent`.
 pub fn mount(view: &View, parent: &web_sys::Node) -> Result<MountedRoot, MountError> {
+    mount_with_optional_observer(view, parent, None)
+}
+
+/// Mount a view while observing the renderer's validated mutation plans.
+pub fn mount_with_observer(
+    view: &View,
+    parent: &web_sys::Node,
+    observer: Rc<dyn DomCommitObserver>,
+) -> Result<MountedRoot, MountError> {
+    mount_with_optional_observer(view, parent, Some(observer))
+}
+
+fn mount_with_optional_observer(
+    view: &View,
+    parent: &web_sys::Node,
+    observer: Option<Rc<dyn DomCommitObserver>>,
+) -> Result<MountedRoot, MountError> {
     let document = document_for(parent)?;
     let namespace = namespace_for_children(parent)?;
     let parent_context = mount_parent_context(parent)?;
-    let errors = ErrorSlot::default();
+    let errors = ErrorSlot::new(observer);
     let staged = stage_view(
         &document,
         view,
@@ -2300,6 +2386,7 @@ fn mount_before(
             let parent_context = position.parent_context.cloned();
             let guaranteed_prefix_content = direct.has_serialized_content;
             let errors = scope.errors.clone();
+            let target = errors.next_dom_target();
             let cleanup = scope.cleanup_weak()?;
             let initial_error = Rc::new(RefCell::new(None));
             let initial_error_effect = Rc::clone(&initial_error);
@@ -2333,9 +2420,20 @@ fn mount_before(
                         for cleanup in &chain {
                             cleanup.ensure_active(MountOperation::InstallEffect)?;
                         }
+                        let plan = errors.before_dom_commit(
+                            target,
+                            DomOp::SetText {
+                                previous_bytes: text.data().len(),
+                                next_bytes: candidate.len(),
+                            },
+                        );
+                        for cleanup in &chain {
+                            cleanup.ensure_active(MountOperation::InstallEffect)?;
+                        }
                         // Text::set_data is non-throwing. Validation and the
                         // active-owner check both precede the write.
                         text.set_data(&candidate);
+                        errors.after_dom_commit(plan);
                         Ok::<(), MountError>(())
                     })();
                     if let Err(error) = result {
@@ -2408,6 +2506,7 @@ fn mount_element(
                 let name = name.clone();
                 let value = Rc::clone(value);
                 let errors = scope.errors.clone();
+                let target = errors.next_dom_target();
                 let cleanup = scope.cleanup_weak()?;
                 let initial_error = Rc::new(RefCell::new(None));
                 let initial_error_effect = Rc::clone(&initial_error);
@@ -2436,12 +2535,30 @@ fn mount_element(
                             for cleanup in &chain {
                                 cleanup.ensure_active(MountOperation::SetAttribute)?;
                             }
+                            let plan = errors.before_dom_commit(
+                                target,
+                                DomOp::SetAttribute {
+                                    name: name.to_string(),
+                                    had_previous: get_attribute(
+                                        &dom_element,
+                                        namespace,
+                                        name.as_str(),
+                                    )
+                                    .is_some(),
+                                    next_bytes: candidate.len(),
+                                },
+                            );
+                            for cleanup in &chain {
+                                cleanup.ensure_active(MountOperation::SetAttribute)?;
+                            }
                             let write =
                                 set_attribute(&dom_element, namespace, name.as_str(), &candidate);
                             for cleanup in &chain {
                                 cleanup.ensure_active(MountOperation::SetAttribute)?;
                             }
-                            write
+                            write?;
+                            errors.after_dom_commit(plan);
+                            Ok::<(), MountError>(())
                         })();
                         if let Err(error) = result {
                             // The browser retains the previous attribute value.
@@ -2681,6 +2798,7 @@ fn install_keyed_view_effect(
     initial_keys: Option<(String, Vec<KeyedKey>)>,
 ) -> Result<(), MountError> {
     let parent_cleanup = scope.cleanup_weak()?;
+    let target = errors.next_dom_target();
     let document = document.clone();
     let initial_error = Rc::new(RefCell::new(None));
     let initial_error_effect = Rc::clone(&initial_error);
@@ -2832,6 +2950,34 @@ fn install_keyed_view_effect(
                 state.borrow().ensure_updating()?;
 
                 let keep = keyed_lis(&planned);
+                let retained_rows = planned
+                    .iter()
+                    .filter(|row| row.old_index().is_some())
+                    .count();
+                let inserted_rows = planned.len() - retained_rows;
+                let moved_rows = planned
+                    .iter()
+                    .zip(&keep)
+                    .filter(|(row, keep)| row.old_index().is_some() && !**keep)
+                    .count();
+                let removed_rows = current_snapshots.len() - retained_rows;
+                let plan = (moved_rows != 0 || inserted_rows != 0 || removed_rows != 0)
+                    .then(|| {
+                        errors.before_dom_commit(
+                            target,
+                            DomOp::ReconcileKeyed {
+                                previous_rows: current_snapshots.len(),
+                                next_rows: planned.len(),
+                                retained_rows,
+                                moved_rows,
+                                inserted_rows,
+                                removed_rows,
+                            },
+                        )
+                    })
+                    .flatten();
+                topology.ensure_active(MountOperation::InsertRange)?;
+                state.borrow().ensure_updating()?;
                 let mut retained = vec![false; current_snapshots.len()];
                 for row in &planned {
                     if let Some(index) = row.old_index() {
@@ -2948,6 +3094,7 @@ fn install_keyed_view_effect(
                     return Err(error);
                 }
                 state.borrow_mut().finish_update()?;
+                errors.after_dom_commit(plan);
                 Ok::<(), MountError>(())
             })();
 
@@ -3037,6 +3184,7 @@ fn install_dynamic_view_effect(
     errors: ErrorSlot,
 ) -> Result<(), MountError> {
     let parent_cleanup = scope.cleanup_weak()?;
+    let target = errors.next_dom_target();
     let document = document.clone();
     let initial_error = Rc::new(RefCell::new(None));
     let initial_error_effect = Rc::clone(&initial_error);
@@ -3179,6 +3327,14 @@ fn install_dynamic_view_effect(
 
                 topology.ensure_active(MountOperation::InsertRange)?;
                 state.borrow().ensure_updating()?;
+                let plan = errors.before_dom_commit(
+                    target,
+                    DomOp::ReplaceSubtree {
+                        had_previous: stable_snapshot.is_some(),
+                    },
+                );
+                topology.ensure_active(MountOperation::InsertRange)?;
+                state.borrow().ensure_updating()?;
                 let insertion = insert_before(
                     &parent,
                     candidate.fragment.as_ref(),
@@ -3233,6 +3389,7 @@ fn install_dynamic_view_effect(
                     return Err(error);
                 }
                 state.borrow_mut().finish_update()?;
+                errors.after_dom_commit(plan);
                 Ok::<(), MountError>(())
             })();
             if let Err(error) = replacement {
@@ -3284,6 +3441,18 @@ fn attribute_namespace(element_namespace: ElementNamespace, name: &str) -> Optio
         Some(XML_URI)
     } else {
         None
+    }
+}
+
+fn get_attribute(
+    element: &web_sys::Element,
+    element_namespace: ElementNamespace,
+    name: &str,
+) -> Option<String> {
+    let local_name = name.split_once(':').map_or(name, |(_, local)| local);
+    match attribute_namespace(element_namespace, name) {
+        Some(namespace) => element.get_attribute_ns(Some(namespace), local_name),
+        None => element.get_attribute(name),
     }
 }
 

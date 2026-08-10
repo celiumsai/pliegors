@@ -730,6 +730,7 @@ fn install_adopted_dynamic_text(
 ) -> Result<(), MountError> {
     let cleanup = scope.cleanup_weak()?;
     let errors = scope.errors.clone();
+    let target = errors.next_dom_target();
     let first_run = Rc::new(Cell::new(true));
     let first_run_effect = Rc::clone(&first_run);
     let initial_error = Rc::new(RefCell::new(None));
@@ -760,7 +761,18 @@ fn install_adopted_dynamic_text(
                         ));
                     }
                 } else {
+                    let plan = errors.before_dom_commit(
+                        target,
+                        DomOp::SetText {
+                            previous_bytes: node.data().len(),
+                            next_bytes: candidate.len(),
+                        },
+                    );
+                    for cleanup in &chain {
+                        cleanup.ensure_active(MountOperation::InstallEffect)?;
+                    }
                     node.set_data(&candidate);
+                    errors.after_dom_commit(plan);
                 }
                 Ok::<(), MountError>(())
             })();
@@ -786,6 +798,7 @@ fn install_adopted_dynamic_attribute(
 ) -> Result<(), MountError> {
     let cleanup = scope.cleanup_weak()?;
     let errors = scope.errors.clone();
+    let target = errors.next_dom_target();
     let first_run = Rc::new(Cell::new(true));
     let first_run_effect = Rc::clone(&first_run);
     let initial_error = Rc::new(RefCell::new(None));
@@ -815,7 +828,26 @@ fn install_adopted_dynamic_attribute(
                         ));
                     }
                 } else {
-                    set_attribute(&element, plan.namespace, plan.name.as_str(), &candidate)?;
+                    let commit = errors.before_dom_commit(
+                        target,
+                        DomOp::SetAttribute {
+                            name: plan.name.to_string(),
+                            had_previous: get_attribute(
+                                &element,
+                                plan.namespace,
+                                plan.name.as_str(),
+                            )
+                            .is_some(),
+                            next_bytes: candidate.len(),
+                        },
+                    );
+                    for cleanup in &chain {
+                        cleanup.ensure_active(MountOperation::SetAttribute)?;
+                    }
+                    let write =
+                        set_attribute(&element, plan.namespace, plan.name.as_str(), &candidate);
+                    write?;
+                    errors.after_dom_commit(commit);
                 }
                 Ok::<(), MountError>(())
             })();
@@ -1092,7 +1124,16 @@ fn commit_plan(
 
 /// Adopt a versioned SSR seed under `parent` without rebuilding authored DOM.
 pub fn adopt(view: &View, parent: &web_sys::Node) -> Result<MountedRoot, MountError> {
-    adopt_with_limits(view, parent, RenderLimits::default())
+    adopt_with_optional_observer(view, parent, RenderLimits::default(), None)
+}
+
+/// Adopt a versioned SSR seed while observing subsequent DOM commit plans.
+pub fn adopt_with_observer(
+    view: &View,
+    parent: &web_sys::Node,
+    observer: Rc<dyn DomCommitObserver>,
+) -> Result<MountedRoot, MountError> {
+    adopt_with_optional_observer(view, parent, RenderLimits::default(), Some(observer))
 }
 
 /// Adopt a versioned SSR seed under the element with `id`.
@@ -1111,6 +1152,15 @@ pub fn adopt_with_limits(
     view: &View,
     parent: &web_sys::Node,
     limits: RenderLimits,
+) -> Result<MountedRoot, MountError> {
+    adopt_with_optional_observer(view, parent, limits, None)
+}
+
+fn adopt_with_optional_observer(
+    view: &View,
+    parent: &web_sys::Node,
+    limits: RenderLimits,
+    observer: Option<Rc<dyn DomCommitObserver>>,
 ) -> Result<MountedRoot, MountError> {
     let document = document_for(parent)?;
     let namespace = namespace_for_children(parent)?;
@@ -1144,7 +1194,7 @@ pub fn adopt_with_limits(
         collect_subtree_nodes(node, &mut rollback_nodes);
     }
 
-    let errors = ErrorSlot::default();
+    let errors = ErrorSlot::new(observer);
     let scope = MountScope::with_errors(errors);
     scope.register_node(root_start.as_ref())?;
     scope.register_node(root_end.as_ref())?;

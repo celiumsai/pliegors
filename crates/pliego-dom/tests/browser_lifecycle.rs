@@ -6,9 +6,10 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use pliego_dom::{
-    DomError, ElementNamespace, IntoView, KeyedError, KeyedKey, MountError,
-    MountStructureViolation, RenderError, RenderLimits, View, adopt, adopt_with_limits, dyn_text,
-    dyn_view, el, keyed, mount, render_adoptable_html, text, try_el,
+    DomCommitContext, DomCommitObserver, DomCommitReceipt, DomError, DomOp, DomPlan,
+    ElementNamespace, IntoView, KeyedError, KeyedKey, MountError, MountStructureViolation,
+    RenderError, RenderLimits, View, adopt, adopt_with_limits, adopt_with_observer, dyn_text,
+    dyn_view, el, keyed, mount, mount_with_observer, render_adoptable_html, text, try_el,
 };
 use pliego_reactive::Signal;
 use wasm_bindgen::JsCast;
@@ -312,6 +313,52 @@ fn query(host: &web_sys::Element, selector: &str) -> web_sys::Element {
     host.query_selector(selector)
         .expect("valid test selector")
         .unwrap_or_else(|| panic!("missing element for selector {selector:?}"))
+}
+
+struct RecordingDomObserver {
+    events: RefCell<Vec<RecordedDomEvent>>,
+    context: RefCell<DomCommitContext>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum RecordedDomEvent {
+    Before(DomPlan),
+    After(DomCommitReceipt),
+}
+
+impl DomCommitObserver for RecordingDomObserver {
+    fn context(&self) -> DomCommitContext {
+        self.context.borrow().clone()
+    }
+
+    fn before_commit(&self, plan: &DomPlan) {
+        self.events
+            .borrow_mut()
+            .push(RecordedDomEvent::Before(plan.clone()));
+    }
+
+    fn after_commit(&self, receipt: &DomCommitReceipt) {
+        self.events
+            .borrow_mut()
+            .push(RecordedDomEvent::After(receipt.clone()));
+    }
+}
+
+impl RecordingDomObserver {
+    fn new(context: DomCommitContext) -> Self {
+        Self {
+            events: RefCell::new(Vec::new()),
+            context: RefCell::new(context),
+        }
+    }
+
+    fn take(&self) -> Vec<RecordedDomEvent> {
+        std::mem::take(&mut *self.events.borrow_mut())
+    }
+
+    fn set_context(&self, context: DomCommitContext) {
+        *self.context.borrow_mut() = context;
+    }
 }
 
 fn count_direct_comment(host: &web_sys::Element, value: &str) -> usize {
@@ -715,6 +762,146 @@ fn dynamic_text_and_attribute_patch_in_place_and_reject_unsafe_updates() {
             DomError::InvalidAttributeValue { .. }
         ))
     ));
+
+    root.dispose();
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn observer_wraps_text_and_attribute_mutations_with_mount_local_receipts() {
+    let host = test_host();
+    let label = Signal::new("first".to_owned());
+    let state = Signal::new("cold".to_owned());
+    let observer = Rc::new(RecordingDomObserver::new(DomCommitContext {
+        transaction_id: Some(17),
+        state_root: Some("sha256:state".to_owned()),
+    }));
+    let view = el("output")
+        .attr_dyn("data-state", move || state.get())
+        .child(dyn_text(move || label.get()))
+        .into_view();
+    let root = mount_with_observer(&view, host.as_ref(), observer.clone())
+        .expect("mount observed bindings");
+
+    let initial = observer.take();
+    assert_eq!(initial.len(), 4);
+    assert!(matches!(
+        &initial[0],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::SetAttribute { name, had_previous: false, next_bytes: 4 },
+            ..
+        }) if name == "data-state"
+    ));
+    assert!(matches!(
+        &initial[2],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::SetText {
+                previous_bytes: 0,
+                next_bytes: 5
+            },
+            ..
+        })
+    ));
+
+    observer.set_context(DomCommitContext {
+        transaction_id: Some(18),
+        state_root: Some("sha256:next-state".to_owned()),
+    });
+    label.set("second".to_owned());
+    state.set("warm".to_owned());
+
+    let updates = observer.take();
+    assert_eq!(updates.len(), 4);
+    for pair in updates.chunks_exact(2) {
+        let RecordedDomEvent::Before(plan) = &pair[0] else {
+            panic!("mutation did not emit a pre-commit plan")
+        };
+        let RecordedDomEvent::After(receipt) = &pair[1] else {
+            panic!("mutation did not emit a post-commit receipt")
+        };
+        assert_eq!(receipt.plan_id, plan.id);
+        assert_eq!(receipt.target, plan.target);
+        assert_eq!(receipt.context, plan.context);
+        assert_eq!(receipt.operation, plan.operation);
+        assert_eq!(plan.context.transaction_id, Some(18));
+        assert_eq!(
+            plan.context.state_root.as_deref(),
+            Some("sha256:next-state")
+        );
+    }
+    assert!(matches!(
+        &updates[0],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::SetText {
+                previous_bytes: 5,
+                next_bytes: 6
+            },
+            ..
+        })
+    ));
+    assert!(matches!(
+        &updates[2],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::SetAttribute { name, had_previous: true, next_bytes: 4 },
+            ..
+        }) if name == "data-state"
+    ));
+
+    root.dispose();
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn observer_reports_only_successful_subtree_and_keyed_commits() {
+    let host = test_host();
+    let alternate = Signal::new(false);
+    let order = Signal::new(vec![1_u32, 2]);
+    let observer = Rc::new(RecordingDomObserver::new(DomCommitContext::default()));
+    let view = View::Fragment(vec![
+        dyn_view(move || {
+            if alternate.get() {
+                text("alternate")
+            } else {
+                text("stable")
+            }
+        }),
+        keyed(
+            move || order.get(),
+            |id| *id,
+            |id| el("span").child(id.to_string()).into_view(),
+        ),
+    ]);
+    let root = mount_with_observer(&view, host.as_ref(), observer.clone())
+        .expect("mount observed structural views");
+    observer.take();
+
+    alternate.set(true);
+    order.set(vec![2, 3]);
+
+    let updates = observer.take();
+    assert_eq!(updates.len(), 4);
+    assert!(matches!(
+        &updates[0],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::ReplaceSubtree { had_previous: true },
+            ..
+        })
+    ));
+    assert!(matches!(
+        &updates[2],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::ReconcileKeyed {
+                previous_rows: 2,
+                next_rows: 2,
+                retained_rows: 1,
+                moved_rows: 0,
+                inserted_rows: 1,
+                removed_rows: 1,
+            },
+            ..
+        })
+    ));
+    assert_eq!(host.text_content().as_deref(), Some("alternate23"));
 
     root.dispose();
     remove_test_host(&host);
@@ -2571,6 +2758,102 @@ fn adopt_reuses_static_dom_and_installs_dynamic_text_attributes_and_listeners() 
         .dispatch_event(&web_sys::Event::new("click").expect("create detached adopted click"))
         .expect("dispatch detached adopted listener");
     assert_eq!(clicks.get(), 1, "adopted listener survived disposal");
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adopted_bindings_emit_plans_only_after_the_seed_is_reused() {
+    let host = test_host();
+    let count = Signal::new(1_u32);
+    let view = el("output")
+        .attr_dyn("data-count", move || count.get().to_string())
+        .child(dyn_text(move || format!("count:{}", count.get())))
+        .into_view();
+    host.set_inner_html(&render_adoptable_html(&view));
+    let observer = Rc::new(RecordingDomObserver::new(DomCommitContext::default()));
+
+    let root = adopt_with_observer(&view, host.as_ref(), observer.clone())
+        .expect("adopt observed dynamic bindings");
+
+    assert!(
+        observer.take().is_empty(),
+        "seed validation must not claim a DOM mutation"
+    );
+    count.set(2);
+    let updates = observer.take();
+    assert_eq!(updates.len(), 4);
+    assert!(matches!(
+        &updates[0],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::SetAttribute {
+                name,
+                had_previous: true,
+                next_bytes: 1,
+            },
+            ..
+        }) if name == "data-count"
+    ));
+    assert!(matches!(
+        &updates[2],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::SetText {
+                previous_bytes: 7,
+                next_bytes: 7,
+            },
+            ..
+        })
+    ));
+
+    root.dispose();
+    remove_test_host(&host);
+}
+
+#[wasm_bindgen_test]
+fn adopted_keyed_seed_emits_only_real_reconciliation_work() {
+    let host = test_host();
+    let order = Signal::new(vec![1_u32, 2]);
+    let view = keyed(
+        move || order.get(),
+        |id| *id,
+        |id| el("span").child(id.to_string()).into_view(),
+    );
+    host.set_inner_html(&render_adoptable_html(&view));
+    let observer = Rc::new(RecordingDomObserver::new(DomCommitContext::default()));
+
+    let root = adopt_with_observer(&view, host.as_ref(), observer.clone())
+        .expect("adopt observed keyed seed");
+
+    assert!(
+        observer.take().is_empty(),
+        "retaining an adopted keyed seed must not claim a DOM commit"
+    );
+    order.set(vec![2, 3]);
+    let updates = observer.take();
+    assert_eq!(updates.len(), 2);
+    assert!(matches!(
+        &updates[0],
+        RecordedDomEvent::Before(DomPlan {
+            operation: DomOp::ReconcileKeyed {
+                previous_rows: 2,
+                next_rows: 2,
+                retained_rows: 1,
+                moved_rows: 0,
+                inserted_rows: 1,
+                removed_rows: 1,
+            },
+            ..
+        })
+    ));
+    let RecordedDomEvent::After(receipt) = &updates[1] else {
+        panic!("adopted keyed reconciliation did not emit its receipt")
+    };
+    let RecordedDomEvent::Before(plan) = &updates[0] else {
+        unreachable!()
+    };
+    assert_eq!(receipt.plan_id, plan.id);
+    assert_eq!(host.text_content().as_deref(), Some("23"));
+
+    root.dispose();
     remove_test_host(&host);
 }
 
