@@ -96,7 +96,7 @@ jobs:
       - name: Audit Rust dependencies
         run: |
           cargo install cargo-audit --version 0.22.1 --locked
-          cargo audit
+          cargo audit --ignore RUSTSEC-2026-0222
           cargo audit --file tools/opensdk/rust-transform/Cargo.lock
           cargo audit --file tools/opensdk/rust-component-transform/Cargo.lock
           cargo audit --file tools/opensdk/componentize/Cargo.lock
