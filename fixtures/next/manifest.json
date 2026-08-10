@@ -267,7 +267,7 @@
       "objective": "Counter, local state, list, conditional, owned effect, and mount/unmount lifecycle.",
       "sourceIdentity": {
         "algorithm": "sha256-tree-v1",
-        "digest": "5d0a87ead6e7fbdfd26eff29bc45de4cee97b4900b65d4763676583055e00e1e"
+        "digest": "243296253f34d90e9d53d2de643377d0684e3b42758008e069f516437ba8aad4"
       },
       "notApplicable": []
     },
@@ -279,7 +279,7 @@
       "objective": "Thousands of nodes, filters, keyed table, charts, frequent updates, nested ownership, and lifecycle stress.",
       "sourceIdentity": {
         "algorithm": "sha256-tree-v1",
-        "digest": "e308be73b801bb8afb091c338bda933b5b69b56522385f30c9a3a0ea46976536"
+        "digest": "70542ece9d01e49ca5b89fc19557252437fc8eb4bc71418d45bc7cab00a4f326"
       },
       "notApplicable": []
     },
