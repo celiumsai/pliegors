@@ -1,8 +1,13 @@
 # P8 trust and adoption contract
 
-**Status:** in progress  
-**Target line:** `0.0.2`  
+**Status:** complete for `0.0.2`; preserved as a release regression gate
+**Target line:** historical `0.0.2` closure
 **Audit baseline:** local `main` at `a13cd4a` on 2026-07-18
+
+The row-level language below records the pre-closure audit state. Final closure
+authority is the signed `v0.0.2` release and release-only golden matrix named in
+the current [execution backlog](19-product-execution-backlog.md). Later releases
+must preserve these gates but do not rewrite this historical baseline.
 
 P8 makes the existing public preview diagnosable, reproducible, measurable, and
 safe to evaluate before PliegoRS expands into OpenSDK or a server runtime. R0-R7

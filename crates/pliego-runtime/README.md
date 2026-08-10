@@ -65,7 +65,7 @@ inbound `tracestate` and baggage are discarded so provider state remains
 local. Custom HTTP methods require an explicit bounded allowlist entry.
 Receipts retain only a coarse duration bucket.
 
-The crate is published on crates.io as `0.2.0-beta.1`. Its API may change on
+The crate is published on crates.io as `0.4.0-beta.1`. Its API may change on
 another beta line, and publication is not a stable production-support promise. See
 [`RFC-008`](../../docs/rfc/RFC-008-native-runtime.md).
 
@@ -77,8 +77,9 @@ adapter work rather than implicit trust in forwarding headers.
 
 The coordinated beta also contains G2: sealed loader,
 action, session, idempotency, cache, upload, decompression, invalidation, and
-application-contract registries backed by `pliego-data`. G3 host adapters and a
-production `pliego serve` command remain unavailable.
+application-contract registries backed by `pliego-data`. G3 PBOC native/OCI and
+Cloudflare host adapters are released previews. A generic production `pliego
+serve` command remains unavailable.
 
 See the [G1 transport evidence](../../docs/evidence/g1-transport-load-security.md),
 [G2 full-stack evidence](../../docs/evidence/g2-fullstack-beta.md), and the

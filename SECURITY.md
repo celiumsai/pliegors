@@ -13,7 +13,7 @@ published pre-release and the default branch.
 
 | Version | Supported |
 | --- | --- |
-| `0.0.2` | Yes |
+| `0.4.0-beta.1` | Yes |
 | Earlier versions | No |
 
 After 1.0, this table will identify every supported release line.

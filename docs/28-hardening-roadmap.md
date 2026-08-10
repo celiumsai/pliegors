@@ -5,9 +5,10 @@
 **Purpose:** make PliegoRS a framework for verifiable, replayable, durable web
 software rather than a generic clone of an existing frontend framework.
 
-This roadmap is normative for work after the current native framework
-foundation. Findings from the source review remain open until reproduced or
-closed by tests against the current tree.
+This roadmap is the preserved authority for R0-R7 regression gates. New `0.5.x`
+execution follows the [PliegoRS 0.5 roadmap](../ROADMAP.md), and may not weaken
+the accepted gates here. Findings from the source review remain open until
+reproduced or closed by tests against the current tree.
 
 ## Product thesis
 

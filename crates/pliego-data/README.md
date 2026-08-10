@@ -9,7 +9,7 @@ an ORM, identity provider, database driver, cloud SDK, executor, or HTTP
 transport. `pliego-runtime` binds these APIs to an admitted request and sealed
 route; applications provide concrete resources and production stores.
 
-## Source-beta surface
+## Public beta surface
 
 - `DataContext`: request identity, deadline, cancellation, admitted values,
   cleanup, grants, and bounded redacted receipts;
@@ -78,7 +78,7 @@ evidence through the same public contracts.
 
 ## Status
 
-The G2 implementation is published on crates.io as `0.2.0-beta.1` in the
+The G2 implementation is published on crates.io as `0.4.0-beta.1` in the
 coordinated framework graph. Pin every `pliego-*` crate to that exact version
 and expect another beta line to change the API.
 

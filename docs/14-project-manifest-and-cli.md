@@ -48,10 +48,9 @@ intended use without requiring an existing project.
 The project directory must be empty. During framework development,
 `--framework-path <checkout>` writes explicit local path dependencies; the
 `PLIEGO_FRAMEWORK_PATH` environment variable provides the same override. A
-released CLI otherwise writes Git dependencies for the canonical PliegoRS
-source repository, with every framework crate pinned to the exact 40-character
-commit revision embedded when that CLI was built. Local checkout discovery is
-intentionally not implicit.
+released CLI otherwise writes exact crates.io requirements for its coordinated
+PliegoRS version. Local checkout discovery is intentionally not implicit, and a
+project never mixes first-party framework versions.
 
 `pliego check` parses the project manifest and Cargo metadata, verifies that the
 site package exposes a binary, and validates an optional client's `cdylib`,
