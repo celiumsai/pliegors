@@ -78,7 +78,7 @@ wasm-bindgen-test = "=0.3.76"
 web-sys = "=0.3.103"
 wit-parser = { version = "=0.233.0", default-features = false }
 wasmparser = { version = "=0.233.0", default-features = false, features = ["component-model", "std", "validate"] }
-wasmtime = { version = "=36.0.13", default-features = false, features = ["component-model", "cranelift", "runtime", "std"] }
+wasmtime = { version = "=36.0.8", default-features = false, features = ["component-model", "cranelift", "runtime", "std"] }
 # Wasmtime permits newer psm releases whose build graph requires Rust 1.88.
 # Pin the last graph validated under the PliegoRS 1.86 MSRV.
 psm = "=0.1.28"
