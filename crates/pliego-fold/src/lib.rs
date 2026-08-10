@@ -13,7 +13,9 @@
 
 mod codec;
 mod projection;
+mod scheduler;
 mod snapshot;
+mod state_root;
 
 use pliego_log::{EventSchema, Log};
 use pliego_reactive::Signal;
@@ -25,10 +27,18 @@ pub use codec::{
 };
 pub use pliego_log::LogCursor;
 pub use projection::{Projection, ProjectionError, Reducer, ReducerError};
+pub use scheduler::{
+    CausalError, CausalErrorKind, CausalHandle, CausalLimits, CausalScheduler, DispatchOutcome,
+    DispatchTicket, DrainReport, MAX_CONFIGURED_EVENTS_PER_DRAIN,
+    MAX_CONFIGURED_EVENTS_PER_TRANSACTION, MAX_CONFIGURED_TRANSACTIONS_PER_DRAIN, ProjectionPoint,
+    RuntimePhase, TRANSACTION_RECEIPT_CONTRACT_V1, TransactionFailure, TransactionId,
+    TransactionOutcome, TransactionReceipt,
+};
 pub use snapshot::{
     CodecIdentity, MAX_CONTRACT_ID_BYTES, MAX_PROJECTION_SNAPSHOT_BYTES, ProjectionSnapshot,
     ReducerIdentity, SNAPSHOT_FORMAT_V1, SnapshotError,
 };
+pub use state_root::{STATE_ROOT_DOMAIN_V1, STATE_ROOT_FORMAT_V1, StateRoot};
 
 /// Compatibility name for the one projection implementation; it does not
 /// introduce a second fold or snapshot contract.
@@ -84,6 +94,14 @@ impl ReactiveLog {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    pub(crate) fn clone_untracked(&self) -> Log {
+        self.inner.get_untracked()
+    }
+
+    pub(crate) fn publish(&self, log: Log) {
+        self.inner.set(log);
     }
 }
 

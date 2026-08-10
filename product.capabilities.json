@@ -240,6 +240,17 @@
       "limitations": ["Current release-blocking browser lifecycle evidence is Chromium; Firefox and Safari remain candidates."]
     },
     {
+      "id": "causal-transaction-kernel",
+      "label": "Causal transaction kernel",
+      "domain": "browser",
+      "availability": "source-preview",
+      "stability": "experimental",
+      "gate": "G4",
+      "summary": "Versioned StateRoot identities and bounded event transactions whose effect-produced events enter the next transaction generation.",
+      "evidence": ["docs/adr/ADR-009-state-root-v1.md", "docs/adr/ADR-010-causal-transaction-scheduler.md", "docs/30-event-schema-and-snapshot-contract.md"],
+      "limitations": ["The preview coordinates typed events, projections, effects, and receipts only; DOM plans, routing, cancellation, HMR, and panic-abort browser recovery remain outside this contract."]
+    },
+    {
       "id": "server-deployment",
       "label": "Native and OCI application deployment",
       "domain": "deployment",
