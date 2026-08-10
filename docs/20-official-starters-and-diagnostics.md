@@ -1,6 +1,6 @@
 # Official starters and CLI diagnostics
 
-**Status:** R5 accepted; G4 starter revisions in progress
+**Status:** R5 accepted; G4 starter revisions released in `0.4.0-beta.1`
 
 ## Architecture
 
@@ -110,10 +110,10 @@ cases had zero horizontal overflow, zero clipped text, and no failed visible
 images. Editorial lazy images were additionally loaded after a 7,117-pixel
 scroll and all reported their real 1536-pixel intrinsic width.
 
-`pliego-starters` also passes Cargo's packaged-tarball verification. Framework
-crates explicitly reject registry publication;
-the distributed CLI instead generates `git + rev` dependencies that resolve
-the same canonical source commit on every machine once the repository opens.
+`pliego-starters` also passes Cargo's packaged-tarball verification. The
+distributed CLI generates exact crates.io requirements for the coordinated
+framework version; local framework development requires an explicit path
+override.
 
 | Minimal | Editorial | Cinematic |
 | --- | --- | --- |

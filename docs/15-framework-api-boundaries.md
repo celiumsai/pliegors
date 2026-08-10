@@ -1,6 +1,6 @@
 # Framework API boundaries
 
-**Status:** accepted private R0-R7 candidate; public SemVer surface not yet frozen
+**Status:** public `0.4.0-beta.1` preview boundary; no stable 1.0 API
 
 ## Framework-owned
 
@@ -45,16 +45,15 @@ contract.
   stream-bound replay typestate. The authenticated transport, production
   gateway/service, key distribution, durable outbox, and replay persistence are
   not implemented by that client crate.
-- DOM ownership, retained keyed reconciliation, strict SSR adoption, and
-  adapter cancellation are complete under the R4 lifecycle contract. Partial
-  or streaming SSR adoption is not implemented.
-- The current production proof remains static generation plus Rust/WASM. G1
-  native HTTP and streaming SSR are public component previews, not a production
-  deployment or support claim.
-- Hosted extension registry and discovery are not implemented. The maintained Cloudflare static
-  deployment package supports separate protected-preview and public delivery
-  profiles, but deployment and repository visibility remain deliberate release
-  operations outside the framework API.
+- DOM ownership, retained keyed reconciliation, strict complete-seed SSR
+  adoption, and adapter cancellation are complete under the R4 lifecycle
+  contract. Boundary-local causal-state adoption is not implemented.
+- G1 native HTTP and dynamic/streamed SSR, G2 data contracts, and G3 PBOC native,
+  OCI, and Cloudflare hosts are released previews. Production durable providers,
+  TLS/proxy policy, and broad provider parity remain outside those contracts.
+- Hosted extension registry and discovery are not implemented. OpenSDK
+  build/browser/tooling planes are released previews; its server plane remains
+  unavailable.
 
 These limitations are release boundaries, not hidden fallbacks to Astro, Vite,
 Next.js, or another application framework.

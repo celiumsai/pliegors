@@ -10,7 +10,7 @@ PliegoRS uses two official distribution systems:
 
 - `https://github.com/celiumsai/pliegors` owns source history, tags, release
   records, checksums, manifests, installers, and prebuilt CLI archives.
-- `https://crates.io` distributes the 19 `pliego-*` Rust packages. Every
+- `https://crates.io` distributes the 21 `pliego-*` Rust packages. Every
   first-party dependency in one release uses an exact `=VERSION` requirement.
 - First-party Node packages remain private workspace tooling in this repository.
   They are not published to npmjs.com or another JavaScript package registry;

@@ -6,7 +6,9 @@
 > Rust fold contract across client and database, with Hyphae as the reference
 > durable engine.
 
-Status: founding (2026-07-10). Method: Kaizen — we studied Leptos's architecture
+Status: founding thesis (2026-07-10), preserved as design history. Current
+execution is governed by the [PliegoRS 0.5 roadmap](../ROADMAP.md) and canonical
+[`product.capabilities.json`](../product.capabilities.json). Method: Kaizen — we studied Leptos's architecture
 in depth to *learn* how surgical fine-grained reactivity is built; we take the
 lessons, not the dependency. This doc records what we learned, what we reuse
 conceptually, and what we build that nobody has.
@@ -171,9 +173,10 @@ pliegors/
   production target uses `panic=abort`, so a panic is a terminal WASM trap and
   no post-panic recovery is promised for that instance. Reactive unwind safety
   applies only to targets built with unwinding support.
-- **Server/SSR:** bounded HTML serialization and versioned browser adoption are
-  implemented and verified. Streaming SSR and server functions remain future
-  work. Cloudflare Workers is the required deployment target.
+- **Server/SSR:** bounded HTML serialization, complete-seed browser adoption,
+  dynamic and streamed SSR, and native/OCI plus Cloudflare PBOC hosts are
+  released previews. Boundary-local causal-state adoption and portable
+  production data providers remain future work.
 - **Native later:** the reactive core + folds are DOM-free crates; a native
   renderer is additive.
 
@@ -188,7 +191,8 @@ M1  SPIKE, the thesis on one screen:
     GATE: replay(log) == live state, bit-for-bit.                  ← done
 M2  pliego-reactive: the graph (tracking, coloring, equality gate, ownership)
     GATE: diamond runs effect once; untaken branch not tracked.    ← implemented
-    NOTE: disposal reclamation, scoped runtimes, and panic safety remain.
+    NOTE: disposal reclamation, scoped runtimes, and unwind-target panic safety
+    are preserved R0 regression gates.
 M3  pliego-fold as a first-class node + snapshots
     GATE: reducer consumes only the exact tail from a snapshot.    ← R3 complete
 M4  pliego-dom: owned DOM, keyed reconciliation, SSR adoption     ← R4 complete
@@ -199,8 +203,8 @@ M5  Hyphae seam
     persistence, shared reducers, and field-level provenance.
 M6  SSR + SSG on Cloudflare Workers, islands (near-zero WASM for static pages),
     streaming HTML — deterministic SSG, resumable islands, adapter lifecycle,
-    file routes, redirects, and the first CLI slice are implemented. Streaming
-    SSR and Cloudflare deployment remain.
+    file routes, redirects, dynamic/streamed SSR, and PBOC Cloudflare deployment
+    are released previews. Boundary-local causal adoption remains.
 M7  THE FULL-SITE PATH (the general-purpose goal): static-site generation,
     content collections, routing/pages, head/SEO management, asset pipeline —
     everything a content site needs, so PliegoRS replaces Astro/Next outright.

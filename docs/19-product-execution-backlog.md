@@ -1,9 +1,16 @@
 # PliegoRS execution backlog
 
-**Updated:** 2026-07-25
-**Objective:** preserve R0-R7 and P8 as regression gates while PliegoRS executes
-the G0-G7 full-stack evolution program. OpenSDK remains a bounded preview and
-advances only where the runtime requires a public extension contract.
+**Updated:** 2026-08-08
+**Objective:** preserve R0-R7, P8, and completed G0-G4 engineering evidence as
+regression gates while PliegoRS executes the coordinated `0.5.x` transition.
+OpenSDK remains a bounded preview and advances only where the runtime requires a
+public extension contract.
+
+The [PliegoRS 0.5 roadmap](../ROADMAP.md) is the current execution sequence. Its
+[transition program](52-pliegors-next-transition.md) integrates the remaining
+G4-G7 outcomes instead of running a competing product roadmap. This document
+retains the completed gate history and the open adoption, ecosystem, operations,
+and claim obligations that feed that program.
 
 The normative hardening sequence is defined in
 [`28-hardening-roadmap.md`](28-hardening-roadmap.md). A task is complete only
@@ -30,7 +37,7 @@ work after R7. P9 entered preview only after the P8 release gates closed. Its
 implemented conformance surface does not imply RFC or ADR acceptance, stable
 API status, or release of the preview crate.
 
-## Full-stack evolution program
+## Full-stack evolution program integrated into 0.5
 
 | Gate | Status | Exit evidence |
 | --- | --- | --- |
@@ -38,15 +45,15 @@ API status, or release of the preview crate.
 | G1 Native runtime and dynamic rendering | Complete | [Runtime](evidence/g1-native-runtime-foundation.md), [native-socket](evidence/g1-native-socket-foundation.md), [complete-render](evidence/g1-complete-render-foundation.md), [ordered-render](evidence/g1-ordered-render-foundation.md), [async-boundary](evidence/g1-async-boundary-foundation.md), [layout-composition](evidence/g1-layout-composition-foundation.md), [OpenTelemetry](evidence/g1-opentelemetry-foundation.md), [middleware/error](evidence/g1-middleware-error-foundation.md), [dynamic-reference](evidence/g1-dynamic-reference-foundation.md), and [transport/load/security](evidence/g1-transport-load-security.md) cover the sealed route graph, bounded lifecycle, real TCP HTTP/1.1 and HTTP/2, three SSR modes, route-owned complete and streamed layouts, structured logs and OTel, slow peers, fixed-load RSS, parser/body policy, capability mediation, authored errors, and the reference application. Protected CI, crates.io reconstruction, and the component prerelease completed the public-preview promotion. |
 | G2 Data, actions, and cache | Complete; public in `0.3.0-beta.1` | [G2 evidence](evidence/g2-fullstack-beta.md) covers progressive authenticated mutation across two native instances, typed resources/loaders, idempotency, truthful cancellation and commit state, sessions, bounded uploads, SSRF policy, cache isolation, coordinated invalidation, diagnostics, and the ASVS ownership map. Production durable providers remain outside this gate. |
 | G3 Portable deployment | Complete; public preview in `0.3.0-beta.1` | [G3 evidence](evidence/g3-pboc-provider-conformance.md) covers one sealed PBOC, exact pre-upload verification, native/OCI and Cloudflare same-corpus behavior, capability rejection, rolling skew, rollback, secret exclusion, and least-privilege OCI. PBOC remains v1alpha1. |
-| G4 Adoption | Engineering prerequisite accepted in `0.4.0-beta.1`; external trial pending | [G4 engineering readiness](51-g4-engineering-readiness.md) and [accepted evidence](evidence/g4-engineering-readiness.md) cover the internal incremental-build, DX, asset-work-queue, and clean-revision measurement prerequisite. The adoption gate closes only when an unaffiliated team completes a greenfield application and partial migration using public resources only. |
-| G5 OpenSDK ecosystem | Preview foundation only | Reviewed server plane, package lock/resolution, generated SDKs, registry/discovery, and independent non-Rust extension. |
-| G6 Operational maturity | Not started | Exercised release/support/security policy with owner redundancy and incident drill. |
-| G7 Competitive claim | Not started | Reproducible comparison, three external production deployments, public limitations, and approved claim wording. |
+| G4 Adoption | Engineering prerequisite accepted in `0.4.0-beta.1`; integrated into the `0.5` beta gate | [G4 engineering readiness](51-g4-engineering-readiness.md) and [accepted evidence](evidence/g4-engineering-readiness.md) cover the internal incremental-build, DX, asset-work-queue, and clean-revision measurement prerequisite. The adoption gate closes only when an unaffiliated team completes a greenfield application and partial migration using public resources only. |
+| G5 OpenSDK ecosystem | Preview foundation; bounded input to `0.5` | Reviewed server plane, package lock/resolution, generated SDKs, registry/discovery, and independent non-Rust extension. Work does not block the causal runtime unless that runtime needs the extension boundary. |
+| G6 Operational maturity | Not started; `0.5` release-maturity input | Exercised release/support/security policy with owner redundancy and incident drill. |
+| G7 Competitive claim | Not started; remains post-evidence | Reproducible comparison, three external production deployments, public limitations, and approved claim wording. |
 
-The critical path is `G0 -> G1 -> G2 -> G3`. G4 may perform read-only migration
-analysis during G1/G2. G5 cannot stabilize the buffered HTTP preview ahead of
-the runtime lifecycle. G6 is designed from G0 and closes only when it can be
-staffed. G7 cannot close from internal demos or tests.
+G0-G3 are completed foundations. G4 external adoption, G5's required extension
+boundaries, and G6 operational maturity now feed the `0.5` phases defined in the
+current roadmap. G7 cannot close from internal demos or tests and does not gate
+implementation of the causal runtime.
 
 ## Already implemented foundations
 

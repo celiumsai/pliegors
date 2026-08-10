@@ -61,11 +61,12 @@ Current classification:
 | Surface | Tier |
 | --- | --- |
 | R0-R7 contracts and their accepted evidence | `preview` |
-| Published `pliego-*` Rust APIs and CLI commands in `0.0.x` | `preview` |
+| Published `pliego-*` Rust APIs and CLI commands in `0.4.0-beta.1` | `preview` |
 | Hyphae protocol client boundary | `preview`; production gateway operation is outside this repository |
 | Delegated PliegoCSS command | `experimental`; active optional companion |
 | Product topology registry | `experimental` until OpenSDK conformance fixes its external schema |
-| OpenSDK, server runtime, PBOC, and Pliego.run provider adapter | Not released |
+| OpenSDK build/browser/tooling, native server runtime, dynamic SSR, and PBOC | `preview`; released in `0.4.0-beta.1` with the limits in `product.capabilities.json` |
+| OpenSDK server plane and Pliego.run provider adapter | Not released; the Pliego.run implementation remains outside this repository |
 | Any `stable` public API | None before its explicit promotion record |
 
 ## Canonical capability authority
