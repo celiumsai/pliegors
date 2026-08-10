@@ -148,6 +148,13 @@ exception handling aborts instead. See the
 [R3 contract](docs/30-event-schema-and-snapshot-contract.md) and
 [acceptance record](docs/evidence/r3-snapshot-schema.md).
 
+The `0.5.x` source preview adds `StateRoot` and `CausalScheduler` inside
+`pliego-fold`. The scheduler is a sole-writer, single-threaded event coordinator:
+events produced while transaction N is active enter transaction N+1, and each
+attempt emits a receipt binding exact before/after roots and cursors. This is a
+projection-kernel preview, not yet the complete DOM/HMR browser coordinator and
+not a released `0.4.0-beta.1` capability.
+
 ## Language boundary
 
 Rust owns product routing, rendering, content schemas, state, folds, persistence

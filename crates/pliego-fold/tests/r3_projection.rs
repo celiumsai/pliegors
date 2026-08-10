@@ -7,8 +7,8 @@ use std::rc::Rc;
 use pliego_fold::{
     CANONICAL_JSON_CODEC_ID, CanonicalJsonCodec, CodecError, CodecIdentity,
     MAX_CANONICAL_STATE_BYTES, MAX_PROJECTION_SNAPSHOT_BYTES, Projection, ProjectionError,
-    ProjectionSnapshot, ReactiveLog, Reducer, ReducerError, ReducerIdentity, SnapshotError,
-    StateCodec,
+    ProjectionSnapshot, ReactiveLog, Reducer, ReducerError, ReducerIdentity, STATE_ROOT_FORMAT_V1,
+    SnapshotError, StateCodec, StateRoot,
 };
 use pliego_log::{EventCatalogBuilder, EventSchema, Log, SealedEventCatalog};
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,98 @@ use serde::{Deserialize, Serialize};
 struct Delta {
     amount: i64,
     mode: String,
+}
+
+#[test]
+fn state_root_is_stable_across_live_genesis_and_snapshot_tail_replay() {
+    let history = log_of(&events([(2, "ok"), (3, "ok"), (-1, "ok")]));
+    let live = projection(history.clone());
+    let live_root = live.state_root().unwrap();
+
+    let replay = projection(history.clone());
+    assert_eq!(replay.state_root().unwrap(), live_root);
+
+    let prefix = log_of(&events([(2, "ok"), (3, "ok")]));
+    let prefix_projection = projection(prefix);
+    let snapshot = prefix_projection.snapshot().unwrap();
+    let restored = Projection::restore(
+        ReactiveLog::from_log(history),
+        snapshot,
+        catalog(),
+        reducer(3),
+        CanonicalJsonCodec::default(),
+    )
+    .unwrap();
+    assert_eq!(restored.state_root().unwrap(), live_root);
+    assert_eq!(live_root.format(), STATE_ROOT_FORMAT_V1);
+    assert_eq!(live_root.to_string().len(), "sha256:".len() + 64);
+}
+
+#[test]
+fn state_root_binds_history_schema_reducer_codec_and_state() {
+    let base = projection(log_of(&events([(2, "ok")])))
+        .state_root()
+        .unwrap();
+    let changed_history = projection(log_of(&events([(3, "ok")])))
+        .state_root()
+        .unwrap();
+    assert_ne!(changed_history, base);
+
+    let log = log_of(&events([(2, "ok")]));
+    let alternate_schema = Projection::new(
+        ReactiveLog::from_log(log.clone()),
+        Counter::default(),
+        alternate_catalog(),
+        reducer(1),
+        CanonicalJsonCodec::default(),
+    )
+    .unwrap()
+    .state_root()
+    .unwrap();
+    assert_ne!(alternate_schema, base);
+
+    let changed_reducer = Projection::new(
+        ReactiveLog::from_log(log.clone()),
+        Counter::default(),
+        catalog(),
+        reducer(2),
+        CanonicalJsonCodec::default(),
+    )
+    .unwrap()
+    .state_root()
+    .unwrap();
+    assert_ne!(changed_reducer, base);
+
+    let changed_codec = Projection::new(
+        ReactiveLog::from_log(log),
+        Counter::default(),
+        catalog(),
+        reducer(1),
+        CanonicalJsonCodec::with_max_bytes(1024).unwrap(),
+    )
+    .unwrap()
+    .state_root()
+    .unwrap();
+    assert_ne!(changed_codec, base);
+}
+
+#[test]
+fn state_root_has_a_pinned_golden_vector() {
+    let root = projection(log_of(&events([(2, "ok"), (3, "ok")])))
+        .state_root()
+        .unwrap();
+    assert_eq!(
+        root.to_string(),
+        "sha256:f0ba6c46814249860f257c3fce86dd9cca3b4ad6419ddb0bf05165f1a792bf98"
+    );
+    assert_eq!(
+        StateRoot::from_snapshot(
+            &projection(log_of(&events([(2, "ok"), (3, "ok")])))
+                .snapshot()
+                .unwrap()
+        ),
+        root
+    );
 }
 
 impl EventSchema for Delta {

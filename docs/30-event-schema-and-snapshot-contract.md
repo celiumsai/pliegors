@@ -322,6 +322,39 @@ replicates the `EventSchema + Serialize + DeserializeOwned + PartialEq` bound
 and delegates to the same exact round-trip admission path rather than accepting
 free-form call-site strings.
 
+## StateRoot v1
+
+StateRoot is an additive, separately domain-versioned identity derived from an
+integrity-checked projection snapshot. It binds the exact history cursor,
+schema-set digest, reducer identity/configuration, codec identity/configuration,
+state digest, and snapshot digest without changing the snapshot envelope.
+
+The portable spelling is `sha256:<64 lowercase hex>`. The exact preimage and
+field order are fixed by [ADR-009](adr/ADR-009-state-root-v1.md). Like snapshot
+digests, a state root proves deterministic integrity under this contract; it is
+not signer authority or provenance.
+
+`Projection::state_root()` settles the projection, creates its verified
+snapshot, and derives `StateRoot`. Live execution, genesis replay, and
+snapshot-tail replay must produce the same root for the same accepted history
+and executable contracts.
+
+## Causal transaction scheduler
+
+The source-preview `CausalScheduler` is the sole-writer event coordinator above
+`ReactiveLog` and `Projection`. It separates events queued before a transaction
+from events produced while that transaction is active. Effects therefore enqueue
+facts for the exact next transaction rather than extending the transaction whose
+state they observed.
+
+Each transaction preflights typed append and projection reduction against an
+unpublished candidate log, commits the projection once, publishes the log once,
+runs reactive effects, and records exact before/after `StateRoot` and `LogCursor`
+points. Rejection leaves both points equal. Post-commit effect panic is reported
+without pretending the committed event rolled back. The detailed ordering,
+limits, and panic boundary are fixed in
+[ADR-010](adr/ADR-010-causal-transaction-scheduler.md).
+
 ## Determinism and parity
 
 The principal R3 invariant is:

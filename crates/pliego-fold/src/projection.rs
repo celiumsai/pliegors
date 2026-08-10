@@ -9,12 +9,12 @@ use std::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::rc::Rc;
 
-use pliego_log::{CursorError, Hash, LogCursor, SealedEventCatalog};
+use pliego_log::{CursorError, Hash, Log, LogCursor, SealedEventCatalog};
 use pliego_reactive::Memo;
 
-use crate::ReactiveLog;
 use crate::codec::{CodecError, MAX_CANONICAL_STATE_BYTES, StateCodec};
 use crate::snapshot::{CodecIdentity, ProjectionSnapshot, ReducerIdentity, SnapshotError};
+use crate::{ReactiveLog, StateRoot};
 
 const MAX_FAILURE_MESSAGE_BYTES: usize = 2048;
 
@@ -220,6 +220,34 @@ struct StableSeed<'a, S> {
     history: LogCursor,
 }
 
+pub(crate) struct PreparedProjection<S> {
+    expected_history: LogCursor,
+    next_history: LogCursor,
+    state: S,
+    state_bytes: Vec<u8>,
+    folded: u64,
+    state_root: StateRoot,
+}
+
+impl<S> PreparedProjection<S> {
+    pub(crate) const fn history(&self) -> LogCursor {
+        self.next_history
+    }
+
+    pub(crate) const fn state_root(&self) -> StateRoot {
+        self.state_root
+    }
+}
+
+struct ProjectionContract<S: 'static, E: 'static> {
+    catalog: Rc<SealedEventCatalog<E>>,
+    reducer: Reducer<S, E>,
+    codec: Rc<dyn StateCodec<S>>,
+    schema_set_digest: Hash,
+    reducer_identity: ReducerIdentity,
+    codec_identity: CodecIdentity,
+}
+
 #[derive(Clone, PartialEq, Eq)]
 struct ProjectionRead {
     history: LogCursor,
@@ -238,6 +266,7 @@ pub struct Projection<S: 'static, E: 'static> {
     schema_set_digest: Hash,
     reducer_identity: ReducerIdentity,
     codec_identity: CodecIdentity,
+    contract: Rc<ProjectionContract<S, E>>,
     _event: std::marker::PhantomData<fn() -> E>,
 }
 
@@ -368,33 +397,35 @@ where
         }));
         let memo_stable = stable.clone();
         let catalog = Rc::new(catalog);
-        let memo_catalog = catalog.clone();
-        let memo_reducer = reducer.clone();
-        let memo_codec = codec.clone();
-        let memo = Memo::new(move || {
-            match synchronize(
-                log,
-                &memo_stable,
-                memo_catalog.as_ref(),
-                &memo_reducer,
-                memo_codec.as_ref(),
-            ) {
-                Ok(history) => ProjectionRead {
-                    history,
-                    error: None,
-                },
-                Err(error) => ProjectionRead {
-                    history: memo_stable.borrow().history,
-                    error: Some(error),
-                },
-            }
+        let contract = Rc::new(ProjectionContract {
+            catalog,
+            reducer,
+            codec,
+            schema_set_digest,
+            reducer_identity: reducer_identity.clone(),
+            codec_identity: codec_identity.clone(),
         });
+        let memo_contract = Rc::clone(&contract);
+        let memo =
+            Memo::new(
+                move || match synchronize(log, &memo_stable, memo_contract.as_ref()) {
+                    Ok(history) => ProjectionRead {
+                        history,
+                        error: None,
+                    },
+                    Err(error) => ProjectionRead {
+                        history: memo_stable.borrow().history,
+                        error: Some(error),
+                    },
+                },
+            );
         Ok(Self {
             memo,
             stable,
             schema_set_digest,
             reducer_identity,
             codec_identity,
+            contract,
             _event: std::marker::PhantomData,
         })
     }
@@ -450,6 +481,34 @@ where
         .map_err(ProjectionError::from)
     }
 
+    /// Derive the versioned identity of the current verified projection state.
+    pub fn state_root(&self) -> Result<StateRoot, ProjectionError> {
+        self.snapshot()
+            .map(|snapshot| StateRoot::from_snapshot(&snapshot))
+    }
+
+    pub(crate) fn prepare(
+        &self,
+        candidate_log: &Log,
+    ) -> Result<PreparedProjection<S>, ProjectionError> {
+        prepare_projection(candidate_log, &self.stable, self.contract.as_ref())
+    }
+
+    pub(crate) fn commit_prepared(
+        &self,
+        prepared: PreparedProjection<S>,
+    ) -> Result<S, ProjectionError> {
+        let mut stable = self.stable.borrow_mut();
+        if stable.history != prepared.expected_history {
+            return Err(ProjectionError::ConcurrentMutation);
+        }
+        let previous = std::mem::replace(&mut stable.state, prepared.state);
+        stable.state_bytes = prepared.state_bytes;
+        stable.history = prepared.next_history;
+        stable.folded = prepared.folded;
+        Ok(previous)
+    }
+
     /// Exact stable history checkpoint. Failing tails do not advance it.
     pub fn history(&self) -> Result<LogCursor, ProjectionError> {
         self.settle()?;
@@ -485,18 +544,13 @@ where
 fn synchronize<S, E>(
     log: ReactiveLog,
     stable: &Rc<RefCell<Stable<S>>>,
-    catalog: &SealedEventCatalog<E>,
-    reducer: &Reducer<S, E>,
-    codec: &dyn StateCodec<S>,
+    contract: &ProjectionContract<S, E>,
 ) -> Result<LogCursor, ProjectionError>
 where
     S: Clone + PartialEq + 'static,
     E: 'static,
 {
-    let (mut candidate, expected) = {
-        let stable = stable.borrow();
-        (stable.state.clone(), stable.history)
-    };
+    let expected = stable.borrow().history;
     let next = log.with(|raw| {
         raw.tail(&expected).map_err(ProjectionError::from)?;
         Ok::<_, ProjectionError>(raw.cursor())
@@ -504,22 +558,44 @@ where
     if next.position == expected.position {
         return Ok(expected);
     }
+    let prepared = log.with(|raw| prepare_projection(raw, stable, contract))?;
+    let next = prepared.next_history;
+    let previous = commit_stable(stable, prepared)?;
+    drop(previous);
+    Ok(next)
+}
+
+fn prepare_projection<S, E>(
+    candidate_log: &Log,
+    stable: &Rc<RefCell<Stable<S>>>,
+    contract: &ProjectionContract<S, E>,
+) -> Result<PreparedProjection<S>, ProjectionError>
+where
+    S: Clone + PartialEq + 'static,
+    E: 'static,
+{
+    let (mut candidate, expected, folded) = {
+        let stable = stable.borrow();
+        (stable.state.clone(), stable.history, stable.folded)
+    };
+    candidate_log.tail(&expected)?;
+    let next = candidate_log.cursor();
     let event_count = next
         .position
         .checked_sub(expected.position)
         .ok_or(ProjectionError::ConcurrentMutation)?;
     for sequence in expected.position..next.position {
-        let stored = log.with(|raw| raw.get(sequence).cloned());
+        let stored = candidate_log.get(sequence).cloned();
         let stored = stored.ok_or(ProjectionError::ConcurrentMutation)?;
         let sequence = stored.seq();
-        let resolved = catch_unwind(AssertUnwindSafe(|| catalog.decode(&stored)))
+        let resolved = catch_unwind(AssertUnwindSafe(|| contract.catalog.decode(&stored)))
             .map_err(|_| ProjectionError::SchemaPanicked { sequence })?
             .map_err(|error| ProjectionError::Schema {
                 sequence,
                 message: bounded_message(error.to_string()),
             })?;
         catch_unwind(AssertUnwindSafe(|| {
-            reducer.apply(&mut candidate, &resolved)
+            contract.reducer.apply(&mut candidate, &resolved)
         }))
         .map_err(|_| ProjectionError::ReducerPanicked { sequence })?
         .map_err(|error| ProjectionError::Reducer {
@@ -527,28 +603,46 @@ where
             message: error.message,
         })?;
     }
-    let candidate_bytes = canonical_state_bytes(codec, &candidate)?;
+    let candidate_bytes = canonical_state_bytes(contract.codec.as_ref(), &candidate)?;
     {
         let stable = stable.borrow();
         if candidate == stable.state && candidate_bytes != stable.state_bytes {
             return Err(ProjectionError::NonCanonicalState);
         }
     }
-    let mut stable = stable.borrow_mut();
-    if stable.history != expected {
-        return Err(ProjectionError::ConcurrentMutation);
-    }
-    let folded = stable
-        .folded
+    let folded = folded
         .checked_add(event_count)
         .ok_or(ProjectionError::CounterOverflow)?;
-    let previous_state = std::mem::replace(&mut stable.state, candidate);
-    stable.state_bytes = candidate_bytes;
-    stable.history = next;
-    stable.folded = folded;
-    drop(stable);
-    drop(previous_state);
-    Ok(next)
+    let snapshot = ProjectionSnapshot::create(
+        next,
+        contract.schema_set_digest,
+        contract.reducer_identity.clone(),
+        contract.codec_identity.clone(),
+        candidate_bytes.clone(),
+    )?;
+    Ok(PreparedProjection {
+        expected_history: expected,
+        next_history: next,
+        state: candidate,
+        state_bytes: candidate_bytes,
+        folded,
+        state_root: StateRoot::from_snapshot(&snapshot),
+    })
+}
+
+fn commit_stable<S>(
+    stable: &Rc<RefCell<Stable<S>>>,
+    prepared: PreparedProjection<S>,
+) -> Result<S, ProjectionError> {
+    let mut stable = stable.borrow_mut();
+    if stable.history != prepared.expected_history {
+        return Err(ProjectionError::ConcurrentMutation);
+    }
+    let previous = std::mem::replace(&mut stable.state, prepared.state);
+    stable.state_bytes = prepared.state_bytes;
+    stable.history = prepared.next_history;
+    stable.folded = prepared.folded;
+    Ok(previous)
 }
 
 fn canonical_state_bytes<S>(
