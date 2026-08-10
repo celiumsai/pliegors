@@ -1,0 +1,38 @@
+:root {
+  color: #ebe9e1;
+  background: #131512;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+body {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.eyebrow {
+  color: #d8ff2f;
+  font: 700 0.75rem/1.2 ui-monospace, monospace;
+  letter-spacing: 0.14em;
+}
+
+button,
+input {
+  margin: 0.35rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #62675d;
+  color: inherit;
+  background: #1f221d;
+}
+
+output {
+  display: inline-block;
+  min-width: 2rem;
+  margin: 0.35rem;
+}
+
+#causal-app {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #3a3e36;
+}

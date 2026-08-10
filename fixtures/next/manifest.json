@@ -1,0 +1,299 @@
+{
+  "$schema": "https://pliegors.dev/schemas/pliego.next-fixture-manifest.schema.json",
+  "contract": "dev.pliegors.next-fixture-manifest/v1",
+  "authority": {
+    "releasedTag": "v0.4.0-beta.1",
+    "releasedRevision": "9cdadea508dfbf78b2ec5061df6846e7fa727211",
+    "preNextRevision": "bdc285fbe208f09c47ffdfbf1081e923884a9cf7"
+  },
+  "policy": {
+    "warmupRuns": 1,
+    "measuredRuns": 5,
+    "percentileMethod": "nearest-rank",
+    "percentiles": [
+      "p50",
+      "p95",
+      "p99"
+    ],
+    "outlierPolicy": "none",
+    "bottlenecks": {
+      "statistic": "p95",
+      "unit": "milliseconds",
+      "count": 3,
+      "candidateCaseIds": [
+        "build-cold",
+        "build-warm-verified",
+        "phase-rust-wasm",
+        "phase-site",
+        "dev-start-cold",
+        "dev-start-warm",
+        "change-to-server",
+        "change-to-browser-visible"
+      ]
+    }
+  },
+  "measurementCases": [
+    {
+      "id": "build-cold",
+      "category": "build",
+      "unit": "milliseconds",
+      "collector": "native-build-v1",
+      "description": "Cold build from an empty fixture Cargo target"
+    },
+    {
+      "id": "build-warm-verified",
+      "category": "build",
+      "unit": "milliseconds",
+      "collector": "native-build-v1",
+      "description": "Verified unchanged warm build"
+    },
+    {
+      "id": "phase-discovery",
+      "category": "build",
+      "unit": "milliseconds",
+      "collector": "native-build-v1",
+      "description": "Project discovery and build-context phase"
+    },
+    {
+      "id": "phase-rust-wasm",
+      "category": "build",
+      "unit": "milliseconds",
+      "collector": "native-build-v1",
+      "description": "Rust, WASM, and wasm-bindgen phase"
+    },
+    {
+      "id": "phase-site",
+      "category": "build",
+      "unit": "milliseconds",
+      "collector": "native-build-v1",
+      "description": "Site execution phase"
+    },
+    {
+      "id": "phase-transform",
+      "category": "build",
+      "unit": "milliseconds",
+      "collector": "host-transform-v1",
+      "description": "Build-host transform phase"
+    },
+    {
+      "id": "phase-verification",
+      "category": "build",
+      "unit": "milliseconds",
+      "collector": "native-build-v1",
+      "description": "Output and build-context verification phase"
+    },
+    {
+      "id": "dev-start-cold",
+      "category": "development",
+      "unit": "milliseconds",
+      "collector": "native-dev-v1",
+      "description": "Cold development-host startup to ready"
+    },
+    {
+      "id": "dev-start-warm",
+      "category": "development",
+      "unit": "milliseconds",
+      "collector": "native-dev-v1",
+      "description": "Warm development-host startup to ready"
+    },
+    {
+      "id": "change-to-server",
+      "category": "development",
+      "unit": "milliseconds",
+      "collector": "native-dev-v1",
+      "description": "Filesystem change to server HMR publication"
+    },
+    {
+      "id": "change-to-browser-visible",
+      "category": "browser",
+      "unit": "milliseconds",
+      "collector": "browser-update-v1",
+      "description": "Filesystem change to visible browser update"
+    },
+    {
+      "id": "hmr-phase-discovery",
+      "category": "development",
+      "unit": "milliseconds",
+      "collector": "native-dev-v1",
+      "description": "CSS rebuild discovery and build-context phase"
+    },
+    {
+      "id": "hmr-phase-rust-wasm",
+      "category": "development",
+      "unit": "milliseconds",
+      "collector": "native-dev-v1",
+      "description": "CSS rebuild Rust, WASM, and wasm-bindgen phase"
+    },
+    {
+      "id": "hmr-phase-site",
+      "category": "development",
+      "unit": "milliseconds",
+      "collector": "native-dev-v1",
+      "description": "CSS rebuild site execution phase"
+    },
+    {
+      "id": "hmr-phase-verification",
+      "category": "development",
+      "unit": "milliseconds",
+      "collector": "native-dev-v1",
+      "description": "CSS rebuild output verification phase"
+    },
+    {
+      "id": "hmr-host-transport-overhead",
+      "category": "development",
+      "unit": "milliseconds",
+      "collector": "native-dev-v1",
+      "description": "Observed CSS HMR latency outside recorded build phases"
+    },
+    {
+      "id": "dom-mutations",
+      "category": "browser",
+      "unit": "count",
+      "collector": "browser-update-v1",
+      "description": "DOM mutations caused by the measured update"
+    },
+    {
+      "id": "peak-rss",
+      "category": "memory",
+      "unit": "bytes",
+      "collector": "process-tree-v1",
+      "description": "Peak RSS of the measured command process tree"
+    },
+    {
+      "id": "long-session-rss",
+      "category": "memory",
+      "unit": "bytes",
+      "collector": "process-tree-v1",
+      "description": "Development-session RSS high-water mark"
+    },
+    {
+      "id": "active-owners",
+      "category": "lifecycle",
+      "unit": "count",
+      "collector": "runtime-inspector-v1",
+      "description": "Active runtime owners after the workload"
+    },
+    {
+      "id": "active-listeners",
+      "category": "lifecycle",
+      "unit": "count",
+      "collector": "runtime-inspector-v1",
+      "description": "Active browser listeners after the workload"
+    },
+    {
+      "id": "active-effects",
+      "category": "lifecycle",
+      "unit": "count",
+      "collector": "runtime-inspector-v1",
+      "description": "Active effects after the workload"
+    },
+    {
+      "id": "mounted-roots",
+      "category": "lifecycle",
+      "unit": "count",
+      "collector": "runtime-inspector-v1",
+      "description": "Retained mounted roots after the workload"
+    },
+    {
+      "id": "wasm-bytes",
+      "category": "artifacts",
+      "unit": "bytes",
+      "collector": "artifact-ledger-v1",
+      "description": "Emitted WebAssembly payload bytes"
+    },
+    {
+      "id": "asset-bytes",
+      "category": "artifacts",
+      "unit": "bytes",
+      "collector": "artifact-ledger-v1",
+      "description": "Total emitted non-ledger asset bytes"
+    },
+    {
+      "id": "cache-attempts",
+      "category": "cache",
+      "unit": "count",
+      "collector": "cache-record-v1",
+      "description": "Artifact cache lookup attempts"
+    },
+    {
+      "id": "cache-hits",
+      "category": "cache",
+      "unit": "count",
+      "collector": "cache-record-v1",
+      "description": "Artifact cache hits"
+    },
+    {
+      "id": "cache-misses",
+      "category": "cache",
+      "unit": "count",
+      "collector": "cache-record-v1",
+      "description": "Artifact cache misses"
+    },
+    {
+      "id": "cache-reused-artifacts",
+      "category": "cache",
+      "unit": "count",
+      "collector": "cache-record-v1",
+      "description": "Verified artifacts reused by the build"
+    },
+    {
+      "id": "cache-hit-rate",
+      "category": "cache",
+      "unit": "ratio",
+      "collector": "cache-record-v1",
+      "description": "Cache hits divided by cache attempts"
+    },
+    {
+      "id": "remount-count",
+      "category": "hmr",
+      "unit": "count",
+      "collector": "hmr-receipt-v1",
+      "description": "Boundary remounts grouped by typed reason"
+    },
+    {
+      "id": "full-reload-count",
+      "category": "hmr",
+      "unit": "count",
+      "collector": "hmr-receipt-v1",
+      "description": "Full reloads grouped by typed reason"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "minimal",
+      "root": "fixtures/next/minimal",
+      "descriptor": "fixtures/next/minimal/fixture.json",
+      "workload": "minimal-causal-ui-v1",
+      "objective": "Counter, local state, list, conditional, owned effect, and mount/unmount lifecycle.",
+      "sourceIdentity": {
+        "algorithm": "sha256-tree-v1",
+        "digest": "5d0a87ead6e7fbdfd26eff29bc45de4cee97b4900b65d4763676583055e00e1e"
+      },
+      "notApplicable": []
+    },
+    {
+      "id": "stress-dashboard",
+      "root": "fixtures/next/stress-dashboard",
+      "descriptor": "fixtures/next/stress-dashboard/fixture.json",
+      "workload": "stress-dashboard-v1",
+      "objective": "Thousands of nodes, filters, keyed table, charts, frequent updates, nested ownership, and lifecycle stress.",
+      "sourceIdentity": {
+        "algorithm": "sha256-tree-v1",
+        "digest": "e308be73b801bb8afb091c338bda933b5b69b56522385f30c9a3a0ea46976536"
+      },
+      "notApplicable": []
+    },
+    {
+      "id": "hyphae-console",
+      "root": "fixtures/next/hyphae-console",
+      "descriptor": "fixtures/next/hyphae-console/fixture.json",
+      "workload": "hyphae-console-v1",
+      "objective": "Navigation, simulated authentication, SSR, streaming, queries, optional PliegoCSS, and verified persistent state.",
+      "sourceIdentity": {
+        "algorithm": "sha256-tree-v1",
+        "digest": "a201f4afb96b7ed1860d3656c31cf9c6d9ee53e8b54ba2bc7b72cc8fad15b6d5"
+      },
+      "notApplicable": []
+    }
+  ]
+}

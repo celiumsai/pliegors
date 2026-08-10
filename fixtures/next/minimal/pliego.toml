@@ -1,0 +1,10 @@
+[project]
+id = "minimal-next"
+name = "Minimal Next fixture"
+site_package = "minimal-next-site"
+output = "target/site"
+
+[client]
+package = "minimal-next-client"
+wasm_name = "minimal_next_client"
+bindgen_output = "target/minimal-next-client/pkg"

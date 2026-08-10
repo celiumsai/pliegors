@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+
+[workspace]
+resolver = "2"
+members = ["client", "site"]
+default-members = ["client", "site"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.86"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+js-sys = "=0.3.103"
+pliego-dom = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-dom" }
+pliego-fold = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-fold" }
+pliego-log = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-log" }
+pliego-reactive = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-reactive" }
+pliego-ssg = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-ssg" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "=0.2.126"
+web-sys = { version = "=0.3.103", features = [
+    "Document",
+    "Element",
+    "Event",
+    "EventTarget",
+    "HtmlElement",
+    "HtmlSelectElement",
+    "Node",
+    "NodeList",
+    "Window",
+] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = "symbols"
