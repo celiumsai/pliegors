@@ -291,7 +291,17 @@
       "objective": "Navigation, simulated authentication, SSR, streaming, queries, optional PliegoCSS, and verified persistent state.",
       "sourceIdentity": {
         "algorithm": "sha256-tree-v1",
-        "digest": "a201f4afb96b7ed1860d3656c31cf9c6d9ee53e8b54ba2bc7b72cc8fad15b6d5"
+        "digest": "bcc04af5e8f11078087be2bf8f192732f9feb51e1ac8d80450bb89f9828aa7da"
+      },
+      "externalAuthority": {
+        "repository": "https://github.com/celiumsai/hyphae",
+        "releaseTag": "v1.0.1",
+        "releaseRevision": "84161cf067141b60f4847b965ef77c5b749749c0",
+        "releaseChecksumsSha256": "3e45b7056f27a3e2062e7d216cf03972108aae032bee36589210eb28cd569048",
+        "transport": "native-http-v2-loopback",
+        "productMediaType": "application/vnd.hyphae.product-v1",
+        "errorMediaType": "application/vnd.hyphae.error-v1",
+        "rustMsrv": "1.89.0"
       },
       "notApplicable": []
     }

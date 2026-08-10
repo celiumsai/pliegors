@@ -53,10 +53,13 @@ identities under `fixtures/next`. Source changes require the explicit
 review of the resulting digest change. The current workload descriptors are
 specifications, not accepted measurements.
 
-`hyphae-console` is currently deferred behind Hyphae Native G7/G8 and the public
-`1.0.0` integration decision. The fixture must not embed the current Hyphae
-development workspace or present protocol-v2 test doubles as the released
-Native product.
+`hyphae-console` is specified against exact Hyphae `v1.0.1` through the
+PliegoRS-owned loopback HTTP `/v2` sidecar boundary in
+[`ADR-011`](adr/ADR-011-hyphae-native-sidecar.md). It must not embed the Hyphae
+workspace, link Rust `1.89` crates into PliegoRS, expose the sidecar to browsers,
+or present protocol-v2 test doubles as the released Native product. G7 blocks
+performance claims; durable source-level G8 closure and the completed PliegoRS
+sidecar adapter block final fixture acceptance.
 
 No new package is published merely because a directory exists. New crates stay
 unreleased in `product.capabilities.json` until their public contract and release

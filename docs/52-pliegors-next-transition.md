@@ -87,9 +87,10 @@ The versioned fixture and report contracts are now defined by:
 - `schemas/pliego.next-fixture-manifest.schema.json`;
 - `schemas/pliego.next-baseline-report.schema.json`.
 
-The three fixture directories currently freeze their objectives, source donors,
-and required capabilities. They are deliberately marked `specified`; an
-inventory run reports every unimplemented collector as `unavailable` rather
+The three fixture directories freeze their objectives, source donors, and
+required capabilities. Minimal and stress dashboard are `executable`; Hyphae
+Console is `specified` against an exact external release but is not executable.
+An inventory run reports every unimplemented collector as `unavailable` rather
 than inventing a zero measurement.
 
 Fixture source identity is `sha256-tree-v1`: a domain-separated SHA-256 over
@@ -136,10 +137,13 @@ reports from the same observations. The reports bind the exact source, fixture,
 machine, tools, cache state, warmup, and sample count. The three largest measured
 bottlenecks are named without extrapolating beyond the measured environment.
 
-The Hyphae Console fixture is deferred, not replaced by a mock product. It
-unblocks after Hyphae Native closes G7 and G8, publishes `1.0.0`, and selects a
-public PliegoRS integration boundary. PliegoRS continues implementing host,
-runtime, browser, and measurement work that does not depend on that release.
+The Hyphae Console fixture is specified, not replaced by a mock product. Hyphae
+`v1.0.1` and its closed bounded G6 functional profile are sufficient to begin a
+PliegoRS-owned loopback HTTP `/v2` sidecar adapter without raising the framework
+MSRV. [`ADR-011`](adr/ADR-011-hyphae-native-sidecar.md) freezes that boundary.
+G7 still blocks performance and scale claims, while durable source-level G8
+closure and the completed PliegoRS sidecar adapter block executable-fixture
+acceptance and a complete Phase 0 baseline.
 
 ### Current commands
 

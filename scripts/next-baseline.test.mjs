@@ -44,7 +44,7 @@ test("canonical Next fixture registry has exact authority and source identities"
   ]);
 });
 
-test("fixture validation rejects unknown fixtures and changed source bytes", async () => {
+test("fixture validation rejects registry, source, and external authority drift", async () => {
   const contracts = await loadNextBaselineContracts(root);
   const manifest = JSON.parse(await readFile(path.join(root, "fixtures", "next", "manifest.json"), "utf8"));
   const extra = structuredClone(manifest);
@@ -55,6 +55,18 @@ test("fixture validation rejects unknown fixtures and changed source bytes", asy
   const changed = structuredClone(manifest);
   changed.fixtures[0].sourceIdentity.digest = "0".repeat(64);
   await assert.rejects(validateFixtureManifest(changed, contracts, root), /source identity/u);
+
+  const changedAuthority = structuredClone(manifest);
+  changedAuthority.fixtures[2].externalAuthority.releaseTag = "v1.0.2";
+  await assert.rejects(validateFixtureManifest(changedAuthority, contracts, root), /Hyphae authority/u);
+
+  const missingAuthority = structuredClone(manifest);
+  delete missingAuthority.fixtures[2].externalAuthority;
+  await assert.rejects(validateFixtureManifest(missingAuthority, contracts, root), /fixture manifest schema/u);
+
+  const misplacedAuthority = structuredClone(manifest);
+  misplacedAuthority.fixtures[0].externalAuthority = structuredClone(manifest.fixtures[2].externalAuthority);
+  await assert.rejects(validateFixtureManifest(misplacedAuthority, contracts, root), /fixture manifest schema/u);
 });
 
 test("nearest-rank summary retains p99 as the maximum for five samples", () => {
@@ -65,7 +77,7 @@ test("nearest-rank summary retains p99 as the maximum for five samples", () => {
   });
 });
 
-test("inventory report is incomplete and never invents zero measurements", async () => {
+test("inventory report distinguishes specified fixtures without inventing measurements", async () => {
   const contracts = await loadNextBaselineContracts(root);
   const manifest = JSON.parse(await readFile(path.join(root, "fixtures", "next", "manifest.json"), "utf8"));
   const report = await buildInventoryReport({ manifest, contracts, root, now: "2026-08-08T12:00:00.000Z" });
@@ -77,7 +89,8 @@ test("inventory report is incomplete and never invents zero measurements", async
   assert.ok(report.fixtures.every((fixture) => fixture.results.every((result) => result.status === "unavailable")));
   assert.ok(report.fixtures.every((fixture) => fixture.results.every((result) => !("observations" in result))));
   assert.equal(report.fixtures[0].results[0].reasonCode, "COLLECTOR_NOT_EXECUTED");
-  assert.equal(report.fixtures[2].results[0].reasonCode, "FIXTURE_DEFERRED");
+  assert.equal(report.fixtures[2].results[0].reasonCode, "FIXTURE_NOT_EXECUTABLE");
+  assert.match(report.fixtures[2].results[0].explanation, /specified but not executable/u);
 });
 
 test("baseline validation rejects unavailable results marked complete", async () => {

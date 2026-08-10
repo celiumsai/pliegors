@@ -20,6 +20,17 @@ export const NEXT_FIXTURE_IDS = Object.freeze([
   "hyphae-console",
 ]);
 
+const NEXT_HYPHAE_AUTHORITY = Object.freeze({
+  repository: "https://github.com/celiumsai/hyphae",
+  releaseTag: "v1.0.1",
+  releaseRevision: "84161cf067141b60f4847b965ef77c5b749749c0",
+  releaseChecksumsSha256: "3e45b7056f27a3e2062e7d216cf03972108aae032bee36589210eb28cd569048",
+  transport: "native-http-v2-loopback",
+  productMediaType: "application/vnd.hyphae.product-v1",
+  errorMediaType: "application/vnd.hyphae.error-v1",
+  rustMsrv: "1.89.0",
+});
+
 export const NEXT_CASE_IDS = Object.freeze([
   "build-cold",
   "build-warm-verified",
@@ -86,6 +97,8 @@ export async function validateFixtureManifest(manifest, contracts, root) {
   assertDeepEqual(manifest.measurementCases.map((item) => item.id), NEXT_CASE_IDS, "measurement cases or order differ");
   assertUnique(manifest.measurementCases.map((item) => item.id), "measurement case ID");
   assertUnique(manifest.fixtures.map((fixture) => fixture.id), "fixture ID");
+  const hyphaeFixture = manifest.fixtures.find((fixture) => fixture.id === "hyphae-console");
+  assertDeepEqual(hyphaeFixture.externalAuthority, NEXT_HYPHAE_AUTHORITY, "Hyphae authority differs");
 
   const cases = new Map(manifest.measurementCases.map((item) => [item.id, item]));
   for (const candidate of manifest.policy.bottlenecks.candidateCaseIds) {
@@ -247,15 +260,22 @@ export async function buildInventoryReport({ manifest, contracts, root, now = ne
             explanation: declared.explanation,
           };
         }
-        const deferred = stages.get(fixture.id) === "deferred";
+        const stage = stages.get(fixture.id);
+        let reasonCode = "COLLECTOR_NOT_EXECUTED";
+        let explanation = "The fixture is executable, but this collector was not selected for the current report.";
+        if (stage === "deferred") {
+          reasonCode = "FIXTURE_DEFERRED";
+          explanation = "The fixture is deliberately deferred behind an external product and integration gate.";
+        } else if (stage === "specified") {
+          reasonCode = "FIXTURE_NOT_EXECUTABLE";
+          explanation = "The fixture is specified but not executable, so no measurement collector can run yet.";
+        }
         return {
           caseId,
           unit: cases.get(caseId).unit,
           status: "unavailable",
-          reasonCode: deferred ? "FIXTURE_DEFERRED" : "COLLECTOR_NOT_EXECUTED",
-          explanation: deferred
-            ? "The fixture is deliberately deferred behind an external product and integration gate."
-            : "The fixture is executable, but this collector was not selected for the current report.",
+          reasonCode,
+          explanation,
         };
       }),
     })),
