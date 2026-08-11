@@ -50,6 +50,12 @@ assert.equal(
   false,
   "Hyphae Console introduced a product binary before fixture promotion",
 );
+const acceptanceTarget = fixturePackage.targets.find(
+  (target) => target.name === "hyphae-console-acceptance-server",
+);
+assert(acceptanceTarget, "Hyphae Console acceptance process target is missing");
+assert.deepEqual(acceptanceTarget.kind, ["example"]);
+assert.deepEqual(acceptanceTarget["required-features"], ["acceptance-harness"]);
 assert.equal(
   fixturePackage.dependencies.some((dependency) => dependency.name === "pliego-hyphae"),
   false,

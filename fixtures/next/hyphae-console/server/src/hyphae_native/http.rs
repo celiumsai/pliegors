@@ -32,6 +32,11 @@ impl NativeHttpClient {
         Ok(Self { endpoint, timeout })
     }
 
+    #[cfg(test)]
+    pub(super) fn endpoint(&self) -> SocketAddr {
+        self.endpoint
+    }
+
     pub async fn capabilities(
         &self,
         request_id: u128,
@@ -196,7 +201,10 @@ impl NativeHttpClient {
                 return decode_response(&body).map_err(Into::into);
             }
             if status != StatusCode::OK && content_type == ERROR_MEDIA_TYPE {
-                return Err(decode_error(&body)?.into());
+                return Err(TransportError::Product {
+                    status,
+                    error: Box::new(decode_error(&body)?),
+                });
             }
             Err(TransportError::MediaType(content_type))
         };
@@ -216,7 +224,10 @@ pub enum TransportError {
     MediaType(String),
     RequestId,
     Protocol(WireError),
-    Product(Box<ProductError>),
+    Product {
+        status: StatusCode,
+        error: Box<ProductError>,
+    },
     UnexpectedResponse,
     OutcomeUnknown(u128),
     NonStrictCommit,
@@ -239,7 +250,7 @@ impl fmt::Display for TransportError {
             Self::MediaType(_) => "Hyphae response media type differs",
             Self::RequestId => "Hyphae response request identity differs",
             Self::Protocol(_) => "Hyphae response protocol is invalid",
-            Self::Product(_) => "Hyphae rejected the product operation",
+            Self::Product { .. } => "Hyphae rejected the product operation",
             Self::UnexpectedResponse => "Hyphae returned the wrong response kind",
             Self::OutcomeUnknown(_) => "Hyphae mutation outcome requires resolution",
             Self::NonStrictCommit => "Hyphae mutation was not strictly durable",
@@ -253,12 +264,6 @@ impl std::error::Error for TransportError {}
 impl From<WireError> for TransportError {
     fn from(error: WireError) -> Self {
         Self::Protocol(error)
-    }
-}
-
-impl From<ProductError> for TransportError {
-    fn from(error: ProductError) -> Self {
-        Self::Product(Box::new(error))
     }
 }
 

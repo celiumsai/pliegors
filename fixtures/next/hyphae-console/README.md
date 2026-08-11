@@ -39,11 +39,14 @@ npm run check:next-hyphae-sidecar
 cargo test --manifest-path fixtures/next/hyphae-console/Cargo.toml --locked
 ```
 
-The ignored persistence test requires `HYPHAE_V101_BIN` to name the verified
-release executable. CI downloads the exact Linux archive, verifies the release
-checksum file, archive, and executable digests, then runs that test. This does
-not promote the Console to `executable`; application routes, simulated auth,
-SSR, streaming, cancellation acceptance, and browser isolation still remain.
+The exact-release acceptance lane requires `HYPHAE_V101_BIN` to name the
+verified executable. CI downloads the Linux archive, verifies the release
+checksum file, archive, and executable digests, then runs both direct sidecar
+persistence and the feature-gated process harness. That harness starts a real
+Hyphae sidecar and PliegoRS TCP server, drives Chrome with JavaScript enabled
+and disabled, restarts the complete process against the same data directory,
+and verifies session invalidation, tenant persistence, process exit, and port
+release.
 
 The library-only application layer now seals five Pliego-owned routes:
 `GET /login`, `POST /login`, `GET /console`, `POST /console/increment`, and
@@ -52,6 +55,12 @@ independent tenant keys. Sessions rotate on login, mutations require Origin and
 session-bound CSRF, complete pages use SSR, and the activity page uses ordered
 streaming SSR. No route proxies `/v2` or exposes Hyphae media types.
 
-The fixture remains `specified`: it has no `main.rs` or binary target. Real-
-browser isolation, exact-binary application restart, cancellation/outcome-
-unknown acceptance, and the remaining ADR-011 gates still precede promotion.
+The sidecar tests also place a loopback TCP fault proxy between the adapter and
+the exact binary. One drops a strict SET acknowledgement and proves that the
+idempotency query resolves it as committed. Another induces Hyphae's released
+blob-staging failure, observes `outcome_unknown`, restarts the exact binary, and
+proves recovery resolves the token as rolled back.
+
+The fixture remains `specified`: it has no `main.rs` or product binary target.
+The `acceptance-harness` Cargo feature exposes only a non-default example used
+by CI. The remaining ADR-011 G7/G8 gates still precede promotion.

@@ -8,9 +8,21 @@ rust-version.workspace = true
 license.workspace = true
 publish = false
 
+[features]
+default = []
+acceptance-harness = []
+
+[[example]]
+name = "hyphae-console-acceptance-server"
+path = "examples/acceptance_server.rs"
+required-features = ["acceptance-harness"]
+test = false
+bench = false
+
 [dependencies]
 bytes = { workspace = true }
 futures-util = { workspace = true }
+getrandom = { workspace = true }
 http = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true }
@@ -24,6 +36,5 @@ sha2 = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
-getrandom = { workspace = true }
 tempfile = { workspace = true }
 tower = { workspace = true }

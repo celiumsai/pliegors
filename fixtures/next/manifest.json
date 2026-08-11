@@ -291,7 +291,7 @@
       "objective": "Navigation, simulated authentication, tenant-isolated persistence, SSR, streaming, queries, optional PliegoCSS, and verified replay.",
       "sourceIdentity": {
         "algorithm": "sha256-tree-v1",
-        "digest": "2a7ab3951fb36a3790b16a94872655e393b5ae17fd755ac2c07dcc5f829a18d5"
+        "digest": "4ddd1289e61d215ea163016beb72e69bb629b6308d9bc63296c9974b7fd54f5a"
       },
       "externalAuthority": {
         "repository": "https://github.com/celiumsai/hyphae",

@@ -106,7 +106,9 @@ jobs:
             --all-targets \
             --locked
 
-      - name: Verify Hyphae v1.0.1 sidecar compatibility
+      - name: Verify Hyphae v1.0.1 full-process acceptance
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
         shell: bash
         run: |
           set -euo pipefail
@@ -129,15 +131,7 @@ jobs:
             real_v101_ \
             -- \
             --ignored
-
-      - name: Validate Hyphae Console browser isolation
-        run: >-
-          cargo test
-          --manifest-path fixtures/next/hyphae-console/Cargo.toml
-          --locked
-          real_browser_keeps_hyphae_outside_the_browser_boundary
-          --
-          --ignored
+          npm run check:next-hyphae-console-browser
 
       - name: Test workspace
         run: cargo test --workspace --all-targets --locked

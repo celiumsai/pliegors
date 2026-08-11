@@ -7,12 +7,11 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex as StdMutex, MutexGuard};
 use tower::ServiceExt;
 
-use crate::{HyphaeInstallation, HyphaeSidecar, SidecarAuthority};
-
 #[derive(Clone, Default)]
 struct FakeStore {
     values: Arc<StdMutex<BTreeMap<String, Vec<u8>>>>,
     operations: Arc<StdMutex<Vec<(String, String)>>>,
+    roll_back_next_put: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl ConsoleStateStore for FakeStore {
@@ -36,8 +35,12 @@ impl ConsoleStateStore for FakeStore {
     ) -> state::StoreFuture<'a, Result<(), ConsoleStoreError>> {
         let values = self.values.clone();
         let operations = self.operations.clone();
+        let roll_back_next_put = self.roll_back_next_put.clone();
         Box::pin(async move {
             lock(&operations).push(("put".to_owned(), tenant_id.to_owned()));
+            if roll_back_next_put.swap(false, std::sync::atomic::Ordering::AcqRel) {
+                return Err(ConsoleStoreError::MutationRolledBack);
+            }
             lock(&values).insert(tenant_id.to_owned(), value.to_vec());
             Ok(())
         })
@@ -143,6 +146,22 @@ async fn csrf_failures_and_raw_sidecar_paths_never_reach_storage() {
 }
 
 #[tokio::test]
+async fn proven_storage_rollback_is_a_retryable_conflict() {
+    let store = FakeStore::default();
+    let runtime = runtime(store.clone());
+    let alice = login(&runtime, "alice").await;
+    store
+        .roll_back_next_put
+        .store(true, std::sync::atomic::Ordering::Release);
+
+    let response = increment(&runtime, &alice, None).await;
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let html = body_text(request(&runtime, "GET", "/console", Some(&alice), None).await).await;
+    assert!(html.contains("data-counter=\"0\""));
+}
+
+#[tokio::test]
 async fn complete_and_ordered_pages_apply_the_no_exposure_policy() {
     let runtime = runtime(FakeStore::default());
     let alice = login(&runtime, "alice").await;
@@ -171,96 +190,6 @@ async fn complete_and_ordered_pages_apply_the_no_exposure_policy() {
     assert!(activity_html.ends_with("</body></html>"));
 }
 
-#[tokio::test]
-#[ignore = "requires HYPHAE_V101_BIN pointing to the reviewed release executable"]
-async fn real_v101_console_preserves_tenant_state_across_full_restart() {
-    let executable = std::env::var_os("HYPHAE_V101_BIN").expect("HYPHAE_V101_BIN");
-    let authority = SidecarAuthority::load().unwrap();
-    let installation =
-        HyphaeInstallation::admit(std::path::Path::new(&executable), &authority).unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let data = directory.path().join("data");
-
-    let mut sidecar = HyphaeSidecar::start(&installation, &data).await.unwrap();
-    let runtime_a = real_runtime(sidecar.store());
-    let old_alice = login(&runtime_a, "alice").await;
-    assert_eq!(
-        increment(&runtime_a, &old_alice, None).await.status(),
-        StatusCode::SEE_OTHER
-    );
-    let bob = login(&runtime_a, "bob").await;
-    assert!(
-        body_text(request(&runtime_a, "GET", "/console", Some(&bob), None).await)
-            .await
-            .contains("data-counter=\"0\"")
-    );
-    sidecar.shutdown().unwrap();
-
-    let mut sidecar = HyphaeSidecar::start(&installation, &data).await.unwrap();
-    let runtime_b = real_runtime(sidecar.store());
-    assert_eq!(
-        request(&runtime_b, "GET", "/console", Some(&old_alice), None)
-            .await
-            .status(),
-        StatusCode::UNAUTHORIZED
-    );
-    let new_alice = login(&runtime_b, "alice").await;
-    let alice_html =
-        body_text(request(&runtime_b, "GET", "/console", Some(&new_alice), None).await).await;
-    assert!(alice_html.contains("data-counter=\"1\""));
-    assert!(alice_html.contains("data-tenant=\"tenant-a\""));
-    let new_bob = login(&runtime_b, "bob").await;
-    let bob_html =
-        body_text(request(&runtime_b, "GET", "/console", Some(&new_bob), None).await).await;
-    assert!(bob_html.contains("data-counter=\"0\""));
-    assert!(bob_html.contains("data-tenant=\"tenant-b\""));
-    sidecar.shutdown().unwrap();
-}
-
-#[tokio::test]
-#[ignore = "requires Node.js and a real Chrome acceptance lane"]
-async fn real_browser_keeps_hyphae_outside_the_browser_boundary() {
-    let store = FakeStore::default();
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let origin = format!("http://localhost:{}", address.port());
-    let runtime = browser_runtime(store, &origin);
-    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-    let server = tokio::spawn(async move {
-        runtime
-            .serve(listener, async move {
-                let _ = shutdown_rx.await;
-            })
-            .await
-    });
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(4)
-        .unwrap()
-        .join("scripts/check-next-hyphae-console-browser.mjs");
-    let output = tokio::task::spawn_blocking(move || {
-        std::process::Command::new("node")
-            .arg(script)
-            .env("PLIEGO_HYPHAE_CONSOLE_URL", origin)
-            .output()
-            .unwrap()
-    })
-    .await
-    .unwrap();
-    let _ = shutdown_tx.send(());
-    tokio::time::timeout(std::time::Duration::from_secs(5), server)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "browser acceptance failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-    );
-}
-
 fn runtime(store: FakeStore) -> NativeRuntime {
     runtime_for_origin(store, ORIGIN_VALUE)
 }
@@ -273,33 +202,6 @@ fn runtime_for_origin(store: FakeStore, origin: &str) -> NativeRuntime {
         origin,
         SecretHandle::new("console-csrf", 1, key).unwrap(),
         None,
-    )
-    .unwrap()
-}
-
-fn browser_runtime(store: FakeStore, origin: &str) -> NativeRuntime {
-    let mut key = vec![0_u8; 32];
-    getrandom::fill(&mut key).unwrap();
-    let cookie = pliego_runtime::SessionCookiePolicy::new("pliego-browser-session")
-        .unwrap()
-        .secure(false)
-        .unwrap();
-    build_console_runtime_with_store(
-        Arc::new(store),
-        origin,
-        SecretHandle::new("console-csrf", 1, key).unwrap(),
-        Some(cookie),
-    )
-    .unwrap()
-}
-
-fn real_runtime(store: ConsoleStore) -> NativeRuntime {
-    let mut key = vec![0_u8; 32];
-    getrandom::fill(&mut key).unwrap();
-    build_console_runtime(
-        store,
-        ORIGIN_VALUE,
-        SecretHandle::new("console-csrf", 1, key).unwrap(),
     )
     .unwrap()
 }
