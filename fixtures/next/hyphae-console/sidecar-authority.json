@@ -1,0 +1,28 @@
+{
+  "contract": "dev.pliegors.hyphae-sidecar-authority/v1",
+  "repository": "https://github.com/celiumsai/hyphae",
+  "releaseTag": "v1.0.1",
+  "releaseRevision": "84161cf067141b60f4847b965ef77c5b749749c0",
+  "releaseChecksumsSha256": "3e45b7056f27a3e2062e7d216cf03972108aae032bee36589210eb28cd569048",
+  "engineVersion": "1.0.1",
+  "productApiVersion": 1,
+  "nativeDirectoryFormat": 1,
+  "transport": "native-http-v2-loopback",
+  "productMediaType": "application/vnd.hyphae.product-v1",
+  "errorMediaType": "application/vnd.hyphae.error-v1",
+  "rustMsrv": "1.89.0",
+  "artifacts": [
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "archive": "hyphae-1.0.1-x86_64-pc-windows-msvc.zip",
+      "archiveSha256": "2864d7370e78e8e49b8d72a8f12ce07f7c4434d0ea191c93e1a3237db6c3c07b",
+      "executableSha256": "23db588b23955a0a6c61a0813b82f2e9ea569510a10cf8ce10c72bcdf903e99a"
+    },
+    {
+      "target": "x86_64-unknown-linux-gnu",
+      "archive": "hyphae-1.0.1-x86_64-unknown-linux-gnu.tar.gz",
+      "archiveSha256": "8745c3615fb5b21747a190b4c922860ff8d3c1c69efe35068a80be56942bcd13",
+      "executableSha256": "8a34113a51ffd795db4669419674918f0e11da41f2146f9a4cbe7dcf1878fde1"
+    }
+  ]
+}

@@ -68,6 +68,7 @@ jobs:
           cargo fmt --manifest-path tools/opensdk/rust-transform/Cargo.toml -- --check
           cargo fmt --manifest-path tools/opensdk/rust-component-transform/Cargo.toml -- --check
           cargo fmt --manifest-path tools/opensdk/componentize/Cargo.toml -- --check
+          cargo fmt --manifest-path fixtures/next/hyphae-console/Cargo.toml -- --check
 
       - name: Lint all targets
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -90,6 +91,45 @@ jobs:
             --locked \
             -- -D warnings
 
+      - name: Validate private Hyphae sidecar adapter
+        run: |
+          npm run check:next-hyphae-sidecar
+          cargo clippy \
+            --manifest-path fixtures/next/hyphae-console/Cargo.toml \
+            --workspace \
+            --all-targets \
+            --locked \
+            -- -D warnings
+          cargo test \
+            --manifest-path fixtures/next/hyphae-console/Cargo.toml \
+            --workspace \
+            --all-targets \
+            --locked
+
+      - name: Verify Hyphae v1.0.1 sidecar compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="https://github.com/celiumsai/hyphae/releases/download/v1.0.1"
+          archive="hyphae-1.0.1-x86_64-unknown-linux-gnu.tar.gz"
+          checksums="$RUNNER_TEMP/SHA256SUMS"
+          curl --fail --silent --show-error --location "$release/SHA256SUMS" --output "$checksums"
+          echo "3e45b7056f27a3e2062e7d216cf03972108aae032bee36589210eb28cd569048  $checksums" | sha256sum --check --strict -
+          curl --fail --silent --show-error --location "$release/$archive" --output "$RUNNER_TEMP/$archive"
+          expected="$(awk -v name="$archive" '$2 == name { print $1 }' "$checksums")"
+          test "$expected" = "8745c3615fb5b21747a190b4c922860ff8d3c1c69efe35068a80be56942bcd13"
+          echo "$expected  $RUNNER_TEMP/$archive" | sha256sum --check --strict -
+          mkdir "$RUNNER_TEMP/hyphae-v1.0.1"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/hyphae-v1.0.1"
+          export HYPHAE_V101_BIN="$RUNNER_TEMP/hyphae-v1.0.1/hyphae-1.0.1-x86_64-unknown-linux-gnu/hyphae"
+          echo "8a34113a51ffd795db4669419674918f0e11da41f2146f9a4cbe7dcf1878fde1  $HYPHAE_V101_BIN" | sha256sum --check --strict -
+          cargo test \
+            --manifest-path fixtures/next/hyphae-console/Cargo.toml \
+            --locked \
+            real_v101_sidecar_persists_strict_state_across_restart \
+            -- \
+            --ignored
+
       - name: Test workspace
         run: cargo test --workspace --all-targets --locked
 
@@ -100,6 +140,7 @@ jobs:
           cargo audit --file tools/opensdk/rust-transform/Cargo.lock
           cargo audit --file tools/opensdk/rust-component-transform/Cargo.lock
           cargo audit --file tools/opensdk/componentize/Cargo.lock
+          cargo audit --file fixtures/next/hyphae-console/Cargo.lock
 
       - name: Check Rust documentation
         run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
