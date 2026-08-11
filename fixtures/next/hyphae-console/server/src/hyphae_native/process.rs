@@ -151,6 +151,20 @@ pub struct HyphaeSidecar {
     stdout: PathBuf,
     stderr: PathBuf,
     client: NativeHttpClient,
+    #[cfg(feature = "acceptance-harness")]
+    http_address: SocketAddr,
+    #[cfg(feature = "acceptance-harness")]
+    native_endpoint: String,
+}
+
+#[cfg(feature = "acceptance-harness")]
+#[derive(Clone, Debug)]
+pub struct SidecarObservation {
+    pub process_id: u32,
+    pub http_address: SocketAddr,
+    pub native_endpoint: String,
+    pub stdout_log: PathBuf,
+    pub stderr_log: PathBuf,
 }
 
 impl HyphaeSidecar {
@@ -197,6 +211,10 @@ impl HyphaeSidecar {
             stdout,
             stderr,
             client,
+            #[cfg(feature = "acceptance-harness")]
+            http_address: address,
+            #[cfg(feature = "acceptance-harness")]
+            native_endpoint: endpoint,
         };
         sidecar.wait_until_ready().await?;
         Ok(sidecar)
@@ -208,6 +226,17 @@ impl HyphaeSidecar {
 
     pub fn store(&self) -> super::ConsoleStore {
         super::ConsoleStore::new(self.client.clone())
+    }
+
+    #[cfg(feature = "acceptance-harness")]
+    pub fn observation(&self) -> SidecarObservation {
+        SidecarObservation {
+            process_id: self.child.id(),
+            http_address: self.http_address,
+            native_endpoint: self.native_endpoint.clone(),
+            stdout_log: self.stdout.clone(),
+            stderr_log: self.stderr.clone(),
+        }
     }
 
     pub fn shutdown(&mut self) -> Result<(), SidecarError> {

@@ -67,6 +67,25 @@ pub fn build_console_runtime(
     build_console_runtime_with_store(Arc::new(store), origin, csrf_key, None)
 }
 
+#[cfg(feature = "acceptance-harness")]
+pub fn build_console_acceptance_runtime(
+    store: ConsoleStore,
+    origin: &str,
+) -> Result<NativeRuntime, ConsoleApplicationError> {
+    let mut key = vec![0_u8; 32];
+    getrandom::fill(&mut key).map_err(|_| ConsoleApplicationError::Build)?;
+    let cookie = pliego_runtime::SessionCookiePolicy::new("pliego-hyphae-acceptance-session")
+        .map_err(|_| ConsoleApplicationError::Build)?
+        .secure(false)
+        .map_err(|_| ConsoleApplicationError::Build)?;
+    build_console_runtime_with_store(
+        Arc::new(store),
+        origin,
+        SecretHandle::new("console-csrf", 1, key).map_err(|_| ConsoleApplicationError::Build)?,
+        Some(cookie),
+    )
+}
+
 fn build_console_runtime_with_store(
     store: Arc<dyn ConsoleStateStore>,
     origin: &str,
@@ -419,14 +438,18 @@ async fn increment_action(
                 .map_err(|_| DataError::ActionFailure("console-state-invalid".to_owned()))?;
             let identity = mutation_identity(&tenant_id, &encoded);
             action.commit().begin_commit()?;
-            if services
-                .store
-                .put(&tenant_id, &encoded, identity)
-                .await
-                .is_err()
-            {
-                action.commit().outcome_unknown()?;
-                return Err(DataError::ActionOutcomeUnknown);
+            match services.store.put(&tenant_id, &encoded, identity).await {
+                Ok(()) => {}
+                Err(ConsoleStoreError::MutationRolledBack) => {
+                    action.commit().failed()?;
+                    return Err(DataError::ActionFailure(
+                        "console-mutation-rolled-back".to_owned(),
+                    ));
+                }
+                Err(_) => {
+                    action.commit().outcome_unknown()?;
+                    return Err(DataError::ActionOutcomeUnknown);
+                }
             }
             action.commit().committed()?;
             Ok(ActionResponse::Success {
@@ -439,8 +462,22 @@ async fn increment_action(
         .data()
         .act(&policy, &admission, &mutation, input)
         .await
-        .map_err(action_failure_to_handler_error)?
-    {
+        .map_err(|failure| {
+            if failure.error()
+                == &DataError::ActionFailure("console-mutation-rolled-back".to_owned())
+            {
+                HandlerError::new(
+                    StatusCode::CONFLICT,
+                    pliego_runtime::RuntimeDiagnostic::new(
+                        "PLG-CON-409",
+                        "Console mutation rolled back; refresh before retrying",
+                    )
+                    .expect("static diagnostic is valid"),
+                )
+            } else {
+                action_failure_to_handler_error(failure)
+            }
+        })? {
         ActionResponse::Invalid { field_errors } => form_error(
             field_errors
                 .first()
