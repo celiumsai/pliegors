@@ -3,7 +3,7 @@
   "id": "hyphae-console",
   "stage": "specified",
   "workload": "hyphae-console-v1",
-  "objective": "Exercise navigation, simulated authentication, SSR, streaming, queries, optional PliegoCSS output, and persistent verified state.",
+  "objective": "Exercise navigation, simulated authentication, tenant-isolated persistence, SSR, streaming, queries, optional PliegoCSS output, and verified replay.",
   "sourceDonors": [
     "crates/pliego-hyphae",
     "examples/fullstack-pliego",
@@ -15,6 +15,7 @@
     "loopback-server-boundary",
     "exact-release-pin",
     "simulated-authentication",
+    "tenant-isolation",
     "dynamic-ssr",
     "streaming",
     "persistent-state",

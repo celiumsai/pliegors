@@ -18,6 +18,7 @@
     "check:next-minimal-browser": "node scripts/check-next-minimal-browser.mjs",
     "check:next-stress-dashboard-browser": "node scripts/check-next-stress-dashboard-browser.mjs",
     "check:next-hyphae-sidecar": "node scripts/check-next-hyphae-sidecar.mjs",
+    "check:next-hyphae-console-browser": "node scripts/check-next-hyphae-console-browser.mjs",
     "check:email-worker": "npm --prefix workers/pliegors-email run check",
     "check:fuzz": "node scripts/check-fuzz-contract.mjs",
     "check:golden-path": "node scripts/check-golden-matrix.mjs",

@@ -19,6 +19,8 @@ const [manifest, authority] = await Promise.all([
 ]);
 const fixture = manifest.fixtures.find((candidate) => candidate.id === "hyphae-console");
 assert(fixture, "Hyphae Console fixture is missing");
+const descriptor = await readJson(path.join(fixtureRoot, "fixture.json"));
+assert.equal(descriptor.stage, "specified", "Hyphae Console was promoted before acceptance");
 assert.equal(fixture.externalAuthority.repository, authority.repository);
 assert.equal(fixture.externalAuthority.releaseTag, authority.releaseTag);
 assert.equal(fixture.externalAuthority.releaseRevision, authority.releaseRevision);
@@ -43,6 +45,16 @@ const fixturePackage = metadata.packages.find((pkg) => pkg.name === "pliegors-ne
 assert(fixturePackage, "private Hyphae Console server package is missing");
 assert.deepEqual(fixturePackage.publish, [], "Hyphae Console server became publishable");
 assert.equal(fixturePackage.rust_version, "1.86", "Hyphae Console server MSRV drift");
+assert.equal(
+  fixturePackage.targets.some((target) => target.kind.includes("bin")),
+  false,
+  "Hyphae Console introduced a product binary before fixture promotion",
+);
+assert.equal(
+  fixturePackage.dependencies.some((dependency) => dependency.name === "pliego-hyphae"),
+  false,
+  "Hyphae Console conflates Native Product v2 with verified-sync v2",
+);
 
 process.stdout.write(
   `Hyphae sidecar contract PASS: ${authority.releaseTag} ${authority.transport}, ${metadata.packages.length} packages, no hyphae-* dependencies\n`,

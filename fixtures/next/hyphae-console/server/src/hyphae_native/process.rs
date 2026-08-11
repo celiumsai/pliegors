@@ -206,6 +206,10 @@ impl HyphaeSidecar {
         &self.client
     }
 
+    pub fn store(&self) -> super::ConsoleStore {
+        super::ConsoleStore::new(self.client.clone())
+    }
+
     pub fn shutdown(&mut self) -> Result<(), SidecarError> {
         if self.child.try_wait().map_err(SidecarError::Io)?.is_none() {
             terminate_process_tree(&mut self.child)?;

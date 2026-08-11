@@ -126,9 +126,18 @@ jobs:
           cargo test \
             --manifest-path fixtures/next/hyphae-console/Cargo.toml \
             --locked \
-            real_v101_sidecar_persists_strict_state_across_restart \
+            real_v101_ \
             -- \
             --ignored
+
+      - name: Validate Hyphae Console browser isolation
+        run: >-
+          cargo test
+          --manifest-path fixtures/next/hyphae-console/Cargo.toml
+          --locked
+          real_browser_keeps_hyphae_outside_the_browser_boundary
+          --
+          --ignored
 
       - name: Test workspace
         run: cargo test --workspace --all-targets --locked

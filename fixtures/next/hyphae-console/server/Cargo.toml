@@ -10,14 +10,20 @@ publish = false
 
 [dependencies]
 bytes = { workspace = true }
+futures-util = { workspace = true }
 http = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true }
 hyper-util = { workspace = true }
+pliego-dom = { workspace = true }
+pliego-router = { workspace = true }
+pliego-runtime = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+getrandom = { workspace = true }
 tempfile = { workspace = true }
+tower = { workspace = true }
