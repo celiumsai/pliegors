@@ -26,13 +26,16 @@ behavior, diagnostics, and acceptance evidence.
 
 | Product | Visibility | Boundary |
 | --- | --- | --- |
-| PliegoRS | GPL-3.0-only software and CC-BY-SA-4.0 documentation/media in `celiumsai/pliegors` | Framework, CLI, OpenSDK specifications, conformance suites, portable artifacts, and provider-neutral deployment contracts |
+| PliegoRS | AGPL-3.0-only software and CC-BY-SA-4.0 project-authored documentation, graphics, diagrams, and original non-software media in `celiumsai/pliegors` | Framework, CLI, OpenSDK specifications, conformance suites, portable artifacts, and provider-neutral deployment contracts |
 | Pliego.run | Closed source in a separate private repository | Hosted control plane, build orchestration, UI, infrastructure, billing, and operations |
 | PliegoCSS | Separate Apache-2.0 public-preview product | Optional build-time companion; never a required PliegoRS dependency |
 
 PliegoRS's split license is prospective from the `0.5.x` source line. Signed
 `v0.4.0-beta.1` and earlier artifacts remain available under their published
 Apache-2.0 terms. See [`LICENSING.md`](../LICENSING.md).
+
+The historical Apache-2.0 and GPL-3.0-only grants retain the exact boundaries
+recorded in [`LICENSING.md`](../LICENSING.md).
 
 The PliegoRS repository must not contain the Pliego.run dashboard, control
 plane, billing logic, infrastructure implementation, or private provider

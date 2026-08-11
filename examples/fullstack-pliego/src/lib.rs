@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use pliego_router::{RouteGraphBuilder, RouteMethod, RouteResourceSpec, RouteSpec};
 use pliego_runtime::{

@@ -1,15 +1,19 @@
 PliegoRS
 Copyright 2026 Celiums Solutions LLC
 
-PliegoRS software is licensed under GPL-3.0-only. Project-authored documentation
-and original non-software media identified by file or scope are licensed under
-CC-BY-SA-4.0. See LICENSING.md, LICENSE, LICENSE-DOCUMENTATION, and LICENSES/.
+Current and future PliegoRS software is licensed under AGPL-3.0-only.
+Project-authored documentation, graphics, diagrams, and original non-software
+media identified by file or scope are licensed under CC-BY-SA-4.0. See
+LICENSING.md, LICENSE, LICENSE-DOCUMENTATION, and LICENSES/.
 
-This relicensing is prospective. Releases and source revisions already
-distributed under Apache-2.0 retain those previously granted permissions.
+This correction is prospective. `v0.4.0-beta.1`, earlier public material, and
+descendant source revisions through 96a4eca retain their Apache-2.0 grants.
+The public GPL revisions beginning at 056666e and ending at main revision
+2cf1d7b, plus branch-only revisions eaf0dbc and 5ae7482, retain their
+GPL-3.0-only grants. See LICENSING.md for exact revisions and boundaries.
 
 The names PliegoRS and Celiums, their wordmarks, and their visual marks are not
-granted under GPL or Creative Commons. See TRADEMARKS.md for permitted use.
+granted under AGPL or Creative Commons. See TRADEMARKS.md for permitted use.
 
 Third-party software and media retain their respective licenses and notices.
 See THIRD_PARTY_NOTICES.md and notices distributed beside bundled assets.

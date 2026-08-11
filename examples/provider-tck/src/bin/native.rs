@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use pliego_pboc::{decode_manifest, verify_bundle};
 use provider_tck::native::build_runtime_with_identity;

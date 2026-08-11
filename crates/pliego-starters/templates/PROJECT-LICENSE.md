@@ -10,12 +10,15 @@ project:
 4. add matching notices to source and content files where appropriate.
 
 The PliegoRS framework, CLI, and template code copied into this project are
-licensed under GPL-3.0-only.
-Distributing a combined or derivative work that includes GPL-covered PliegoRS
-code may require the combined work to comply with GPL v3. Merely generating a
-project does not transfer ownership of your original work or select a license
-for it. This placeholder is not a license exception for copied PliegoRS
-template code. This notice is informational and is not legal advice.
+licensed under AGPL-3.0-only.
+Distributing a combined or derivative work that includes AGPL-covered PliegoRS
+code may require the combined work to comply with AGPL v3. If you modify the
+Program and that modified version supports remote network interaction, AGPL
+section 13 requires a prominent no-charge Corresponding Source offer to its
+remote users. Merely generating a project does not transfer ownership of your
+original work or select a license for it. This placeholder is not a license
+exception for copied PliegoRS template code. This notice is informational and
+is not legal advice.
 
 Third-party dependencies, fonts, and media retain their own licenses and
 notices. Preserve every applicable `THIRD_PARTY_NOTICES.md` and license file.

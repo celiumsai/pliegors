@@ -16,12 +16,14 @@ beside the bundled fonts. Crate tests fail when those files are absent.
 The official documentation site bundles Instrument Serif, Instrument Sans,
 and Fragment Mono under the SIL Open Font License 1.1. Their complete license
 texts are stored beside the font files in `examples/pliegors-site/public/fonts`.
-The original PliegoRS brand images under `examples/pliegors-site/public/media`
-are Celiums Solutions LLC project assets and are not third-party stock media.
+The original PliegoRS graphics and media under
+`examples/pliegors-site/public/media` are Celiums Solutions LLC project assets,
+are not third-party stock media, and fall within the project-authored
+CC-BY-SA-4.0 non-software scope described in `LICENSING.md`.
 
 The official `default` starter contains no third-party media or fonts. Generated
 projects receive a neutral `LICENSE.md` placeholder; PliegoRS itself remains
-GPL-3.0-only.
+AGPL-3.0-only.
 
 This file is a distribution index, not a replacement for dependency license
 texts or for notices placed beside bundled assets.

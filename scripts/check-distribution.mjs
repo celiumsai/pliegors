@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -32,7 +32,7 @@ assert.deepEqual(crates.map((pkg) => pkg.name), expected);
 const packagesByName = new Map(allCrates.map((pkg) => [pkg.name, pkg]));
 for (const pkg of allCrates) {
   assert.equal(pkg.version, workspaceVersion, `${pkg.name} version drift`);
-  assert.equal(pkg.license, 'GPL-3.0-only', `${pkg.name} license`);
+  assert.equal(pkg.license, 'AGPL-3.0-only', `${pkg.name} license`);
   assert.equal(pkg.repository, 'https://github.com/celiumsai/pliegors', `${pkg.name} repository`);
   assert.equal(pkg.homepage, 'https://pliegors.dev', `${pkg.name} homepage`);
   assert.equal(pkg.rust_version, '1.86', `${pkg.name} rust-version`);
@@ -124,7 +124,7 @@ for (const contract of [
   'link-arg=/Brepro',
   'pliego-$env:RELEASE_TARGET.zip', 'retention-days: 7', 'retention-days: 14',
   'Copy-Item LICENSE, LICENSE-DOCUMENTATION, LICENSING.md, NOTICE, README.md, THIRD_PARTY_NOTICES.md, TRADEMARKS.md',
-  'Copy-Item LICENSES/GPL-3.0-only.txt, LICENSES/CC-BY-SA-4.0.txt',
+  'Copy-Item LICENSES/AGPL-3.0-only.txt, LICENSES/GPL-3.0-only.txt, LICENSES/CC-BY-SA-4.0.txt',
   'CANDIDATE-METADATA.json',
   'PLIEGORS_CANDIDATE_SIGNING_KEY', 'create-release-manifest.mjs',
   'verify-release-bundle.mjs', 'install.sh', 'install.ps1', 'golden_path',
@@ -204,6 +204,7 @@ const publicProjectFiles = [
   'LICENSE',
   'LICENSE-DOCUMENTATION',
   'LICENSES/CC-BY-SA-4.0.txt',
+  'LICENSES/AGPL-3.0-only.txt',
   'LICENSES/GPL-3.0-only.txt',
   'LICENSING.md',
   'NOTICE',

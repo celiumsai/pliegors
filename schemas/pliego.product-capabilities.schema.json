@@ -19,6 +19,9 @@
         "openSdkVersion",
         "license",
         "documentationLicense",
+        "graphicsLicense",
+        "diagramsLicense",
+        "originalNonSoftwareMediaLicense",
         "releasedCrateCount",
         "unreleasedCrates"
       ],
@@ -28,8 +31,11 @@
         "releasedVersion": { "$ref": "#/$defs/packageVersion" },
         "workspaceVersion": { "$ref": "#/$defs/packageVersion" },
         "openSdkVersion": { "$ref": "#/$defs/packageVersion" },
-        "license": { "const": "GPL-3.0-only" },
+        "license": { "const": "AGPL-3.0-only" },
         "documentationLicense": { "const": "CC-BY-SA-4.0" },
+        "graphicsLicense": { "const": "CC-BY-SA-4.0" },
+        "diagramsLicense": { "const": "CC-BY-SA-4.0" },
+        "originalNonSoftwareMediaLicense": { "const": "CC-BY-SA-4.0" },
         "releasedCrateCount": { "type": "integer", "minimum": 1, "maximum": 128 },
         "unreleasedCrates": {
           "type": "array",

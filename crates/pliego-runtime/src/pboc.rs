@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use pliego_pboc::{
     FeatureRequirement, HostAdmission, HostKind, HostProfile, PbocError, PbocManifest, feature,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use crate::loader::canonical_json_bytes;
 use crate::receipt::DataDurationBucket;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 #![cfg(target_arch = "wasm32")]
 #![forbid(unsafe_code)]
 

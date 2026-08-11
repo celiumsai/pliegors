@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use crate::validate::{HostAdmission, PbocError, encode_manifest, validate_manifest};
 use pliego_router::RouteSpec;

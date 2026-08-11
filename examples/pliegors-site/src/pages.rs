@@ -873,8 +873,8 @@ fn about_stewardship(locale: Locale) -> View {
                 )))
                 .child(el("p").child(l(
                     locale,
-                    "PliegoRS is stewarded in Medellín by Celiums Solutions LLC. Software is GPL-3.0-only; documentation and original media are CC-BY-SA-4.0; the project name and symbol remain protected marks. Governance, security reporting, compatibility, and releases are documented public contracts.",
-                    "PliegoRS es administrado desde Medellín por Celiums Solutions LLC. El software usa GPL-3.0-only; la documentación y medios originales usan CC-BY-SA-4.0; el nombre y el símbolo siguen siendo marcas protegidas. Gobernanza, reportes de seguridad, compatibilidad y releases son contratos públicos documentados.",
+                    "PliegoRS is stewarded in Medellín by Celiums Solutions LLC. Current software is AGPL-3.0-only; project-authored documentation, graphics, diagrams, and original non-software media are CC-BY-SA-4.0; the project name and symbol remain protected marks.",
+                    "PliegoRS es administrado desde Medellín por Celiums Solutions LLC. El software actual usa AGPL-3.0-only; la documentación, gráficos, diagramas y medios originales que no son software del proyecto usan CC-BY-SA-4.0; el nombre y el símbolo siguen siendo marcas protegidas.",
                 )))
                 .child(
                     el("div")
@@ -2109,15 +2109,15 @@ pub fn legal_document(locale: Locale, slug: &str) -> Result<View, String> {
                     "02",
                     "License",
                     "Licencia",
-                    "Framework software and packages are GPL-3.0-only. Project-authored documentation and original non-software media are CC-BY-SA-4.0. Trademarks and third-party files remain subject to their accompanying notices and policies.",
-                    "El software y los paquetes del framework usan GPL-3.0-only. La documentación del proyecto y los medios originales que no son software usan CC-BY-SA-4.0. Las marcas y archivos de terceros conservan sus avisos y políticas aplicables.",
+                    "Current and future framework software and packages are AGPL-3.0-only. Project-authored documentation, graphics, diagrams, and original non-software media are CC-BY-SA-4.0. Historical grants, trademarks, and third-party files remain subject to their accompanying notices and policies.",
+                    "El software y los paquetes actuales y futuros del framework usan AGPL-3.0-only. La documentación, gráficos, diagramas y medios originales que no son software del proyecto usan CC-BY-SA-4.0. Las concesiones históricas, marcas y archivos de terceros conservan sus avisos y políticas aplicables.",
                 ),
                 (
                     "03",
                     "No warranty",
                     "Sin garantía",
-                    "The software is provided without warranties to the extent permitted by law, as stated in GPL v3.",
-                    "El software se entrega sin garantías en la medida permitida por la ley, según GPL v3.",
+                    "The software is provided without warranties to the extent permitted by law, as stated in AGPL v3.",
+                    "El software se entrega sin garantías en la medida permitida por la ley, según AGPL v3.",
                 ),
             ],
         ),

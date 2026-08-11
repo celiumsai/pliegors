@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';

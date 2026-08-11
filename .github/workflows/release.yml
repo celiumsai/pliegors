@@ -159,7 +159,7 @@ jobs:
           Copy-Item "target/$env:RELEASE_TARGET/release/$binary" "$directory/$stem/"
           Copy-Item LICENSE, LICENSE-DOCUMENTATION, LICENSING.md, NOTICE, README.md, THIRD_PARTY_NOTICES.md, TRADEMARKS.md "$directory/$stem/"
           New-Item -ItemType Directory -Path "$directory/$stem/LICENSES" | Out-Null
-          Copy-Item LICENSES/GPL-3.0-only.txt, LICENSES/CC-BY-SA-4.0.txt "$directory/$stem/LICENSES/"
+          Copy-Item LICENSES/AGPL-3.0-only.txt, LICENSES/GPL-3.0-only.txt, LICENSES/CC-BY-SA-4.0.txt "$directory/$stem/LICENSES/"
           @(
             "version=$version"
             "commit=$env:GITHUB_SHA"

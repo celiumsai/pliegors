@@ -65,7 +65,7 @@ The editorial and cinematic source trees also include the complete SIL OFL
 license texts and a `THIRD_PARTY_NOTICES.md` file. A crate test requires those
 files whenever a starter embeds local font binaries. Every maintained starter
 ships a neutral `LICENSE.md` project placeholder. Copied starter code remains
-GPL-3.0-only; new original user work is not automatically licensed by PliegoRS.
+AGPL-3.0-only; new original user work is not automatically licensed by PliegoRS.
 
 ## Diagnostics
 

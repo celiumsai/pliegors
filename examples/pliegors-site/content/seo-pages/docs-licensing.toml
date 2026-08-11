@@ -1,5 +1,5 @@
 key = "docs-licensing"
-title = { en = "PliegoRS Licensing | Apache-2.0, Trademarks and Project Policy", es = "Licenciamiento PliegoRS | Apache-2.0, marcas y políticas" }
-description = { en = "Understand PliegoRS GPL-3.0-only software, CC-BY-SA-4.0 documentation and media, starter ownership, third-party notices, trademarks, security, support, and contributions.", es = "Entiende el software GPL-3.0-only de PliegoRS, la documentación y medios CC-BY-SA-4.0, propiedad de starters, avisos de terceros, marcas, seguridad, soporte y contribuciones." }
+title = { en = "PliegoRS Licensing | AGPL-3.0-only and Historical Grants", es = "Licenciamiento PliegoRS | AGPL-3.0-only y concesiones históricas" }
+description = { en = "Understand PliegoRS AGPL-3.0-only software, CC-BY-SA-4.0 documentation, graphics, diagrams, and original media, historical grants, starter ownership, and project policy.", es = "Entiende el software AGPL-3.0-only de PliegoRS, la documentación, gráficos, diagramas y medios originales CC-BY-SA-4.0, las concesiones históricas, la propiedad de starters y las políticas del proyecto." }
 image = "/media/pliegors/fold-hero.webp"
 imageAlt = { en = "The PliegoRS execution fold representing source and policy ownership", es = "El pliegue de ejecución de PliegoRS que representa propiedad de fuente y políticas" }

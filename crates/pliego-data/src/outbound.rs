@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use crate::receipt::{DataDurationBucket, DataOperation, DataOutcome};
 use crate::{DataContext, DataError, DataReceipt, DataSizeBucket, validate_stable_id};
