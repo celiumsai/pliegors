@@ -51,6 +51,7 @@ const sdkVersion = tomlSectionString(sdkCargo, 'package', 'version');
 
 assert.equal(manifest.framework.workspaceVersion, workspaceVersion, 'workspace version drift');
 assert.equal(manifest.framework.releasedVersion, packageDocument.version, 'released npm metadata version drift');
+assert.equal(manifest.framework.releasedLicense, 'Apache-2.0', 'released artifact license drift');
 assert.equal(manifest.framework.openSdkVersion, sdkVersion, 'OpenSDK version drift');
 assert.equal(manifest.framework.license, 'AGPL-3.0-only', 'framework software license drift');
 assert.equal(manifest.framework.documentationLicense, 'CC-BY-SA-4.0', 'documentation license drift');

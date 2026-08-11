@@ -44,6 +44,8 @@ not an implementation or release claim.
 The manifest records three distinct versions:
 
 - `releasedVersion`: the latest complete CLI/distribution release;
+- `releasedLicense`: the license attached to that published release, currently
+  Apache-2.0 for `v0.4.0-beta.1`;
 - `workspaceVersion`: the version currently shared by released workspace
   packages on `main`; and
 - `openSdkVersion`: the OpenSDK protocol version coordinated with the current package graph.
@@ -51,6 +53,10 @@ The manifest records three distinct versions:
 The product-truth checker compares those values with `Cargo.toml`,
 `package.json`, `rust-toolchain.toml`, the released crate set, the README,
 constitution, framework contract, and official site source.
+
+The manifest's `license` field describes current source. It is intentionally
+separate from `releasedLicense`, so a prospective source-license correction
+does not rewrite the terms of an already published artifact.
 
 ## Target authority
 

@@ -5,6 +5,7 @@
     "name": "PliegoRS",
     "channel": "public-beta",
     "releasedVersion": "0.4.0-beta.1",
+    "releasedLicense": "Apache-2.0",
     "workspaceVersion": "0.4.0-beta.1",
     "openSdkVersion": "0.4.0-beta.1",
     "license": "AGPL-3.0-only",
