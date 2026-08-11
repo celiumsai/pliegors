@@ -44,3 +44,14 @@ release executable. CI downloads the exact Linux archive, verifies the release
 checksum file, archive, and executable digests, then runs that test. This does
 not promote the Console to `executable`; application routes, simulated auth,
 SSR, streaming, cancellation acceptance, and browser isolation still remain.
+
+The library-only application layer now seals five Pliego-owned routes:
+`GET /login`, `POST /login`, `GET /console`, `POST /console/increment`, and
+`GET /console/activity`. Simulated users `alice` and `bob` map server-side to
+independent tenant keys. Sessions rotate on login, mutations require Origin and
+session-bound CSRF, complete pages use SSR, and the activity page uses ordered
+streaming SSR. No route proxies `/v2` or exposes Hyphae media types.
+
+The fixture remains `specified`: it has no `main.rs` or binary target. Real-
+browser isolation, exact-binary application restart, cancellation/outcome-
+unknown acceptance, and the remaining ADR-011 gates still precede promotion.

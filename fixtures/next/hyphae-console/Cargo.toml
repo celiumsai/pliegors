@@ -13,12 +13,18 @@ license = "AGPL-3.0-only"
 
 [workspace.dependencies]
 bytes = "=1.12.1"
+futures-util = "=0.3.33"
+getrandom = "=0.3.4"
 http = "=1.4.2"
 http-body-util = "=0.1.4"
 hyper = { version = "=1.10.1", default-features = false, features = ["client", "http1"] }
 hyper-util = { version = "=0.1.20", default-features = false, features = ["tokio"] }
+pliego-dom = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-dom" }
+pliego-router = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-router" }
+pliego-runtime = { version = "=0.4.0-beta.1", path = "../../../crates/pliego-runtime" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 tempfile = "=3.27.0"
-tokio = { version = "=1.53.0", features = ["io-util", "macros", "net", "rt-multi-thread", "time"] }
+tokio = { version = "=1.53.0", features = ["io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
+tower = { version = "=0.5.3", features = ["util"] }

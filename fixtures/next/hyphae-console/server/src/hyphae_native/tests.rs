@@ -128,6 +128,22 @@ fn installation_rejects_changed_executable_bytes() {
     ));
 }
 
+#[test]
+fn mutation_resolution_policy_distinguishes_uncertain_and_definitive_errors() {
+    assert!(mutation_outcome_requires_resolution(
+        &TransportError::Timeout
+    ));
+    assert!(mutation_outcome_requires_resolution(
+        &TransportError::OutcomeUnknown(7)
+    ));
+    assert!(!mutation_outcome_requires_resolution(
+        &TransportError::NonStrictCommit
+    ));
+    assert!(!mutation_outcome_requires_resolution(
+        &TransportError::NonLoopbackEndpoint("192.0.2.1:8788".parse().unwrap())
+    ));
+}
+
 #[tokio::test]
 async fn transport_rejects_non_loopback_endpoints() {
     let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 8788);
@@ -226,9 +242,12 @@ async fn real_v101_sidecar_persists_strict_state_across_restart() {
 
     let mut sidecar = HyphaeSidecar::start(&installation, &data).await.unwrap();
     let store = ConsoleStore::new(sidecar.client().clone());
-    store.put(b"persistent-value", 41).await.unwrap();
+    store
+        .put("tenant-a", b"persistent-value", 41)
+        .await
+        .unwrap();
     assert_eq!(
-        store.get().await.unwrap(),
+        store.get("tenant-a").await.unwrap(),
         Some(b"persistent-value".to_vec())
     );
     sidecar.shutdown().unwrap();
@@ -236,7 +255,7 @@ async fn real_v101_sidecar_persists_strict_state_across_restart() {
     let mut sidecar = HyphaeSidecar::start(&installation, &data).await.unwrap();
     let store = ConsoleStore::new(sidecar.client().clone());
     assert_eq!(
-        store.get().await.unwrap(),
+        store.get("tenant-a").await.unwrap(),
         Some(b"persistent-value".to_vec())
     );
     sidecar.shutdown().unwrap();

@@ -288,10 +288,10 @@
       "root": "fixtures/next/hyphae-console",
       "descriptor": "fixtures/next/hyphae-console/fixture.json",
       "workload": "hyphae-console-v1",
-      "objective": "Navigation, simulated authentication, SSR, streaming, queries, optional PliegoCSS, and verified persistent state.",
+      "objective": "Navigation, simulated authentication, tenant-isolated persistence, SSR, streaming, queries, optional PliegoCSS, and verified replay.",
       "sourceIdentity": {
         "algorithm": "sha256-tree-v1",
-        "digest": "771e2ec4a9feeec11901def642fcae1244d8b1f2f76c21e3fbf253e6c1f9a2bb"
+        "digest": "2a7ab3951fb36a3790b16a94872655e393b5ae17fd755ac2c07dcc5f829a18d5"
       },
       "externalAuthority": {
         "repository": "https://github.com/celiumsai/hyphae",
