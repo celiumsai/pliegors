@@ -1,15 +1,20 @@
 The PliegoRS repository has a split license.
 
-Software is licensed under GPL-3.0-only. Project-authored documentation and
-original non-software media identified by file or scope are licensed under
-CC-BY-SA-4.0.
+Current and future software is licensed under AGPL-3.0-only. Project-authored
+documentation, graphics, diagrams, and original non-software media identified
+by file or scope are licensed under CC-BY-SA-4.0.
 
 The complete controlling legal texts are distributed at:
 
-    LICENSES/GPL-3.0-only.txt
+    LICENSES/AGPL-3.0-only.txt
+    LICENSES/GPL-3.0-only.txt (historical GPL grants only)
     LICENSES/CC-BY-SA-4.0.txt
 
-See LICENSING.md for scope, generated-project licensing, historical Apache-2.0
-releases, trademarks, and third-party materials.
+The complete Apache-2.0 text for historical Apache-licensed revisions is
+available in those revisions and at https://www.apache.org/licenses/LICENSE-2.0.
+
+See LICENSING.md for scope, generated-project licensing, the exact historical
+Apache-2.0 and GPL-3.0-only revision boundaries, trademarks, and third-party
+materials.
 
 Copyright 2026 Celiums Solutions LLC.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use super::wire::{ERROR_MEDIA_TYPE, PRODUCT_MEDIA_TYPE};
 use super::*;

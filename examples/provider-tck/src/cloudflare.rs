@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use crate::{STREAM_BODY, route_graph_sha256, runtime_contract_sha256};
 use futures_util::stream;

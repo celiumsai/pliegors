@@ -7,8 +7,11 @@
     "releasedVersion": "0.4.0-beta.1",
     "workspaceVersion": "0.4.0-beta.1",
     "openSdkVersion": "0.4.0-beta.1",
-    "license": "GPL-3.0-only",
+    "license": "AGPL-3.0-only",
     "documentationLicense": "CC-BY-SA-4.0",
+    "graphicsLicense": "CC-BY-SA-4.0",
+    "diagramsLicense": "CC-BY-SA-4.0",
+    "originalNonSoftwareMediaLicense": "CC-BY-SA-4.0",
     "releasedCrateCount": 21,
     "unreleasedCrates": []
   },

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 import assert from 'node:assert/strict';
 import { access, readFile } from 'node:fs/promises';
@@ -52,8 +52,11 @@ const sdkVersion = tomlSectionString(sdkCargo, 'package', 'version');
 assert.equal(manifest.framework.workspaceVersion, workspaceVersion, 'workspace version drift');
 assert.equal(manifest.framework.releasedVersion, packageDocument.version, 'released npm metadata version drift');
 assert.equal(manifest.framework.openSdkVersion, sdkVersion, 'OpenSDK version drift');
-assert.equal(manifest.framework.license, 'GPL-3.0-only', 'framework software license drift');
+assert.equal(manifest.framework.license, 'AGPL-3.0-only', 'framework software license drift');
 assert.equal(manifest.framework.documentationLicense, 'CC-BY-SA-4.0', 'documentation license drift');
+assert.equal(manifest.framework.graphicsLicense, 'CC-BY-SA-4.0', 'graphics license drift');
+assert.equal(manifest.framework.diagramsLicense, 'CC-BY-SA-4.0', 'diagrams license drift');
+assert.equal(manifest.framework.originalNonSoftwareMediaLicense, 'CC-BY-SA-4.0', 'original media license drift');
 assert.equal(manifest.support.rust.msrv, `${workspaceRust}.0`, 'MSRV drift');
 assert.equal(manifest.support.rust.releaseToolchain, toolchainVersion, 'release toolchain drift');
 

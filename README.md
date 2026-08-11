@@ -24,7 +24,7 @@
   <a href="https://crates.io/crates/pliego-cli"><img alt="crates.io" src="https://img.shields.io/crates/v/pliego-cli.svg"></a>
   <a href="https://docs.rs/pliego-cli"><img alt="docs.rs" src="https://img.shields.io/docsrs/pliego-cli"></a>
   <a href="https://github.com/celiumsai/pliegors/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/celiumsai/pliegors"></a>
-  <a href="LICENSING.md"><img alt="GPL-3.0-only software; CC-BY-SA-4.0 documentation" src="https://img.shields.io/badge/license-GPL--3.0--only%20%2F%20CC--BY--SA--4.0-663399.svg"></a>
+  <a href="LICENSING.md"><img alt="AGPL-3.0-only software; CC-BY-SA-4.0 documentation and media" src="https://img.shields.io/badge/license-AGPL--3.0--only%20%2F%20CC--BY--SA--4.0-663399.svg"></a>
   <a href="https://doc.rust-lang.org/stable/releases.html"><img alt="rustc 1.86+" src="https://img.shields.io/badge/rustc-1.86%2B-b7410e.svg"></a>
   <img alt="Public beta" src="https://img.shields.io/badge/status-public_beta-d8ff2f.svg">
 </p>
@@ -481,6 +481,8 @@ CodeQL, secret scanning, `cargo audit`, and `npm audit` remain active.
 - [Identity assets](brand/README.md)
 - [Public mailbox Worker](workers/pliegors-email/README.md)
 
-Software: GPL-3.0-only. Documentation and original non-software media:
-CC-BY-SA-4.0. Historical Apache-2.0 releases remain under their existing terms.
+Current and future software: AGPL-3.0-only. Project-authored documentation,
+graphics, diagrams, and original non-software media: CC-BY-SA-4.0. Historical
+Apache-2.0 and GPL-3.0-only grants remain irrevocable under their existing terms;
+see [Licensing](LICENSING.md) for exact revision boundaries.
 A Celiums Solutions LLC project. Contact `hello@pliegors.dev`.

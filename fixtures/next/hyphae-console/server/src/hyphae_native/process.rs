@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use super::http::{NativeHttpClient, TransportError};
 use serde::Deserialize;
@@ -403,7 +403,7 @@ fn local_endpoint(data_dir: &Path, port: u16) -> String {
         format!("pliegors-hyphae-{}-{port}", std::process::id())
     } else {
         data_dir
-            .with_extension("sock")
+            .with_extension(format!("{port}.sock"))
             .to_string_lossy()
             .into_owned()
     }
@@ -432,6 +432,23 @@ fn terminate_process_tree(child: &mut Child) -> Result<(), SidecarError> {
             return Err(SidecarError::Termination);
         }
         return Ok(());
+    }
+    let status = Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(SidecarError::Io)?;
+    if !status.success() {
+        return child.kill().map_err(SidecarError::Io);
+    }
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        if child.try_wait().map_err(SidecarError::Io)?.is_some() {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(25));
     }
     child.kill().map_err(SidecarError::Io)
 }

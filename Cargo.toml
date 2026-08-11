@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-only
 # PliegoRS workspace. Crates land as the roadmap advances (docs/00 §4/§6).
 
 [workspace]
@@ -40,7 +40,7 @@ version = "0.4.0-beta.1"
 edition = "2024"
 rust-version = "1.86"
 authors = ["Celiums Solutions LLC <hello@pliegors.dev>"]
-license = "GPL-3.0-only"
+license = "AGPL-3.0-only"
 repository = "https://github.com/celiumsai/pliegors"
 homepage = "https://pliegors.dev"
 readme = "README.md"

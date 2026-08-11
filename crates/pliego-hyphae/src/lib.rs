@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026 Celiums Solutions LLC
 
 //! A versioned client-side sync contract between PliegoRS and Hyphae.

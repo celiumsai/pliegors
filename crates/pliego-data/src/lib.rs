@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2026 Celiums Solutions LLC
 
 //! Provider-neutral request data contracts for PliegoRS.

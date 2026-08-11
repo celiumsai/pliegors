@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-only
 
 [workspace]
 resolver = "2"
@@ -9,7 +9,7 @@ default-members = ["server"]
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.86"
-license = "GPL-3.0-only"
+license = "AGPL-3.0-only"
 
 [workspace.dependencies]
 bytes = "=1.12.1"

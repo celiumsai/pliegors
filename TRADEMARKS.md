@@ -2,8 +2,10 @@
 
 # PliegoRS trademark policy
 
-GPL-3.0-only and CC-BY-SA-4.0 grant copyright permissions for their respective
-materials; neither grants permission to use Celiums Solutions LLC trademarks.
+AGPL-3.0-only grants copyright permissions for current software, and
+CC-BY-SA-4.0 grants copyright permissions for project-authored documentation,
+graphics, diagrams, and original non-software media. Neither grants permission
+to use Celiums Solutions LLC trademarks.
 PliegoRS, the PliegoRS wordmark and symbol, Celiums, and associated visual
 identities are marks of Celiums Solutions LLC, whether or not registered in a
 particular jurisdiction.

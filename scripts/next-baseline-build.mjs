@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 import { cp, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";

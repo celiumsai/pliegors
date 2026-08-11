@@ -267,7 +267,7 @@
       "objective": "Counter, local state, list, conditional, owned effect, and mount/unmount lifecycle.",
       "sourceIdentity": {
         "algorithm": "sha256-tree-v1",
-        "digest": "5585e56f668bf51caab6a9f98d5180e8deac60f35b6a46ee1d7fa97faa5c99fb"
+        "digest": "f248bea7af7aa441f510493f324bd99c9c4cc48399a6a912d8d6451448cd344b"
       },
       "notApplicable": []
     },
@@ -279,7 +279,7 @@
       "objective": "Thousands of nodes, filters, keyed table, charts, frequent updates, nested ownership, and lifecycle stress.",
       "sourceIdentity": {
         "algorithm": "sha256-tree-v1",
-        "digest": "227982841f412465bad01fff63dfd93dc3e9cdc0a3f22946feab1decf61959f2"
+        "digest": "2484ac098c3f14cc37fe638cfae697a3b62e4d081d930601d1c7fce4853f9ae9"
       },
       "notApplicable": []
     },
@@ -291,7 +291,7 @@
       "objective": "Navigation, simulated authentication, SSR, streaming, queries, optional PliegoCSS, and verified persistent state.",
       "sourceIdentity": {
         "algorithm": "sha256-tree-v1",
-        "digest": "04c0b253129d150760f15f71ce190e25567d46e724dc67d22561b54684cb21d7"
+        "digest": "771e2ec4a9feeec11901def642fcae1244d8b1f2f76c21e3fbf253e6c1f9a2bb"
       },
       "externalAuthority": {
         "repository": "https://github.com/celiumsai/hyphae",

@@ -7,7 +7,7 @@
     "namespace": "pliego",
     "name": "browser-component-fixture",
     "version": "0.1.0",
-    "digest": "sha256:c7d6305c8dd181c27c0c20112c3027174c79baf1a030822545b0e353efcff5e5"
+    "digest": "sha256:6dbbdfdfbead305db2c5e7cc099540e45c3982863ce95bf146108fcec4565278"
   },
   "entry": {
     "kind": "browser-esm",

@@ -34,8 +34,8 @@ pub fn footer(locale: Locale, shell: &ShellCopy) -> View {
                 .child(el("span").child("Medellín · Worldwide"))
                 .child(el("span").child(localize(
                     locale,
-                    "Copyleft · GPL-3.0-only / CC-BY-SA-4.0",
-                    "Copyleft · GPL-3.0-only / CC-BY-SA-4.0",
+                    "Copyleft · AGPL-3.0-only software / CC-BY-SA-4.0 materials",
+                    "Copyleft · software AGPL-3.0-only / materiales CC-BY-SA-4.0",
                 ))),
         )
         .into_view()

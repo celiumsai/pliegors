@@ -29,9 +29,11 @@ Use `hello@pliegors.dev` for private project correspondence. Vulnerabilities
 must follow `SECURITY.md`. Do not send secrets or proprietary source unless a
 separate secure exchange has been agreed.
 
-PliegoRS is provided under GPL-3.0-only and CC-BY-SA-4.0 without a support SLA
-or warranty. A future commercial support policy, if any, will be published
-separately and will not change rights already granted by those licenses.
+PliegoRS software is provided under AGPL-3.0-only, while project-authored
+documentation, graphics, diagrams, and original non-software media are provided
+under CC-BY-SA-4.0, without a support SLA or warranty. A future commercial
+support policy, if any, will be published separately and will not change rights
+already granted by those licenses.
 
 Release-channel and compatibility windows are defined in the
 [product constitution](docs/34-product-constitution.md). Before `1.0`, only the

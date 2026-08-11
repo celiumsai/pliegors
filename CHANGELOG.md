@@ -9,10 +9,15 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Added
 
-- Relicense future PliegoRS software revisions under GPL-3.0-only and
-  project-authored documentation/original non-software media under
-  CC-BY-SA-4.0, with explicit historical Apache-2.0 continuity and neutral
-  generated-project licensing.
+- Correct the prospective license for current and future PliegoRS software to
+  AGPL-3.0-only and explicitly keep project-authored documentation, graphics,
+  diagrams, and original non-software media under CC-BY-SA-4.0. Preserve the
+  Apache-2.0 grants through `96a4eca352c766ecc92ed72366e6f41b8b0089d6`
+  and the GPL-3.0-only grants from
+  `056666e303a92f1e64348f126556bc74670b6761` through main revision
+  `2cf1d7bdc094939e0cbb719fce6aa3b6175ae60c`, plus public branch-only
+  revisions `eaf0dbc824459335c9b06ec0dd6bdbaf7681bf67` and
+  `5ae7482009a6f8e2c3bbff67afb88e3264c44d5e`.
 
 - Add the PliegoRS `0.5.x` transition roadmap, fixed release and pre-Next source
   references, package migration inventory, and architecture decisions for the

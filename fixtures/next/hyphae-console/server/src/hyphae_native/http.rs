@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 
 use super::wire::{
     CommitOutcome, ERROR_MEDIA_TYPE, MAX_WIRE_BYTES, PRODUCT_MEDIA_TYPE, ProductCapabilities,

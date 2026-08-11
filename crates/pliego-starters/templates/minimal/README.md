@@ -26,7 +26,7 @@ last build executed or was a verified no-op.
 
 ## License
 
-The copied starter code and PliegoRS engine are GPL-3.0-only. New original work
+The copied starter code and PliegoRS engine are AGPL-3.0-only. New original work
 you author remains yours and is not automatically licensed by PliegoRS. Choose
 an SPDX identifier in `Cargo.toml` and replace `LICENSE.md` before distribution,
-while preserving GPL obligations for covered or combined work.
+while preserving AGPL obligations for covered or combined work.
