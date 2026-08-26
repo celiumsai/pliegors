@@ -6,7 +6,8 @@
 mod product;
 
 pub use product::{
-    ProductComponent, ProductIsland, ProductRegistry, ProductRegistryError, ProductRoute,
+    PRODUCT_TOPOLOGY_SCHEMA, ProductComponent, ProductIsland, ProductRegistry,
+    ProductRegistryError, ProductRoute,
 };
 
 use cap_fs_ext::{DirExt, FollowSymlinks, MetadataExt, OpenOptionsFollowExt, ambient_authority};

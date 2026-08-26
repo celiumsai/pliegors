@@ -104,6 +104,13 @@ Receipt hashes provide deterministic integrity, not authenticity. The complete
 threat model, migration notes, and remaining limits are in
 [`docs/evidence/r1-artifact-trust.md`](docs/evidence/r1-artifact-trust.md).
 
+`ProductRegistry::to_topology_json` exposes the canonical
+`pliegors-product-topology/1` snapshot for optional build adapters. It records
+component source units, route components, islands, and route-to-island
+occurrences without embedding CSS policy, deployment URLs, or compiler output.
+PliegoCSS may consume this snapshot as a separately versioned build companion;
+PliegoRS does not link its crates or require it at runtime.
+
 Generated paths are compared with portable case/Unicode keys. The effective
 Cargo target directory, built-in Rust targets, configured `build.target`,
 output, bindgen directory, and private state must remain disjoint from

@@ -6,6 +6,11 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use serde::Serialize;
+
+/// Wire-format version for canonical framework product topology snapshots.
+pub const PRODUCT_TOPOLOGY_SCHEMA: &str = "pliegors-product-topology/1";
+
 const MAX_ITEMS: usize = 65_535;
 const MAX_ID_BYTES: usize = 256;
 const MAX_PATH_BYTES: usize = 4 * 1024;
@@ -46,6 +51,37 @@ pub struct ProductRegistry {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProductRegistryError {
     message: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProductTopologyDocument<'a> {
+    schema: &'static str,
+    components: Vec<ProductTopologyComponent<'a>>,
+    routes: Vec<ProductTopologyRoute<'a>>,
+    islands: Vec<ProductTopologyIsland<'a>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProductTopologyComponent<'a> {
+    id: &'a str,
+    source_units: Vec<&'a str>,
+}
+
+#[derive(Serialize)]
+struct ProductTopologyRoute<'a> {
+    id: &'a str,
+    path: &'a str,
+    components: Vec<&'a str>,
+    islands: Vec<&'a str>,
+}
+
+#[derive(Serialize)]
+struct ProductTopologyIsland<'a> {
+    id: &'a str,
+    name: &'a str,
+    components: Vec<&'a str>,
 }
 
 impl ProductComponent {
@@ -313,6 +349,86 @@ impl ProductRegistry {
         }
         Ok(())
     }
+
+    /// Encodes a validated, declaration-order-independent product topology snapshot.
+    ///
+    /// The snapshot is the framework-owned build-adapter seam. It contains no
+    /// rendered HTML, CSS identity, compiler configuration, or deployment URL.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the registry is invalid or cannot be serialized.
+    pub fn to_topology_json(&self) -> Result<Vec<u8>, ProductRegistryError> {
+        self.validate()?;
+        let mut components = self.components.iter().collect::<Vec<_>>();
+        components.sort_by(|left, right| left.id.cmp(&right.id));
+        let mut routes = self.routes.iter().collect::<Vec<_>>();
+        routes.sort_by(|left, right| left.id.cmp(&right.id));
+        let mut islands = self.islands.iter().collect::<Vec<_>>();
+        islands.sort_by(|left, right| left.id.cmp(&right.id));
+
+        let document = ProductTopologyDocument {
+            schema: PRODUCT_TOPOLOGY_SCHEMA,
+            components: components
+                .into_iter()
+                .map(|component| {
+                    let mut source_units = component
+                        .source_units
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>();
+                    source_units.sort_unstable();
+                    ProductTopologyComponent {
+                        id: &component.id,
+                        source_units,
+                    }
+                })
+                .collect(),
+            routes: routes
+                .into_iter()
+                .map(|route| {
+                    let mut components = route
+                        .components
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>();
+                    components.sort_unstable();
+                    let mut islands = route.islands.iter().map(String::as_str).collect::<Vec<_>>();
+                    islands.sort_unstable();
+                    ProductTopologyRoute {
+                        id: &route.id,
+                        path: &route.path,
+                        components,
+                        islands,
+                    }
+                })
+                .collect(),
+            islands: islands
+                .into_iter()
+                .map(|island| {
+                    let mut components = island
+                        .components
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>();
+                    components.sort_unstable();
+                    ProductTopologyIsland {
+                        id: &island.id,
+                        name: &island.name,
+                        components,
+                    }
+                })
+                .collect(),
+        };
+        let mut bytes = serde_json::to_vec_pretty(&document)
+            .map_err(|error| invalid(format!("cannot encode product topology: {error}")))?;
+        bytes.push(b'\n');
+        bounded(
+            bytes.len() <= 16 * 1024 * 1024,
+            "product topology snapshot exceeds 16 MiB",
+        )?;
+        Ok(bytes)
+    }
 }
 
 impl fmt::Display for ProductRegistryError {
@@ -477,5 +593,26 @@ mod tests {
             )
             .route(ProductRoute::new("home", "/").component("app::global"));
         assert!(duplicate_source.validate().is_err());
+    }
+
+    #[test]
+    fn topology_snapshot_is_canonical_and_preserves_route_islands() {
+        let first = valid_registry().to_topology_json().unwrap();
+        let second = ProductRegistry::new()
+            .route(
+                ProductRoute::new("home", "/")
+                    .island("counter")
+                    .component("app::global"),
+            )
+            .island(ProductIsland::new("counter", "visit-counter").component("app::counter"))
+            .component(ProductComponent::new("app::counter").source_unit("src/counter.rs"))
+            .component(ProductComponent::new("app::global").source_unit("src/global.rs"))
+            .to_topology_json()
+            .unwrap();
+        assert_eq!(first, second);
+        let value: serde_json::Value = serde_json::from_slice(&first).unwrap();
+        assert_eq!(value["schema"], PRODUCT_TOPOLOGY_SCHEMA);
+        assert_eq!(value["routes"][0]["islands"][0], "counter");
+        assert!(first.ends_with(b"\n"));
     }
 }

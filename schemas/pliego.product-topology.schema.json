@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pliegors.dev/schemas/pliego.product-topology.schema.json",
+  "title": "PliegoRS product topology snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "components", "routes", "islands"],
+  "properties": {
+    "schema": { "const": "pliegors-product-topology/1" },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 65535,
+      "items": { "$ref": "#/$defs/component" }
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 65535,
+      "items": { "$ref": "#/$defs/route" }
+    },
+    "islands": {
+      "type": "array",
+      "maxItems": 65535,
+      "items": { "$ref": "#/$defs/island" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "referenceList": {
+      "type": "array",
+      "maxItems": 65535,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "componentReferenceList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 65535,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourceUnits"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "sourceUnits": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 65535,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[^\\\\\\u0000]+\\.rs$"
+          }
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "components", "islands"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^/" },
+        "components": { "$ref": "#/$defs/componentReferenceList" },
+        "islands": { "$ref": "#/$defs/referenceList" }
+      }
+    },
+    "island": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "components"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "components": { "$ref": "#/$defs/componentReferenceList" }
+      }
+    }
+  }
+}

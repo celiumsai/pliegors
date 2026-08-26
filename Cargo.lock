@@ -1658,6 +1658,7 @@ dependencies = [
  "fs2",
  "pliego-artifact",
  "pliego-dom",
+ "serde",
  "serde_json",
 ]
 
