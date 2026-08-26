@@ -502,12 +502,37 @@ fn validate_source_unit(path: &str) -> Result<(), ProductRegistryError> {
             && path.trim() == path
             && path.ends_with(".rs")
             && !path.starts_with('/')
-            && !path.contains(['\\', '\0'])
-            && path
-                .split('/')
-                .all(|segment| !segment.is_empty() && segment != "." && segment != ".."),
+            && !path.chars().any(char::is_control)
+            && !path.contains('\\')
+            && path.split('/').count() <= 256
+            && path.split('/').all(portable_source_segment),
         format!("invalid product source unit `{path}`"),
     )
+}
+
+fn portable_source_segment(segment: &str) -> bool {
+    if segment.is_empty()
+        || matches!(segment, "." | "..")
+        || segment.ends_with(['.', ' '])
+        || segment.bytes().any(|byte| b"<>:\"|?*".contains(&byte))
+    {
+        return false;
+    }
+    let stem = segment.split('.').next().unwrap_or(segment);
+    if ["con", "prn", "aux", "nul"]
+        .iter()
+        .any(|reserved| stem.eq_ignore_ascii_case(reserved))
+    {
+        return false;
+    }
+    let prefix = stem.get(..3).is_some_and(|value| {
+        value.eq_ignore_ascii_case("com") || value.eq_ignore_ascii_case("lpt")
+    });
+    let port = stem.get(3..).is_some_and(|value| {
+        (value.len() == 1 && matches!(value.as_bytes()[0], b'1'..=b'9'))
+            || matches!(value, "¹" | "²" | "³")
+    });
+    !(prefix && port)
 }
 
 fn bounded(condition: bool, message: impl Into<String>) -> Result<(), ProductRegistryError> {
@@ -577,6 +602,11 @@ mod tests {
             .component(ProductComponent::new("app::global").source_unit("src/global.rs"))
             .route(ProductRoute::new("home", "/").component("app::missing"));
         assert!(dangling.validate().is_err());
+
+        let nonportable = ProductRegistry::new()
+            .component(ProductComponent::new("app::global").source_unit("src/con.rs"))
+            .route(ProductRoute::new("home", "/").component("app::global"));
+        assert!(nonportable.validate().is_err());
     }
 
     #[test]
