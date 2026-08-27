@@ -3273,10 +3273,11 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
                 let generation = state.generation.load(Ordering::SeqCst) + 1;
                 let record =
                     explain_rebuild(generation, changed_sources, current_graph.as_ref(), &after);
-                if outcome.kind == BuildOutcomeKind::NoOp
-                    && record.changed_artifacts.is_empty()
-                    && state.failure().is_none()
-                {
+                if !should_publish_dev_generation(
+                    outcome.kind,
+                    &record.changed_artifacts,
+                    state.failure().is_some(),
+                ) {
                     current_graph = Some(after);
                     continue;
                 }
@@ -3296,6 +3297,14 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
             }
         }
     }
+}
+
+fn should_publish_dev_generation(
+    outcome: BuildOutcomeKind,
+    changed_artifacts: &[String],
+    recovering: bool,
+) -> bool {
+    outcome != BuildOutcomeKind::NoOp || !changed_artifacts.is_empty() || recovering
 }
 
 fn native_watcher(
@@ -4486,6 +4495,30 @@ mod tests {
         assert!(should_queue_watch_event(&Ok(WatchEvent::new(
             notify::EventKind::Modify(notify::event::ModifyKind::Any),
         ))));
+    }
+
+    #[test]
+    fn no_op_builds_publish_only_to_recover_a_failed_generation() {
+        assert!(!should_publish_dev_generation(
+            BuildOutcomeKind::NoOp,
+            &[],
+            false
+        ));
+        assert!(should_publish_dev_generation(
+            BuildOutcomeKind::NoOp,
+            &[],
+            true
+        ));
+        assert!(should_publish_dev_generation(
+            BuildOutcomeKind::NoOp,
+            &["assets/site.css".to_owned()],
+            false
+        ));
+        assert!(should_publish_dev_generation(
+            BuildOutcomeKind::Executed,
+            &[],
+            false
+        ));
     }
 
     #[test]
