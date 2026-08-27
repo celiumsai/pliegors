@@ -3314,10 +3314,13 @@ fn next_watch_changes(
 ) -> Result<BTreeSet<String>, String> {
     let mut changed = BTreeSet::new();
     loop {
-        let first = events
-            .recv()
-            .map_err(|_| "native filesystem watcher stopped unexpectedly".to_owned())?;
-        collect_watch_event(first, root, output, &mut changed)?;
+        if changed.is_empty() {
+            let first = events
+                .recv()
+                .map_err(|_| "native filesystem watcher stopped unexpectedly".to_owned())?;
+            collect_watch_event(first, root, output, &mut changed)?;
+            continue;
+        }
         loop {
             match events.recv_timeout(Duration::from_millis(120)) {
                 Ok(event) => collect_watch_event(event, root, output, &mut changed)?,
@@ -3346,18 +3349,6 @@ fn collect_watch_event(
             return Ok(());
         }
     };
-    if std::env::var_os("PLIEGO_WATCH_TRACE").is_some() {
-        eprintln!(
-            "PLIEGO dev: watch trace {:?} / {}",
-            event.kind,
-            event
-                .paths
-                .iter()
-                .map(|path| path.display().to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
-    }
     if matches!(event.kind, notify::EventKind::Access(_)) {
         return Ok(());
     }
@@ -4439,6 +4430,37 @@ mod tests {
         )
         .unwrap();
         assert_eq!(changed, BTreeSet::from(["src/target/input.txt".to_owned()]));
+    }
+
+    #[test]
+    fn access_events_cannot_starve_a_pending_development_change() {
+        let root = std::env::temp_dir().join(format!(
+            "pliego-watch-access-starvation-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let (sender, receiver) = mpsc::channel();
+        sender
+            .send(Ok(WatchEvent::new(notify::EventKind::Modify(
+                notify::event::ModifyKind::Any,
+            ))
+            .add_path(root.join("src/main.rs"))))
+            .unwrap();
+        for _ in 0..10 {
+            sender
+                .send(Ok(WatchEvent::new(notify::EventKind::Access(
+                    notify::event::AccessKind::Open(notify::event::AccessMode::Any),
+                ))
+                .add_path(root.join("src/main.rs"))))
+                .unwrap();
+        }
+        assert_eq!(
+            next_watch_changes(&receiver, &root, Path::new("target/site")).unwrap(),
+            BTreeSet::from(["src/main.rs".to_owned()])
+        );
     }
 
     #[test]
