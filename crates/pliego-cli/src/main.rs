@@ -3346,6 +3346,18 @@ fn collect_watch_event(
             return Ok(());
         }
     };
+    if std::env::var_os("PLIEGO_WATCH_TRACE").is_some() {
+        eprintln!(
+            "PLIEGO dev: watch trace {:?} / {}",
+            event.kind,
+            event
+                .paths
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
     if matches!(event.kind, notify::EventKind::Access(_)) {
         return Ok(());
     }
