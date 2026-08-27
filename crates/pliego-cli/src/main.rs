@@ -3301,10 +3301,20 @@ fn native_watcher(
     String,
 > {
     let (sender, receiver) = mpsc::channel();
-    let watcher =
-        RecommendedWatcher::new(sender, WatchConfig::default().with_follow_symlinks(false))
-            .map_err(|error| format!("cannot initialize native filesystem watcher: {error}"))?;
+    let watcher = RecommendedWatcher::new(
+        move |event| {
+            if should_queue_watch_event(&event) {
+                let _ = sender.send(event);
+            }
+        },
+        WatchConfig::default().with_follow_symlinks(false),
+    )
+    .map_err(|error| format!("cannot initialize native filesystem watcher: {error}"))?;
     Ok((receiver, watcher))
+}
+
+fn should_queue_watch_event(event: &Result<WatchEvent, notify::Error>) -> bool {
+    !matches!(event, Ok(event) if matches!(event.kind, notify::EventKind::Access(_)))
 }
 
 fn next_watch_changes(
@@ -4461,6 +4471,14 @@ mod tests {
             next_watch_changes(&receiver, &root, Path::new("target/site")).unwrap(),
             BTreeSet::from(["src/main.rs".to_owned()])
         );
+        assert!(!should_queue_watch_event(&Ok(WatchEvent::new(
+            notify::EventKind::Access(notify::event::AccessKind::Open(
+                notify::event::AccessMode::Any,
+            )),
+        ))));
+        assert!(should_queue_watch_event(&Ok(WatchEvent::new(
+            notify::EventKind::Modify(notify::event::ModifyKind::Any),
+        ))));
     }
 
     #[test]
