@@ -3261,7 +3261,7 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
             next_watch_changes(&events, &context.root, &context.manifest.project.output)
                 .map_err(DevFailure::Project)?;
         match build(context) {
-            Ok(_) => {
+            Ok(outcome) => {
                 let after = match load_verified_graph(&root) {
                     Ok(graph) => graph,
                     Err(error) => {
@@ -3273,6 +3273,13 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
                 let generation = state.generation.load(Ordering::SeqCst) + 1;
                 let record =
                     explain_rebuild(generation, changed_sources, current_graph.as_ref(), &after);
+                if outcome.kind == BuildOutcomeKind::NoOp
+                    && record.changed_artifacts.is_empty()
+                    && state.failure().is_none()
+                {
+                    current_graph = Some(after);
+                    continue;
+                }
                 if let Err(error) = development::write_rebuild_record(&context.root, &record) {
                     eprintln!("PLIEGO[PLG-ART-001] cannot persist rebuild cause: {error}");
                 }
