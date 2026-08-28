@@ -3261,7 +3261,7 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
             next_watch_changes(&events, &context.root, &context.manifest.project.output)
                 .map_err(DevFailure::Project)?;
         match build(context) {
-            Ok(_) => {
+            Ok(outcome) => {
                 let after = match load_verified_graph(&root) {
                     Ok(graph) => graph,
                     Err(error) => {
@@ -3273,6 +3273,14 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
                 let generation = state.generation.load(Ordering::SeqCst) + 1;
                 let record =
                     explain_rebuild(generation, changed_sources, current_graph.as_ref(), &after);
+                if !should_publish_dev_generation(
+                    outcome.kind,
+                    &record.changed_artifacts,
+                    state.failure().is_some(),
+                ) {
+                    current_graph = Some(after);
+                    continue;
+                }
                 if let Err(error) = development::write_rebuild_record(&context.root, &record) {
                     eprintln!("PLIEGO[PLG-ART-001] cannot persist rebuild cause: {error}");
                 }
@@ -3291,6 +3299,14 @@ fn dev(context: &Context, options: ServerOptions) -> Result<(), DevFailure> {
     }
 }
 
+fn should_publish_dev_generation(
+    outcome: BuildOutcomeKind,
+    changed_artifacts: &[String],
+    recovering: bool,
+) -> bool {
+    outcome != BuildOutcomeKind::NoOp || !changed_artifacts.is_empty() || recovering
+}
+
 fn native_watcher(
     _root: &Path,
 ) -> Result<
@@ -3301,10 +3317,20 @@ fn native_watcher(
     String,
 > {
     let (sender, receiver) = mpsc::channel();
-    let watcher =
-        RecommendedWatcher::new(sender, WatchConfig::default().with_follow_symlinks(false))
-            .map_err(|error| format!("cannot initialize native filesystem watcher: {error}"))?;
+    let watcher = RecommendedWatcher::new(
+        move |event| {
+            if should_queue_watch_event(&event) {
+                let _ = sender.send(event);
+            }
+        },
+        WatchConfig::default().with_follow_symlinks(false),
+    )
+    .map_err(|error| format!("cannot initialize native filesystem watcher: {error}"))?;
     Ok((receiver, watcher))
+}
+
+fn should_queue_watch_event(event: &Result<WatchEvent, notify::Error>) -> bool {
+    !matches!(event, Ok(event) if matches!(event.kind, notify::EventKind::Access(_)))
 }
 
 fn next_watch_changes(
@@ -3314,10 +3340,13 @@ fn next_watch_changes(
 ) -> Result<BTreeSet<String>, String> {
     let mut changed = BTreeSet::new();
     loop {
-        let first = events
-            .recv()
-            .map_err(|_| "native filesystem watcher stopped unexpectedly".to_owned())?;
-        collect_watch_event(first, root, output, &mut changed)?;
+        if changed.is_empty() {
+            let first = events
+                .recv()
+                .map_err(|_| "native filesystem watcher stopped unexpectedly".to_owned())?;
+            collect_watch_event(first, root, output, &mut changed)?;
+            continue;
+        }
         loop {
             match events.recv_timeout(Duration::from_millis(120)) {
                 Ok(event) => collect_watch_event(event, root, output, &mut changed)?,
@@ -4427,6 +4456,69 @@ mod tests {
         )
         .unwrap();
         assert_eq!(changed, BTreeSet::from(["src/target/input.txt".to_owned()]));
+    }
+
+    #[test]
+    fn access_events_cannot_starve_a_pending_development_change() {
+        let root = std::env::temp_dir().join(format!(
+            "pliego-watch-access-starvation-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let (sender, receiver) = mpsc::channel();
+        sender
+            .send(Ok(WatchEvent::new(notify::EventKind::Modify(
+                notify::event::ModifyKind::Any,
+            ))
+            .add_path(root.join("src/main.rs"))))
+            .unwrap();
+        for _ in 0..10 {
+            sender
+                .send(Ok(WatchEvent::new(notify::EventKind::Access(
+                    notify::event::AccessKind::Open(notify::event::AccessMode::Any),
+                ))
+                .add_path(root.join("src/main.rs"))))
+                .unwrap();
+        }
+        assert_eq!(
+            next_watch_changes(&receiver, &root, Path::new("target/site")).unwrap(),
+            BTreeSet::from(["src/main.rs".to_owned()])
+        );
+        assert!(!should_queue_watch_event(&Ok(WatchEvent::new(
+            notify::EventKind::Access(notify::event::AccessKind::Open(
+                notify::event::AccessMode::Any,
+            )),
+        ))));
+        assert!(should_queue_watch_event(&Ok(WatchEvent::new(
+            notify::EventKind::Modify(notify::event::ModifyKind::Any),
+        ))));
+    }
+
+    #[test]
+    fn no_op_builds_publish_only_to_recover_a_failed_generation() {
+        assert!(!should_publish_dev_generation(
+            BuildOutcomeKind::NoOp,
+            &[],
+            false
+        ));
+        assert!(should_publish_dev_generation(
+            BuildOutcomeKind::NoOp,
+            &[],
+            true
+        ));
+        assert!(should_publish_dev_generation(
+            BuildOutcomeKind::NoOp,
+            &["assets/site.css".to_owned()],
+            false
+        ));
+        assert!(should_publish_dev_generation(
+            BuildOutcomeKind::Executed,
+            &[],
+            false
+        ));
     }
 
     #[test]

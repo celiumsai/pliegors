@@ -9,6 +9,8 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 
 ### Added
 
+- Add the canonical `pliegors-product-topology/1` snapshot as the first
+  framework-owned, runtime-free seam for optional native PliegoCSS builds.
 - Correct the prospective license for current and future PliegoRS software to
   AGPL-3.0-only and explicitly keep project-authored documentation, graphics,
   diagrams, and original non-software media under CC-BY-SA-4.0. Preserve the
