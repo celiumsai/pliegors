@@ -13,7 +13,7 @@
     "graphicsLicense": "CC-BY-SA-4.0",
     "diagramsLicense": "CC-BY-SA-4.0",
     "originalNonSoftwareMediaLicense": "CC-BY-SA-4.0",
-    "releasedCrateCount": 21,
+    "releasedCrateCount": 22,
     "unreleasedCrates": []
   },
   "support": {
@@ -132,6 +132,20 @@
       "summary": "Optional protocol v2 attestations, authority policy, and type-gated verified replay for durable applications.",
       "evidence": ["docs/29-hyphae-verified-sync-guide.md", "docs/evidence/r2-verified-sync.md"],
       "limitations": ["No production Hyphae gateway or durability service is claimed by this repository."]
+    },
+    {
+      "id": "hyphae-native-sidecar",
+      "label": "Hyphae Native sidecar adapter",
+      "domain": "data",
+      "availability": "released",
+      "stability": "experimental",
+      "gate": "G2",
+      "summary": "A published server-only adapter for bounded scalar access to the exact Hyphae Native v1.0.1 product over loopback HTTP /v2.",
+      "evidence": ["docs/adr/ADR-011-hyphae-native-sidecar.md", "crates/pliego-hyphae-native/README.md"],
+      "limitations": [
+        "The source preview supports only reviewed scalar GET, strict SET, capability admission, and idempotency resolution operations.",
+        "Reviewed executable admission currently covers Linux x86-64 and Windows x86-64; the crate is experimental and not production-qualified."
+      ]
     },
     {
       "id": "incremental-build-engine",

@@ -27,6 +27,7 @@ does not mean deleting released code or regression tests.
 | `pliego-pboc` | Provider-neutral deployment manifest and host admission | Preserve and adapt later | Bind new artifact/SSR roots through a versioned PBOC change, never reinterpret v1alpha1 |
 | `pliego-cloudflare` | Cloudflare PBOC host adapter | Preserve outside early critical path | Keep provider conformance while browser-runtime work proceeds |
 | `pliego-hyphae` | Verified durable-sync client boundary | Preserve | Keep optional; add build evidence only through a separate adapter |
+| `pliego-hyphae-native` | Experimental exact-release Native sidecar adapter | Preserve and complete | Complete application types, transactions, catalog, proofs, G2 adapters, sessions, fixture cutover, and browser-isolation gates before production qualification |
 | `pliego-sdk` | OpenSDK admission, Wasm Component execution, capabilities, receipts | Preserve outside early critical path | Reuse capability patterns; do not repurpose its tooling protocol as the build-daemon protocol |
 | `pliego-assets` | Deterministic adaptive asset plans and work status | Preserve | Feed its outputs into the host-neutral artifact graph |
 | `pliego-content` | Typed bounded content collections | Preserve | Use as fixture and build-graph input; no runtime rewrite |

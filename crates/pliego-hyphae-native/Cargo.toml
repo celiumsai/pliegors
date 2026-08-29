@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "pliego-hyphae-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+description = "Server-side adapter for a pinned, loopback-only Hyphae Native sidecar."
+publish.workspace = true
+
+[features]
+default = []
+live-sidecar = []
+
+[dependencies]
+bytes = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true, features = ["client"] }
+hyper-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

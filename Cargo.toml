@@ -9,6 +9,7 @@ members = [
     "crates/pliego-fold",
     "crates/pliego-dom",
     "crates/pliego-hyphae",
+    "crates/pliego-hyphae-native",
     "crates/pliego-inspect",
     "crates/pliego-artifact",
     "crates/pliego-pboc",

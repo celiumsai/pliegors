@@ -52,6 +52,10 @@ Versioning. Before 1.0, minor releases may contain breaking API changes.
 - Specify the reduced Hyphae Console against exact Hyphae `v1.0.1` through a
   PliegoRS-owned loopback HTTP `/v2` sidecar, preserving Rust `1.86` while G7
   and durable G8 closure continue to gate claims and final fixture acceptance.
+- Add the experimental `pliego-hyphae-native` crate with exact
+  Hyphae `v1.0.1` admission, bounded loopback scalar operations, strict
+  durability, and lost-ack resolution, published in the `0.4.0-beta.1` version
+  family without implying production qualification or Hyphae cutover.
 
 ### Changed
 

@@ -199,9 +199,11 @@ state migrations remain outside this preview.
 
 ## Packages
 
-All twenty-one workspace crates are public at the exact `0.4.0-beta.1` version.
-Applications must keep every `pliego-*` dependency on that same version; mixed
-framework graphs are outside the compatibility contract.
+All twenty-two workspace crates are public at the exact `0.4.0-beta.1` version.
+`pliego-hyphae-native` is an experimental server-only adapter rather than a
+production-qualified default. Applications must keep every released `pliego-*`
+dependency on the same version; mixed framework graphs are outside the
+compatibility contract.
 
 | Package | Responsibility |
 | --- | --- |
@@ -218,6 +220,7 @@ framework graphs are outside the compatibility contract.
 | `pliego-assets` | Adaptive media plans, budgets, and manifests |
 | `pliego-inspect` | Artifact integrity and budget inspection |
 | `pliego-hyphae` | Protocol v2 attestations, authority policy, and type-gated verified replay |
+| `pliego-hyphae-native` | Experimental server-side adapter for the pinned Hyphae Native `v1.0.1` loopback product API |
 | `pliego-starters` | Maintained embedded starter projects |
 | `pliego-cli` | Project creation, build, dev server, preview, and inspection |
 
@@ -228,6 +231,7 @@ framework graphs are outside the compatibility contract.
 | [`pliego-data`](https://crates.io/crates/pliego-data/0.4.0-beta.1) | Provider-neutral resources, loaders, actions, sessions, idempotency, secrets, outbound HTTP policy, cache, and invalidation | Public `0.4.0-beta.1` |
 | [`pliego-pboc`](https://crates.io/crates/pliego-pboc/0.4.0-beta.1) | Provider-neutral output manifest, artifact verification, host admission, routing, rolling compatibility, and rollback safety | Public `0.4.0-beta.1` |
 | [`pliego-cloudflare`](https://crates.io/crates/pliego-cloudflare/0.4.0-beta.1) | Rust Cloudflare Workers host adapter for one admitted PBOC bundle | Public `0.4.0-beta.1` |
+| [`pliego-hyphae-native`](https://crates.io/crates/pliego-hyphae-native/0.4.0-beta.1) | Exact-release process admission and bounded loopback HTTP `/v2` scalar operations for Hyphae Native `v1.0.1` | Experimental `0.4.0-beta.1` |
 | [`pliego-sdk`](https://crates.io/crates/pliego-sdk/0.4.0-beta.1) | OpenSDK manifests, capability admission, typed Wasm Component runtime, effect receipts, compatibility, and tooling protocols | Public `0.4.0-beta.1` |
 
 ## Install

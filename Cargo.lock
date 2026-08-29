@@ -1533,6 +1533,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pliego-hyphae-native"
+version = "0.4.0-beta.1"
+dependencies = [
+ "bytes",
+ "http",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "pliego-inspect"
 version = "0.4.0-beta.1"
 dependencies = [

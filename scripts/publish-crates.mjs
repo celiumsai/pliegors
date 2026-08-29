@@ -12,8 +12,8 @@ assert.ok(['--check', '--publish'].includes(mode), 'usage: publish-crates.mjs --
 const layers = [
   [
     'pliego-artifact', 'pliego-assets', 'pliego-content', 'pliego-inspect',
-    'pliego-data', 'pliego-log', 'pliego-macros', 'pliego-reactive', 'pliego-router', 'pliego-sdk',
-    'pliego-starters',
+    'pliego-data', 'pliego-hyphae-native', 'pliego-log', 'pliego-macros', 'pliego-reactive',
+    'pliego-router', 'pliego-sdk', 'pliego-starters',
   ],
   ['pliego-dom', 'pliego-fold', 'pliego-hyphae', 'pliego-pboc'],
   ['pliego-adapters', 'pliego-cloudflare', 'pliego-resume', 'pliego-runtime', 'pliego-ssg'],
